@@ -14,8 +14,8 @@
 	<haxedef name="gl_stats" />
 
 	<!-- 引擎盖上的游戏引擎 -->
-	<haxelib name="hxmaker" />
+	<haxelib name="hxmaker-openfl" />
 
-	<assets path="Assets" rename="assets" embed="false"/>
+	<assets path="Assets" rename="assets" embed="false" />
 
 </project>

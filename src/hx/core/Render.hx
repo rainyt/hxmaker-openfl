@@ -1,5 +1,6 @@
 package hx.core;
 
+import openfl.display.Stage;
 import openfl.geom.ColorTransform;
 import openfl.display.ShaderInput;
 import js.html.webgl.Sampler;
@@ -39,6 +40,12 @@ class Render implements IRender {
 	 * 在OpenFL中渲染的舞台对象
 	 */
 	@:noCompletion private var __stage:Sprite = new Sprite();
+
+	public var stage(get, never):Sprite;
+
+	private function get_stage():Sprite {
+		return __stage;
+	}
 
 	private var __pool:ObjectPool<EngineSprite> = new ObjectPool<EngineSprite>(() -> {
 		return new EngineSprite();
@@ -108,7 +115,6 @@ class Render implements IRender {
 			} else if (object is DisplayObjectContainer) {
 				renderDisplayObjectContainer(cast object);
 			} else if (object is Label) {
-				this.drawBatchBitmapState();
 				renderLabel(cast object);
 			} else if (object is Quad) {
 				this.drawBatchBitmapState();
@@ -164,7 +170,10 @@ class Render implements IRender {
 		textField.width = label.width;
 		textField.height = label.height;
 		label.__dirty = false;
-		__stage.addChild(textField);
+		// 不直接渲染文本，使用位图渲染方式
+		textField.render(this, label);
+		// this.drawBatchBitmapState();
+		// __stage.addChild(textField);
 	}
 
 	private var __rect:Rectangle = new Rectangle();
@@ -195,6 +204,14 @@ class Render implements IRender {
 			bitmap.scrollRect = null;
 		}
 		// 批处理状态渲染
+		pushBitmap(bitmap);
+	}
+
+	public function getCurrentBatchBitmapState():BatchBitmapState {
+		return states[__currentStateIndex];
+	}
+
+	public function pushBitmap(bitmap:Bitmap):Void {
 		var state = states[__currentStateIndex];
 		if (!state.push(bitmap)) {
 			// 开始绘制
@@ -221,13 +238,18 @@ class Render implements IRender {
 			var lastBitmap = state.bitmaps[0];
 			var openfl_TextureId:ShaderParameter<Float> = defalutShader.data.openfl_TextureId;
 			var openfl_Alpha:ShaderParameter<Float> = defalutShader.data.openfl_Alpha_multi;
+			var openfl_ColorMultiplier:ShaderParameter<Float> = defalutShader.data.openfl_ColorMultiplier_muti;
+			var openfl_ColorOffer:ShaderParameter<Float> = defalutShader.data.openfl_ColorOffset_muti;
 			var offests:Array<Float> = [];
 			var mapIds:Map<BitmapData, Int> = [];
 			for (index => data in state.bitmapDatas) {
 				mapIds.set(data, index);
 				var sampler:ShaderInput<BitmapData> = defalutShader.data.getProperty('uSampler$index');
 				sampler.input = data;
+				sampler.filter = LINEAR;
 			}
+			openfl_ColorOffer.value = state.colorOffset;
+			openfl_ColorMultiplier.value = state.colorMultiplier;
 			openfl_TextureId.value = state.ids;
 			openfl_Alpha.value = state.alphas;
 			shape.graphics.beginShaderFill(defalutShader);

@@ -144,6 +144,7 @@ class ImageRender extends Scene {
 			trace("点击到了", e.target);
 			var display:DisplayObject = e.target;
 			display.alpha = 0.5;
+			display.visible = false;
 		});
 	}
 }

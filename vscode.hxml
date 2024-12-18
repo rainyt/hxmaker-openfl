@@ -1,0 +1,6 @@
+--class-path src
+--class-path test
+--main Main
+--interp
+--library openfl
+--library lime

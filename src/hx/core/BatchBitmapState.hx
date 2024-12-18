@@ -18,6 +18,10 @@ class BatchBitmapState {
 	 */
 	public var alphas:Array<Float> = [];
 
+	public var colorMultiplier:Array<Float> = [];
+
+	public var colorOffset:Array<Float> = [];
+
 	/**
 	 * 纹理顶点坐标
 	 */
@@ -63,6 +67,8 @@ class BatchBitmapState {
 	 */
 	public var dataPerIndices:Int = 0;
 
+	public var dataPerIndices16:Int = 0;
+
 	/**
 	 * 位图索引
 	 */
@@ -83,6 +89,7 @@ class BatchBitmapState {
 		dataPerIndices = 0;
 		dataPerVertex = 0;
 		bitmapIndex = 0;
+		dataPerIndices16 = 0;
 		bitmapDatas = [];
 		mapIds = [];
 	}
@@ -142,6 +149,20 @@ class BatchBitmapState {
 			alphas[dataPerIndices + 3] = bitmap.alpha;
 			alphas[dataPerIndices + 4] = bitmap.alpha;
 			alphas[dataPerIndices + 5] = bitmap.alpha;
+
+			var colorTransform = bitmap.transform.colorTransform;
+
+			for (i in 0...6) {
+				colorMultiplier[dataPerIndices16 + 4 * i] = colorTransform.redMultiplier;
+				colorMultiplier[dataPerIndices16 + 1 + 4 * i] = colorTransform.greenMultiplier;
+				colorMultiplier[dataPerIndices16 + 2 + 4 * i] = colorTransform.blueMultiplier;
+				colorMultiplier[dataPerIndices16 + 3 + 4 * i] = colorTransform.alphaMultiplier;
+				colorOffset[dataPerIndices16 + 4 * i] = colorTransform.redOffset;
+				colorOffset[dataPerIndices16 + 1 + 4 * i] = colorTransform.greenOffset;
+				colorOffset[dataPerIndices16 + 2 + 4 * i] = colorTransform.blueOffset;
+				colorOffset[dataPerIndices16 + 3 + 4 * i] = colorTransform.alphaOffset;
+			}
+
 			// transform
 			var tileWidth:Float = bitmap.scrollRect != null ? bitmap.scrollRect.width : bitmap.bitmapData.width;
 			var tileHeight:Float = bitmap.scrollRect != null ? bitmap.scrollRect.height : bitmap.bitmapData.height;
@@ -198,6 +219,7 @@ class BatchBitmapState {
 			indicesOffset += 4;
 			dataPerIndices += 6;
 			dataPerVertex += 8;
+			dataPerIndices16 += 24;
 			#end
 			bitmapIndex++;
 			return true;

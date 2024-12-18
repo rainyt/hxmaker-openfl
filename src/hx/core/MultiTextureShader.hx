@@ -16,8 +16,8 @@ class MultiTextureShader extends GraphicsShader {
 	@:noCompletion private static var __pool:ObjectPool<MultiTextureShader>;
 
 	public static var vertexSource:String = "attribute float openfl_Alpha_multi;
-		attribute vec4 openfl_ColorMultiplier;
-		attribute vec4 openfl_ColorOffset;
+		attribute vec4 openfl_ColorMultiplier_muti;
+		attribute vec4 openfl_ColorOffset_muti;
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
@@ -28,7 +28,6 @@ class MultiTextureShader extends GraphicsShader {
 		varying vec2 openfl_TextureCoordv;
 		varying float openfl_TextureIdv;
 		
-		uniform float openfl_HasColorTransform;
 		uniform mat4 openfl_Matrix;
 		uniform vec2 openfl_TextureSize;
 
@@ -38,12 +37,8 @@ class MultiTextureShader extends GraphicsShader {
             openfl_TextureCoordv = openfl_TextureCoord;
             openfl_TextureIdv = openfl_TextureId;
 
-            if (openfl_HasColorTransform != 0.0) {
-
-                openfl_ColorMultiplierv = openfl_ColorMultiplier;
-                openfl_ColorOffsetv = openfl_ColorOffset / 255.0;
-
-            }
+			openfl_ColorMultiplierv = openfl_ColorMultiplier_muti;
+			openfl_ColorOffsetv = openfl_ColorOffset_muti / 255.0;
 
             gl_Position = openfl_Matrix * openfl_Position;
 
@@ -64,7 +59,6 @@ class MultiTextureShader extends GraphicsShader {
 		varying vec4 openfl_ColorOffsetv;
 		varying vec2 openfl_TextureCoordv;
 		varying float openfl_TextureIdv;
-		uniform float openfl_HasColorTransform;
 
 		uniform sampler2D SAMPLER_INJECT;
 
@@ -81,7 +75,7 @@ class MultiTextureShader extends GraphicsShader {
 
 			gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
 
-		} else if (openfl_HasColorTransform != 0.0) {
+		} else {
 
 			color = vec4 (color.rgb / color.a, color.a);
 
@@ -102,10 +96,6 @@ class MultiTextureShader extends GraphicsShader {
 				gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
 
 			}
-
-		} else {
-
-			gl_FragColor = color * openfl_Alphav;
 
 		}
 
