@@ -114,18 +114,23 @@ class Text implements ITextFieldDataProvider {
 			textHeight = 0;
 			for (char in chars) {
 				var fntFrame = context.getAtlas().getCharFntFrame(char);
-				var image = new Image(fntFrame.data);
-				images.push(image);
-				// 追加到渲染区域
-				var color = ColorUtils.toShaderColor(label.textFormat.color);
-				image.colorTransform = new ColorTransform(color.r, color.g, color.b, 1);
-				image.x = offestX;
-				image.y = offestY;
-				offestX += fntFrame.xadvance * scale;
-				if (offestX > textWidth)
-					textWidth = offestX;
-				if (offestY + fntFrame.data.rect.height > textHeight) {
-					textHeight = offestY + fntFrame.data.rect.height;
+				if (fntFrame != null) {
+					var image = new Image(fntFrame.data);
+					images.push(image);
+					// 追加到渲染区域
+					var color = ColorUtils.toShaderColor(label.textFormat.color);
+					image.colorTransform = new ColorTransform(color.r, color.g, color.b, 1);
+					image.x = offestX;
+					image.y = offestY;
+					offestX += fntFrame.xadvance * scale;
+					if (offestX > textWidth)
+						textWidth = offestX;
+					if (offestY + fntFrame.data.rect.height > textHeight) {
+						textHeight = offestY + fntFrame.data.rect.height;
+					}
+				} else {
+					// 当空格处理
+					offestX += 30 * scale;
 				}
 			}
 			label.updateAlignTranform();
