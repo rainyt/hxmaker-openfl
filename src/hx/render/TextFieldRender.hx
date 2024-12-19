@@ -115,7 +115,8 @@ class Text implements ITextFieldDataProvider {
 			for (char in chars) {
 				var fntFrame = context.getAtlas().getCharFntFrame(char);
 				if (fntFrame != null) {
-					var image = new Image(fntFrame.data);
+					var image = __images_pool.get();
+					image.data = fntFrame.data;
 					images.push(image);
 					// 追加到渲染区域
 					var color = ColorUtils.toShaderColor(label.textFormat.color);
