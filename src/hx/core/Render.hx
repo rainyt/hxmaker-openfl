@@ -1,9 +1,8 @@
 package hx.core;
 
-import openfl.display.Stage;
-import openfl.geom.ColorTransform;
+import hx.render.ImageBufferData;
+import hx.render.ImageRender;
 import openfl.display.ShaderInput;
-import js.html.webgl.Sampler;
 import openfl.display.BitmapData;
 import openfl.display.ShaderParameter;
 import lime.graphics.opengl.GL;
@@ -13,13 +12,9 @@ import openfl.geom.Matrix;
 import hx.displays.Quad;
 import openfl.text.TextFormat;
 import hx.displays.Label;
-import openfl.geom.Rectangle;
-import openfl.display.Tilemap;
 import openfl.utils.ObjectPool;
-import openfl.Vector;
 import hx.displays.Image;
 import hx.displays.DisplayObjectContainer;
-import openfl.display.Bitmap;
 import openfl.display.Sprite;
 import hx.displays.IRender;
 
@@ -35,6 +30,50 @@ class Render implements IRender {
 	 * 默认的着色器支持
 	 */
 	public var defalutShader:Shader;
+
+	/**
+	 * 图片的缓存数据
+	 */
+	public var imageBufferData:Array<ImageBufferData> = [];
+
+	/**
+	 * 当前图片的缓存数据索引
+	 */
+	public var drawImageBuffDataIndex:Int = 0;
+
+	/**
+	 * 绘制图片缓存数据
+	 * @param data 
+	 */
+	public function renderImageBuffData(data:ImageBufferData):Void {
+		if (data.index > 0) {
+			// 图形绘制
+			var shape:Sprite = __pool.get();
+			shape.graphics.clear();
+			var openfl_TextureId:ShaderParameter<Float> = defalutShader.data.openfl_TextureId;
+			var openfl_Alpha:ShaderParameter<Float> = defalutShader.data.openfl_Alpha_multi;
+			var openfl_ColorMultiplier:ShaderParameter<Float> = defalutShader.data.openfl_ColorMultiplier_muti;
+			var openfl_ColorOffer:ShaderParameter<Float> = defalutShader.data.openfl_ColorOffset_muti;
+			var offests:Array<Float> = [];
+			var mapIds:Map<BitmapData, Int> = [];
+			for (index => data in data.bitmapDatas) {
+				mapIds.set(data, index);
+				var sampler:ShaderInput<BitmapData> = defalutShader.data.getProperty('uSampler$index');
+				sampler.input = data;
+				sampler.filter = LINEAR;
+			}
+			openfl_ColorOffer.value = data.colorOffset;
+			openfl_ColorMultiplier.value = data.colorMultiplier;
+			openfl_TextureId.value = data.ids;
+			openfl_Alpha.value = data.alphas;
+			shape.graphics.beginShaderFill(defalutShader);
+			shape.graphics.drawTriangles(data.vertices, data.indices, data.uvtData);
+			shape.graphics.endFill();
+			__stage.addChild(shape);
+			drawImageBuffDataIndex++;
+			createImageBufferData(drawImageBuffDataIndex);
+		}
+	}
 
 	/**
 	 * 在OpenFL中渲染的舞台对象
@@ -55,16 +94,6 @@ class Render implements IRender {
 	 * 游戏引擎对象
 	 */
 	public var engine:Engine;
-
-	/**
-	 * 位图批渲染状态处理支持
-	 */
-	private var states:Array<BatchBitmapState> = [];
-
-	/**
-	 * 当前位图批渲染索引
-	 */
-	private var __currentStateIndex = 0;
 
 	/**
 	 * 多纹理支持的纹理单元数量
@@ -89,20 +118,31 @@ class Render implements IRender {
 
 	public function clear():Void {
 		// 清理舞台
-		__currentStateIndex = 0;
 		for (i in 0...__stage.numChildren) {
 			var display = __stage.getChildAt(i);
 			if (display is EngineSprite) {
 				__pool.release(cast display);
 			}
 		}
-		for (state in states) {
-			state.reset();
-		}
-		if (states[__currentStateIndex] == null) {
-			states[__currentStateIndex] = new BatchBitmapState(this);
-		}
+		drawImageBuffDataIndex = 0;
+		this.createImageBufferData(0);
 		__stage.removeChildren();
+	}
+
+	/**
+	 * 创建图片缓存数据
+	 * @param index 
+	 * @return ImageBufferData
+	 */
+	public function createImageBufferData(index:Int):ImageBufferData {
+		if (imageBufferData[index] == null) {
+			var data = new ImageBufferData();
+			imageBufferData[index] = data;
+			return data;
+		}
+		var data = imageBufferData[index];
+		data.reset();
+		return data;
 	}
 
 	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
@@ -117,11 +157,14 @@ class Render implements IRender {
 			} else if (object is Label) {
 				renderLabel(cast object);
 			} else if (object is Quad) {
-				this.drawBatchBitmapState();
 				renderQuad(cast object);
 			}
 		}
 		container.__dirty = false;
+	}
+
+	public function renderImage(image:Image):Void {
+		ImageRender.render(image, this);
 	}
 
 	/**
@@ -139,6 +182,7 @@ class Render implements IRender {
 		sprite.graphics.drawRect(0, 0, quad.width, quad.height);
 		sprite.transform.matrix = getMarix(quad);
 		sprite.alpha = quad.__worldAlpha;
+		endFill();
 		__stage.addChild(sprite);
 	}
 
@@ -173,102 +217,15 @@ class Render implements IRender {
 		textField.height = label.height;
 		label.__dirty = false;
 		// 不直接渲染文本，使用位图渲染方式
-		textField.render(this, label);
-		// this.drawBatchBitmapState();
-		// __stage.addChild(textField);
-	}
-
-	private var __rect:Rectangle = new Rectangle();
-
-	/**
-	 * 渲染Image对象
-	 * @param image 
-	 */
-	public function renderImage(image:Image) {
-		if (image.data == null || image.data.data == null)
-			return;
-		if (image.root == null) {
-			image.root = new Bitmap();
-		}
-		var bitmap:Bitmap = image.root;
-		bitmap.alpha = image.__worldAlpha;
-		bitmap.bitmapData = image.data.data.getTexture();
-		bitmap.smoothing = image.smoothing;
-		bitmap.transform.matrix = getMarix(image);
-		image.__dirty = false;
-		if (image.data.rect != null) {
-			__rect.x = image.data.rect.x;
-			__rect.y = image.data.rect.y;
-			__rect.width = image.data.rect.width;
-			__rect.height = image.data.rect.height;
-			bitmap.scrollRect = __rect;
-		} else if (bitmap.scrollRect != null) {
-			bitmap.scrollRect = null;
-		}
-		// 批处理状态渲染
-		pushBitmap(bitmap);
-	}
-
-	public function getCurrentBatchBitmapState():BatchBitmapState {
-		return states[__currentStateIndex];
-	}
-
-	public function pushBitmap(bitmap:Bitmap):Void {
-		var state = states[__currentStateIndex];
-		if (!state.push(bitmap)) {
-			// 开始绘制
-			this.drawBatchBitmapState();
-			state.push(bitmap);
-		}
+		// textField.render(this, label);
+		this.endFill();
+		__stage.addChild(textField);
 	}
 
 	/**
-	 * 渲染纹理批处理状态
+	 * 结束所有绘制调用
 	 */
-	private function drawBatchBitmapState():Void {
-		var state = states[__currentStateIndex];
-		if (state.bitmapIndex > 0) {
-			#if custom_render
-			var bitmapBatch = new BitmapBatchDisplayObject();
-			bitmapBatch.state = state;
-			bitmapBatch.render = this;
-			this.__stage.addChild(bitmapBatch);
-			#else
-			// 图形绘制
-			var shape:Sprite = __pool.get();
-			shape.graphics.clear();
-			var lastBitmap = state.bitmaps[0];
-			var openfl_TextureId:ShaderParameter<Float> = defalutShader.data.openfl_TextureId;
-			var openfl_Alpha:ShaderParameter<Float> = defalutShader.data.openfl_Alpha_multi;
-			var openfl_ColorMultiplier:ShaderParameter<Float> = defalutShader.data.openfl_ColorMultiplier_muti;
-			var openfl_ColorOffer:ShaderParameter<Float> = defalutShader.data.openfl_ColorOffset_muti;
-			var offests:Array<Float> = [];
-			var mapIds:Map<BitmapData, Int> = [];
-			for (index => data in state.bitmapDatas) {
-				mapIds.set(data, index);
-				var sampler:ShaderInput<BitmapData> = defalutShader.data.getProperty('uSampler$index');
-				sampler.input = data;
-				sampler.filter = LINEAR;
-			}
-			openfl_ColorOffer.value = state.colorOffset;
-			openfl_ColorMultiplier.value = state.colorMultiplier;
-			openfl_TextureId.value = state.ids;
-			openfl_Alpha.value = state.alphas;
-			shape.graphics.beginShaderFill(defalutShader);
-			shape.graphics.drawTriangles(state.vertices, state.indices, state.uvtData);
-			shape.graphics.endFill();
-			__stage.addChild(shape);
-			#end
-			__currentStateIndex++;
-			if (states[__currentStateIndex] == null) {
-				states[__currentStateIndex] = new BatchBitmapState(this);
-			}
-		}
-	}
-
-	var tilemap:Tilemap = new Tilemap(0, 0);
-
 	public function endFill():Void {
-		this.drawBatchBitmapState();
+		this.renderImageBuffData(this.imageBufferData[this.drawImageBuffDataIndex]);
 	}
 }

@@ -90,7 +90,7 @@ class EngineTextField extends TextField implements ITextFieldDataProvider {
 				tileMatrix.scale(scaleFloat, scaleFloat);
 				tileMatrix.concat(_matrix);
 				tile.transform.matrix = tileMatrix;
-				render.pushBitmap(tile);
+				// render.pushBitmap(tile);
 				lastWidth = frame.rect.width;
 				// if (_lineHeight < frame.height)
 				// _lineHeight = frame.height;
