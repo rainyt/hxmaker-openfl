@@ -145,14 +145,13 @@ class ImageBufferData {
 					// 顶点坐标
 					var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
 					var len = Std.int(vertices.length / 2);
-					var dataPer = this.vertices.length;
 					for (i in 0...len) {
 						var x = vertices[i * 2];
 						var y = vertices[i * 2 + 1];
-						this.vertices[dataPer + i * 2] = tileTransform.__transformX(x, y);
-						this.vertices[dataPer + i * 2 + 1] = tileTransform.__transformY(x, y);
-						this.uvtData[dataPer + i * 2] = uvs[i * 2];
-						this.uvtData[dataPer + i * 2 + 1] = uvs[i * 2 + 1];
+						this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
+						this.vertices[dataPerVertex + i * 2 + 1] = tileTransform.__transformY(x, y);
+						this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
+						this.uvtData[dataPerVertex + i * 2 + 1] = uvs[i * 2 + 1];
 					}
 
 					dataPerVertex6 += indices.length;
