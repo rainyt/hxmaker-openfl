@@ -17,7 +17,7 @@ class EngineTextField extends TextField implements ITextFieldDataProvider {
 	 */
 	public static function getTextFieldContextBitmapData():TextFieldContextBitmapData {
 		if (__contextBitmapData == null)
-			__contextBitmapData = new TextFieldContextBitmapData(36);
+			__contextBitmapData = new TextFieldContextBitmapData(50);
 		return __contextBitmapData;
 	}
 
@@ -30,10 +30,9 @@ class EngineTextField extends TextField implements ITextFieldDataProvider {
 	}
 
 	public function render(render:Render, label:Label):Void {
-		var context = getTextFieldContextBitmapData();
-		context.drawText(this.text);
 		var _maxHeight = 0.;
 		var _maxWidth = 0.;
+		var context = getTextFieldContextBitmapData();
 		var currentAtlas = context.getAtlas();
 		var _lineHeight = currentAtlas.maxHeight;
 		var offestX:Float = 0;
@@ -88,6 +87,7 @@ class EngineTextField extends TextField implements ITextFieldDataProvider {
 				tile.x = offestX + frame.xoffset;
 				tile.y = offestY + frame.yoffset;
 				var tileMatrix = tile.transform.matrix;
+				tileMatrix.scale(scaleFloat, scaleFloat);
 				tileMatrix.concat(_matrix);
 				tile.transform.matrix = tileMatrix;
 				render.pushBitmap(tile);

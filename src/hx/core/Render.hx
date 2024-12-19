@@ -164,6 +164,8 @@ class Render implements IRender {
 			textField.setTextFormat(new TextFormat(format.font, format.size, format.color));
 			label.updateAlignTranform();
 			label.__updateTransform(label.parent);
+			var context = EngineTextField.getTextFieldContextBitmapData();
+			context.drawText(textField.text);
 		}
 		textField.alpha = label.__worldAlpha;
 		textField.transform.matrix = getMarix(label);

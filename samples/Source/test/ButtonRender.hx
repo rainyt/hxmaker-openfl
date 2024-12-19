@@ -1,5 +1,6 @@
 package test;
 
+import hx.events.Event;
 import hx.displays.TextFormat;
 import hx.utils.Assets;
 import hx.displays.DisplayObject;
@@ -41,5 +42,8 @@ class ButtonRender extends Scene {
 			button.x = Std.random(Std.int(stage.stageWidth));
 			button.y = Std.random(Std.int(stage.stageHeight));
 		}
+		this.addEventListener(Event.UPDATE, (e) -> {
+			this.getChildAt(this.children.length - 1).rotation += 1;
+		});
 	}
 }
