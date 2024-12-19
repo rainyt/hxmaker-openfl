@@ -26,7 +26,7 @@ class TextFieldRender {
 		return __contextBitmapData;
 	}
 
-	public static function render(label:Label, render:Render):Void {
+	public inline static function render(label:Label, render:Render):Void {
 		if (label.data == null)
 			return;
 		if (label.root == null) {

@@ -1,5 +1,7 @@
 package hx.render;
 
+import hx.gemo.Matrix;
+import hx.displays.Graphic;
 import hx.core.Render;
 import openfl.display.BitmapData;
 import hx.displays.Image;
@@ -9,6 +11,8 @@ import openfl.Vector;
  * 图片缓存数据
  */
 @:access(hx.displays.Image)
+@:access(hx.displays.Graphic)
+@:access(hx.gemo.Matrix)
 class ImageBufferData {
 	/**
 	 * 纹理ID顶点列表
@@ -65,13 +69,99 @@ class ImageBufferData {
 	 */
 	public var index = 0;
 
+	private var dataPerVertex6 = 0;
+	private var dataPerVertex24 = 0;
+	private var dataPerVertex = 0;
+
 	public function new() {}
 
 	public function reset() {
 		index = 0;
+		dataPerVertex6 = 0;
+		dataPerVertex24 = 0;
+		dataPerVertex = 0;
 		bitmapDatas = [];
 		mapIds = [];
 		indices = new Vector();
+	}
+
+	/**
+	 * 绘制图形
+	 * @param graphic 
+	 * @param render 
+	 * @return Bool
+	 */
+	public function drawGraphic(graphic:Graphic, render:Render):Bool {
+		var data = graphic.__graphicDrawData;
+		var len = data.draws.length;
+		while (graphic.__graphicDrawData.index < len) {
+			var command = data.draws[data.index];
+			if (command == null) {
+				// 当命令为空时，则意味着渲染已结束
+				break;
+			}
+			switch command {
+				case BEGIN_BITMAP_DATA(bitmapData, smoothing):
+					data.currentBitmapData = bitmapData;
+					data.smoothing = smoothing;
+				case DRAW_TRIANGLE(vertices, indices, uvs, alpha, colorTransform):
+					// 开始绘制三角形
+					var texture = data.currentBitmapData.data.getTexture();
+					if (index == 0 || !mapIds.exists(texture)) {
+						if (bitmapDatas.length >= render.supportedMultiTextureUnits) {
+							return false;
+						}
+					}
+					// 如果平滑值不同，则产生新的绘制
+					if (index == 0) {
+						smoothing = data.smoothing;
+					} else if (smoothing != data.smoothing) {
+						return false;
+					}
+					// 可以绘制，记录纹理ID
+					var id = mapIds.get(texture);
+					if (id == null) {
+						bitmapDatas.push(texture);
+						id = bitmapDatas.length - 1;
+						mapIds.set(texture, id);
+					}
+					var indicesOffset = Math.round(this.vertices.length / 2);
+					// 根据顶点设置数据
+					for (i in 0...indices.length) {
+						ids[dataPerVertex6 + i] = id;
+						alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
+						colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier;
+						colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier;
+						colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier;
+						colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier;
+						colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset;
+						colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset;
+						colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset;
+						colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset;
+						this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
+					}
+
+					// 顶点坐标
+					var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
+					var len = Std.int(vertices.length / 2);
+					var dataPer = this.vertices.length;
+					for (i in 0...len) {
+						var x = vertices[i * 2];
+						var y = vertices[i * 2 + 1];
+						this.vertices[dataPer + i * 2] = tileTransform.__transformX(x, y);
+						this.vertices[dataPer + i * 2 + 1] = tileTransform.__transformY(x, y);
+						this.uvtData[dataPer + i * 2] = uvs[i * 2];
+						this.uvtData[dataPer + i * 2 + 1] = uvs[i * 2 + 1];
+					}
+
+					dataPerVertex6 += indices.length;
+					dataPerVertex24 += indices.length * 4;
+					dataPerVertex += vertices.length;
+					this.index++;
+			}
+			data.index++;
+		}
+		return true;
 	}
 
 	/**
@@ -98,9 +188,8 @@ class ImageBufferData {
 			id = bitmapDatas.length - 1;
 			mapIds.set(texture, id);
 		}
+		var indicesOffset = Math.round(this.vertices.length / 2);
 		// 6个顶点数据
-		var dataPerVertex6 = index * 6;
-		var dataPerVertex24 = index * 24;
 		for (i in 0...6) {
 			ids[dataPerVertex6 + i] = id;
 			alphas[dataPerVertex6 + i] = image.__worldAlpha;
@@ -126,7 +215,6 @@ class ImageBufferData {
 		var y3 = @:privateAccess tileTransform.__transformY(0, tileHeight);
 		var x4 = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
 		var y4 = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
-		var dataPerVertex = index * 8;
 		vertices[dataPerVertex] = x;
 		vertices[dataPerVertex + 1] = y;
 		vertices[dataPerVertex + 2] = (x2);
@@ -137,7 +225,6 @@ class ImageBufferData {
 		vertices[dataPerVertex + 7] = (y4);
 
 		// 顶点
-		var indicesOffset = index * 4;
 		indices[dataPerVertex6] = (indicesOffset);
 		indices[dataPerVertex6 + 1] = (indicesOffset + 1);
 		indices[dataPerVertex6 + 2] = (indicesOffset + 2);
@@ -174,6 +261,9 @@ class ImageBufferData {
 
 		// 下一个
 		index++;
+		dataPerVertex6 += 6;
+		dataPerVertex24 += 24;
+		dataPerVertex += 8;
 		return true;
 	}
 }

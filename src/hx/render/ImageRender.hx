@@ -14,11 +14,12 @@ class ImageRender {
 	 * @param image 
 	 * @param render
 	 */
-	public inline static function render(image:Image, render:Render):Void {
+	public static function render(image:Image, render:Render):Void {
 		// 当前渲染的图片缓存数据
 		var dataBuffer = render.imageBufferData[render.drawImageBuffDataIndex];
 		if (!dataBuffer.draw(image, render)) {
 			render.renderImageBuffData(dataBuffer);
+			ImageRender.render(image, render);
 		}
 	}
 }
