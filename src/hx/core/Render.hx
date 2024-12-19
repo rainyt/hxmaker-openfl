@@ -182,7 +182,7 @@ class Render implements IRender {
 		sprite.graphics.drawRect(0, 0, quad.width, quad.height);
 		sprite.transform.matrix = getMarix(quad);
 		sprite.alpha = quad.__worldAlpha;
-		endFill();
+		endFillImageDataBuffer();
 		__stage.addChild(sprite);
 	}
 
@@ -218,8 +218,12 @@ class Render implements IRender {
 		label.__dirty = false;
 		// 不直接渲染文本，使用位图渲染方式
 		// textField.render(this, label);
-		this.endFill();
+		this.endFillImageDataBuffer();
 		__stage.addChild(textField);
+	}
+
+	public function endFillImageDataBuffer():Void {
+		this.renderImageBuffData(this.imageBufferData[this.drawImageBuffDataIndex]);
 	}
 
 	/**
@@ -227,5 +231,6 @@ class Render implements IRender {
 	 */
 	public function endFill():Void {
 		this.renderImageBuffData(this.imageBufferData[this.drawImageBuffDataIndex]);
+		this.imageBufferData = this.imageBufferData.splice(0, this.drawImageBuffDataIndex + 1);
 	}
 }

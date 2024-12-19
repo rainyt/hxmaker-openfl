@@ -148,7 +148,7 @@ class ImageBufferData {
 		// UVs
 		if (image.data.rect != null) {
 			var imageWidth = image.data.data.getWidth();
-			var imageHeight = image.data.data.getWidth();
+			var imageHeight = image.data.data.getHeight();
 			var uvX = image.data.rect.x / imageWidth;
 			var uvY = image.data.rect.y / imageHeight;
 			var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
