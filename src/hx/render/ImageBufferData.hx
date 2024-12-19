@@ -72,6 +72,7 @@ class ImageBufferData {
 	private var dataPerVertex6 = 0;
 	private var dataPerVertex24 = 0;
 	private var dataPerVertex = 0;
+	private var indicesOffset = 0;
 
 	public function new() {}
 
@@ -80,6 +81,7 @@ class ImageBufferData {
 		dataPerVertex6 = 0;
 		dataPerVertex24 = 0;
 		dataPerVertex = 0;
+		indicesOffset = 0;
 		bitmapDatas = [];
 		mapIds = [];
 		indices = new Vector();
@@ -125,7 +127,6 @@ class ImageBufferData {
 						id = bitmapDatas.length - 1;
 						mapIds.set(texture, id);
 					}
-					var indicesOffset = Math.round(this.vertices.length / 2);
 					// 根据顶点设置数据
 					for (i in 0...indices.length) {
 						ids[dataPerVertex6 + i] = id;
@@ -157,10 +158,12 @@ class ImageBufferData {
 					dataPerVertex6 += indices.length;
 					dataPerVertex24 += indices.length * 4;
 					dataPerVertex += vertices.length;
+					this.indicesOffset = Std.int(dataPerVertex / 2);
 					this.index++;
 			}
 			data.index++;
 		}
+		graphic.__graphicDrawData.index = 0;
 		return true;
 	}
 
@@ -188,7 +191,7 @@ class ImageBufferData {
 			id = bitmapDatas.length - 1;
 			mapIds.set(texture, id);
 		}
-		var indicesOffset = Math.round(this.vertices.length / 2);
+
 		// 6个顶点数据
 		for (i in 0...6) {
 			ids[dataPerVertex6 + i] = id;
@@ -264,6 +267,7 @@ class ImageBufferData {
 		dataPerVertex6 += 6;
 		dataPerVertex24 += 24;
 		dataPerVertex += 8;
+		indicesOffset += 4;
 		return true;
 	}
 }

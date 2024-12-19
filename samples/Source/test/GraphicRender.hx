@@ -1,5 +1,6 @@
 package test;
 
+import hx.events.Event;
 import hx.displays.Image;
 import hx.utils.Assets;
 import hx.displays.Graphic;
@@ -32,18 +33,27 @@ class GraphicRender extends Scene {
 
 	public function onLoaded() {
 		// 图形渲染
-		var graphic = new Graphic();
-		this.addChild(graphic);
-		graphic.clear();
-		graphic.beginBitmapData(assets.bitmapDatas.get("logo"));
-		graphic.drawTriangles([0, 0, 100, 0, 0, 100, 100, 100], [0, 1, 2, 1, 2, 3], [0, 0, 1, 0, 0, 1, 1, 1], 0.5);
-		graphic.drawTriangles([-100, 100, 100, 0, 0, 400, 100, 100], [0, 1, 2, 1, 2, 3], [0, 0, 1, 0, 0, 1, 1, 1], 0.5);
-		graphic.drawTriangles([200, 300, 100, 0, 0, 100, 100, 100], [0, 1, 2, 1, 2, 3], [0, 0, 1, 0, 0, 1, 1, 1], 0.5);
-		graphic.x = graphic.y = 300;
+
+		for (i in 0...1000) {
+			var graphic = new Graphic();
+			this.addChild(graphic);
+			graphic.clear();
+			graphic.beginBitmapData(assets.bitmapDatas.get("logo"));
+			graphic.drawTriangles([0, 0, 100, 0, 0, 100, 100, 100], [0, 1, 2, 1, 2, 3], [0, 0, 1, 0, 0, 1, 1, 1], 0.5);
+			graphic.drawTriangles([-100, 100, 100, 0, 0, 400, 100, 100], [0, 1, 2, 1, 2, 3], [0, 0, 1, 0, 0, 1, 1, 1], 0.5);
+			graphic.drawTriangles([200, 300, 100, 0, 0, 100, 100, 100], [0, 1, 2, 1, 2, 3], [0, 0, 1, 0, 0, 1, 1, 1], 0.5);
+			graphic.x = Math.random() * stage.stageWidth;
+			graphic.y = Math.random() * stage.stageHeight;
+			graphic.rotation = Std.random(360);
+		}
 
 		var image = new Image();
-        image.smoothing = true;
+		image.smoothing = true;
 		image.data = assets.bitmapDatas.get("logo");
 		this.addChild(image);
+
+		this.addEventListener(Event.UPDATE, (e) -> {
+			image.rotation++;
+		});
 	}
 }
