@@ -1,5 +1,7 @@
 package hx.render;
 
+import hx.displays.DisplayObject;
+import hx.gemo.Matrix;
 import hx.core.Render;
 import hx.displays.Image;
 
@@ -10,6 +12,7 @@ class ImageRender {
 	/**
 	 * 渲染图片
 	 * @param image 
+	 * @param render
 	 */
 	public inline static function render(image:Image, render:Render):Void {
 		// 当前渲染的图片缓存数据

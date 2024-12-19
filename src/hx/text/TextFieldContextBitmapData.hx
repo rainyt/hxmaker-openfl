@@ -223,7 +223,6 @@ class TextFieldContextBitmapData {
 		if (cleanBitmapData) {
 			bitmapData = new BitmapData(bitmapData.width, bitmapData.height, true, 0x0);
 			bitmapData.disposeImage();
-			__atlas.bitmapData = bitmapData;
 		}
 		__textField = new TextField();
 		bitmapData.fillRect(bitmapData.rect, 0x0);

@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.render.TextFieldRender;
 import hx.render.ImageBufferData;
 import hx.render.ImageRender;
 import openfl.display.ShaderInput;
@@ -197,29 +198,30 @@ class Render implements IRender {
 	 * @param image 
 	 */
 	public function renderLabel(label:Label):Void {
-		if (label.root == null) {
-			label.root = new EngineTextField();
-			label.setDirty();
-		}
-		var textField:EngineTextField = cast label.root;
-		if (label.data != null && textField.text != label.data) {
-			textField.text = label.data;
-			var format:hx.displays.TextFormat = label.__textFormat;
-			textField.setTextFormat(new TextFormat(format.font, format.size, format.color));
-			label.updateAlignTranform();
-			label.__updateTransform(label.parent);
-			var context = EngineTextField.getTextFieldContextBitmapData();
-			context.drawText(textField.text);
-		}
-		textField.alpha = label.__worldAlpha;
-		textField.transform.matrix = getMarix(label);
-		textField.width = label.width;
-		textField.height = label.height;
-		label.__dirty = false;
-		// 不直接渲染文本，使用位图渲染方式
-		// textField.render(this, label);
-		this.endFillImageDataBuffer();
-		__stage.addChild(textField);
+		TextFieldRender.render(label, this);
+		// if (label.root == null) {
+		// 	label.root = new EngineTextField();
+		// 	label.setDirty();
+		// }
+		// var textField:EngineTextField = cast label.root;
+		// if (label.data != null && textField.text != label.data) {
+		// 	textField.text = label.data;
+		// 	var format:hx.displays.TextFormat = label.__textFormat;
+		// 	textField.setTextFormat(new TextFormat(format.font, format.size, format.color));
+		// 	label.updateAlignTranform();
+		// 	label.__updateTransform(label.parent);
+		// 	var context = EngineTextField.getTextFieldContextBitmapData();
+		// 	context.drawText(textField.text);
+		// }
+		// textField.alpha = label.__worldAlpha;
+		// textField.transform.matrix = getMarix(label);
+		// textField.width = label.width;
+		// textField.height = label.height;
+		// label.__dirty = false;
+		// // 不直接渲染文本，使用位图渲染方式
+		// // textField.render(this, label);
+		// this.endFillImageDataBuffer();
+		// __stage.addChild(textField);
 	}
 
 	public function endFillImageDataBuffer():Void {

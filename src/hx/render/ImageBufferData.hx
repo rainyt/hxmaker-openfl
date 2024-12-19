@@ -104,14 +104,14 @@ class ImageBufferData {
 		for (i in 0...6) {
 			ids[dataPerVertex6 + i] = id;
 			alphas[dataPerVertex6 + i] = image.__worldAlpha;
-			colorMultiplier[dataPerVertex24 + i * 4] = 1;
-			colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
-			colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
-			colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
-			colorOffset[dataPerVertex24 + i * 4] = 0;
-			colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
-			colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
-			colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
+			colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
+			colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
+			colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
+			colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
+			colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
+			colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
+			colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
+			colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
 		}
 
 		// 坐标顶点
