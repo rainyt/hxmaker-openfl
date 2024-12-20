@@ -1,5 +1,6 @@
 package hx.core;
 
+import openfl.events.KeyboardEvent;
 import openfl.events.MouseEvent;
 import hx.utils.ScaleUtils;
 import haxe.Timer;
@@ -58,6 +59,14 @@ class Engine extends Sprite implements IEngine {
 		// this.stage.addEventListener(MouseEvent.CLICK, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
+		this.stage.addEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
+		this.stage.addEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
+	}
+
+	private function __onKeyboardEvent(e:KeyboardEvent):Void {
+		var engineEvent:hx.events.KeyboardEvent = new hx.events.KeyboardEvent(e.type);
+		engineEvent.keyCode = e.keyCode;
+		render.handleKeyboardEvent(engineEvent);
 	}
 
 	private function __onMouseEvent(e:MouseEvent):Void {
