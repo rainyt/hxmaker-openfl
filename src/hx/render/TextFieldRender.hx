@@ -37,7 +37,8 @@ class TextFieldRender {
 			var context = getTextFieldContextBitmapData();
 			if (textField.text != label.data) {
 				textField.text = label.data;
-				context.drawText(textField.text); // 进行渲染，使用多个image组成
+				context.drawText(textField.text);
+				// 进行渲染，使用多个image组成
 				textField.drawText(__contextBitmapData, render, true);
 			} else {
 				// 没有变化，则使用已有的数据进行渲染
@@ -126,8 +127,8 @@ class Text implements ITextFieldDataProvider {
 					offestX += fntFrame.xadvance * scale;
 					if (offestX > textWidth)
 						textWidth = offestX;
-					if (offestY + fntFrame.data.rect.height > textHeight) {
-						textHeight = offestY + fntFrame.data.rect.height;
+					if (offestY + fntFrame.data.rect.height * scale > textHeight) {
+						textHeight = offestY + fntFrame.data.rect.height * scale;
 					}
 				} else {
 					// 当空格处理

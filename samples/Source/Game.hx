@@ -30,7 +30,7 @@ class Game extends Stage {
 		this.showScene(0);
 		this.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);
 		var fps = new FPS();
-		fps.textFormat = new TextFormat(null, 32, 0xff0000);
+		fps.label.textFormat = new TextFormat(null, 32, 0xff0000);
 		this.addChild(fps);
 	}
 
