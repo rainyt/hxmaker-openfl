@@ -130,6 +130,10 @@ class Text implements ITextFieldDataProvider {
 					if (offestY + fntFrame.data.rect.height * scale > textHeight) {
 						textHeight = offestY + fntFrame.data.rect.height * scale;
 					}
+				} else if (char == "\n") {
+					// 换行处理
+					offestX = 0;
+					offestY += 60 * scale;
 				} else {
 					// 当空格处理
 					offestX += 30 * scale;
