@@ -1,3 +1,4 @@
+import test.AllDisplayRender;
 import hx.displays.TextFormat;
 import hx.displays.FPS;
 import test.SpineRender;
@@ -23,7 +24,15 @@ class Game extends Stage {
 	/**
 	 * 测试用例列表
 	 */
-	public static var tests:Array<Class<hx.displays.Scene>> = [SpineRender, GraphicRender, ButtonRender, WabbitRender, ImageRender, LabelRender];
+	public static var tests:Array<Class<hx.displays.Scene>> = [
+		AllDisplayRender,
+		SpineRender,
+		GraphicRender,
+		ButtonRender,
+		WabbitRender,
+		ImageRender,
+		LabelRender
+	];
 
 	override function onStageInit() {
 		super.onStageInit();

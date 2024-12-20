@@ -35,9 +35,6 @@ class SpineRender extends Scene {
 			spine.x = stage.stageWidth * Math.random();
 			spine.y = stage.stageHeight * Math.random();
 			spine.scaleX = spine.scaleY = 0.15;
-			this.addEventListener(Event.UPDATE, (e) -> {
-				spine.update(1 / 60);
-			});
 			for (animation in spine.skeleton.data.animations) {
 				trace(animation.name);
 			}

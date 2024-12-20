@@ -226,8 +226,8 @@ class ImageBufferData {
 		// 如果平滑值不同，则产生新的绘制
 		if (index == 0) {
 			smoothing = image.smoothing;
-		} else if (smoothing != image.smoothing) {
-			return false;
+			// } else if (smoothing != image.smoothing) {
+			// return false;
 		}
 		// 可以绘制，记录纹理ID
 		var id = mapIds.get(texture);
