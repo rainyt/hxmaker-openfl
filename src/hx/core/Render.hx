@@ -159,8 +159,6 @@ class Render implements IRender {
 				renderDisplayObjectContainer(cast object);
 			} else if (object is Label) {
 				renderLabel(cast object);
-			} else if (object is Quad) {
-				renderQuad(cast object);
 			} else if (object is Graphic) {
 				renderGraphics(cast object);
 			}
@@ -170,25 +168,6 @@ class Render implements IRender {
 
 	public function renderImage(image:Image):Void {
 		ImageRender.render(image, this);
-	}
-
-	/**
-	 * 渲染矩阵
-	 * @param quad 
-	 */
-	public function renderQuad(quad:Quad):Void {
-		if (quad.root == null) {
-			quad.root = new Sprite();
-			quad.setDirty();
-		}
-		var sprite:Sprite = quad.root;
-		sprite.graphics.clear();
-		sprite.graphics.beginFill(quad.data);
-		sprite.graphics.drawRect(0, 0, quad.width, quad.height);
-		sprite.transform.matrix = getMarix(quad);
-		sprite.alpha = quad.__worldAlpha;
-		endFillImageDataBuffer();
-		__stage.addChild(sprite);
 	}
 
 	public function getMarix(display:DisplayObject):Matrix {

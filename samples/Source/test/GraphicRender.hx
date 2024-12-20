@@ -1,5 +1,6 @@
 package test;
 
+import hx.displays.Quad;
 import hx.events.Event;
 import hx.displays.Image;
 import hx.utils.Assets;
@@ -33,7 +34,6 @@ class GraphicRender extends Scene {
 
 	public function onLoaded() {
 		// 图形渲染
-
 		for (i in 0...1000) {
 			var graphic = new Graphic();
 			this.addChild(graphic);
@@ -47,9 +47,18 @@ class GraphicRender extends Scene {
 			graphic.rotation = Std.random(360);
 		}
 
+		for (i in 0...1000) {
+			var quad = new Quad(32, 32, Std.random(0xFFFFFF));
+			this.addChild(quad);
+			quad.x = Math.random() * stage.stageWidth;
+			quad.y = Math.random() * stage.stageHeight;
+		}
+
 		var image = new Image();
 		image.smoothing = true;
 		image.data = assets.bitmapDatas.get("logo");
+		image.x = stage.stageWidth / 2;
+		image.y = stage.stageHeight / 2;
 		this.addChild(image);
 
 		this.addEventListener(Event.UPDATE, (e) -> {

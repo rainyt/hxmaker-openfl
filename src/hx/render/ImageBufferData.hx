@@ -1,5 +1,6 @@
 package hx.render;
 
+import hx.core.OpenFlBitmapData;
 import hx.gemo.Matrix;
 import hx.displays.Graphic;
 import hx.core.Render;
@@ -14,6 +15,20 @@ import openfl.Vector;
 @:access(hx.displays.Graphic)
 @:access(hx.gemo.Matrix)
 class ImageBufferData {
+	/**
+	 * 只有1像素的位图
+	 */
+	public static var px1bitmapData(get, never):hx.displays.BitmapData;
+
+	private static var __px1bitmapData:hx.displays.BitmapData;
+
+	private static function get_px1bitmapData():hx.displays.BitmapData {
+		if (__px1bitmapData == null) {
+			__px1bitmapData = hx.displays.BitmapData.formData(new OpenFlBitmapData(new BitmapData(1, 1, false, 0xffffff)));
+		}
+		return __px1bitmapData;
+	}
+
 	/**
 	 * 纹理ID顶点列表
 	 */
@@ -103,6 +118,9 @@ class ImageBufferData {
 				break;
 			}
 			switch command {
+				case BEGIN_FILL(color):
+					data.currentBitmapData = px1bitmapData;
+					data.smoothing = false;
 				case BEGIN_BITMAP_DATA(bitmapData, smoothing):
 					data.currentBitmapData = bitmapData;
 					data.smoothing = smoothing;
@@ -117,8 +135,8 @@ class ImageBufferData {
 					// 如果平滑值不同，则产生新的绘制
 					if (index == 0) {
 						smoothing = data.smoothing;
-					} else if (smoothing != data.smoothing) {
-						return false;
+						// } else if (smoothing != data.smoothing) {
+						// return false;
 					}
 					// 可以绘制，记录纹理ID
 					var id = mapIds.get(texture);
@@ -131,14 +149,25 @@ class ImageBufferData {
 					for (i in 0...indices.length) {
 						ids[dataPerVertex6 + i] = id;
 						alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
-						colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier;
-						colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset;
+						if (colorTransform != null) {
+							colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier * colorTransform.redMultiplier;
+							colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier * colorTransform.greenMultiplier;
+							colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier * colorTransform.blueMultiplier;
+							colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier * colorTransform.alphaMultiplier;
+							colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset + colorTransform.redOffset;
+							colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset + colorTransform.greenOffset;
+							colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset + colorTransform.blueOffset;
+							colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset + colorTransform.alphaOffset;
+						} else {
+							colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier;
+							colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier;
+							colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier;
+							colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier;
+							colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset;
+							colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset;
+							colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset;
+							colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset;
+						}
 						this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
 					}
 
