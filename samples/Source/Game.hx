@@ -1,3 +1,5 @@
+import hx.displays.TextFormat;
+import hx.displays.FPS;
 import test.SpineRender;
 import hx.events.KeyboardEvent;
 import hx.events.Keyboard;
@@ -27,6 +29,9 @@ class Game extends Stage {
 		super.onStageInit();
 		this.showScene(0);
 		this.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);
+		var fps = new FPS();
+		fps.textFormat = new TextFormat(null, 32, 0xff0000);
+		this.addChild(fps);
 	}
 
 	private function onKeyUp(e:KeyboardEvent):Void {
@@ -49,6 +54,6 @@ class Game extends Stage {
 	public function showScene(index:Int):Void {
 		this.removeChildren();
 		var scene:Scene = Type.createInstance(tests[index], []);
-		this.addChild(scene);
+		this.addChildAt(scene, 0);
 	}
 }

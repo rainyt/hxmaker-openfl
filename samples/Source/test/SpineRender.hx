@@ -1,5 +1,7 @@
 package test;
 
+import hx.displays.TextFormat;
+import hx.displays.FPS;
 import hx.events.Event;
 import hx.displays.Spine;
 import hx.utils.atlas.SpineTextureAtlas;

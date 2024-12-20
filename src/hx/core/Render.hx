@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.utils.ContextStats;
 import hx.render.GraphicRender;
 import hx.displays.Graphic;
 import hx.render.TextFieldRender;
@@ -76,6 +77,8 @@ class Render implements IRender {
 			__stage.addChild(shape);
 			drawImageBuffDataIndex++;
 			createImageBufferData(drawImageBuffDataIndex);
+			ContextStats.statsVertexCount(data.indices.length);
+			ContextStats.statsDrawCall();
 		}
 	}
 
@@ -131,6 +134,8 @@ class Render implements IRender {
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);
 		__stage.removeChildren();
+		ContextStats.reset();
+		ContextStats.statsFps();
 	}
 
 	/**
