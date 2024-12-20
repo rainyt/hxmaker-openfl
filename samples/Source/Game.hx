@@ -35,13 +35,14 @@ class Game extends Stage {
 				if (index < 0) {
 					index = tests.length - 1;
 				}
+				showScene(index);
 			case Keyboard.D:
 				index++;
 				if (index >= tests.length) {
 					index = 0;
 				}
+				showScene(index);
 		}
-		showScene(index);
 	}
 
 	public function showScene(index:Int):Void {

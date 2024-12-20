@@ -51,6 +51,7 @@ class Render implements IRender {
 	public function renderImageBuffData(data:ImageBufferData):Void {
 		if (data.index > 0) {
 			// 图形绘制
+			data.endFill();
 			var shape:Sprite = __pool.get();
 			shape.graphics.clear();
 			var openfl_TextureId:ShaderParameter<Float> = defalutShader.data.openfl_TextureId;

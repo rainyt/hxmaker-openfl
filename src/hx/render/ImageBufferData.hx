@@ -97,9 +97,24 @@ class ImageBufferData {
 		dataPerVertex24 = 0;
 		dataPerVertex = 0;
 		indicesOffset = 0;
-		bitmapDatas = [];
-		mapIds = [];
-		indices = new Vector();
+		setArrayLength(bitmapDatas, 0);
+		mapIds.clear();
+	}
+
+	public function endFill():Void {
+		vertices.length = dataPerVertex;
+		indices.length = dataPerVertex6;
+		setArrayLength(ids, dataPerVertex6);
+		setArrayLength(alphas, dataPerVertex6);
+		setArrayLength(colorMultiplier, dataPerVertex24);
+		setArrayLength(colorOffset, dataPerVertex24);
+		uvtData.length = dataPerVertex;
+	}
+
+	private function setArrayLength(array:Array<Dynamic>, length:Int):Void {
+		while (array.length > length) {
+			array.pop();
+		}
 	}
 
 	/**

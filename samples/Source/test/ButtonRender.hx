@@ -31,7 +31,7 @@ class ButtonRender extends Scene {
 
 	public function onLoaded() {
 		for (i in 0...3000) {
-			var button:Button = new Button("Button Text", {
+			var button:Button = new Button("测试文案", {
 				up: assets.bitmapDatas.get("logo")
 			});
 			button.textFormat = new TextFormat(null, 36, 0xff0000);
