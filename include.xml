@@ -1,6 +1,8 @@
 <project>
     <source path="engines/openfl" />
-    <haxelib name="hxmaker"/>
+    <haxelib name="hxmaker" />
+    <!-- Spine支持 -->
+    <haxelib name="spine-haxe" />
     <!-- HTML5 CPP 默认开始高清模式 -->
     <window allow-high-dpi="true" vsync="true" if="cpp || hl || html5" />
     <!-- 调试模式 -->

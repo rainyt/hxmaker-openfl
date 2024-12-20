@@ -1,3 +1,4 @@
+import test.SpineRender;
 import hx.events.KeyboardEvent;
 import hx.events.Keyboard;
 import test.GraphicRender;
@@ -20,7 +21,7 @@ class Game extends Stage {
 	/**
 	 * 测试用例列表
 	 */
-	public static var tests:Array<Class<hx.displays.Scene>> = [GraphicRender, ButtonRender, WabbitRender, ImageRender, LabelRender];
+	public static var tests:Array<Class<hx.displays.Scene>> = [SpineRender, GraphicRender, ButtonRender, WabbitRender, ImageRender, LabelRender];
 
 	override function onStageInit() {
 		super.onStageInit();
