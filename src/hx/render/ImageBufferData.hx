@@ -141,68 +141,70 @@ class ImageBufferData {
 					data.smoothing = smoothing;
 				case DRAW_TRIANGLE(vertices, indices, uvs, alpha, colorTransform):
 					// 开始绘制三角形
-					var texture = data.currentBitmapData.data.getTexture();
-					if (index == 0 || !mapIds.exists(texture)) {
-						if (bitmapDatas.length >= render.supportedMultiTextureUnits) {
-							return false;
+					if (data.currentBitmapData != null) {
+						var texture = data.currentBitmapData.data.getTexture();
+						if (index == 0 || !mapIds.exists(texture)) {
+							if (bitmapDatas.length >= render.supportedMultiTextureUnits) {
+								return false;
+							}
 						}
-					}
-					// 如果平滑值不同，则产生新的绘制
-					if (index == 0) {
-						smoothing = data.smoothing;
-						// } else if (smoothing != data.smoothing) {
-						// return false;
-					}
-					// 可以绘制，记录纹理ID
-					var id = mapIds.get(texture);
-					if (id == null) {
-						bitmapDatas.push(texture);
-						id = bitmapDatas.length - 1;
-						mapIds.set(texture, id);
-					}
-					// 根据顶点设置数据
-					for (i in 0...indices.length) {
-						ids[dataPerVertex6 + i] = id;
-						alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
-						if (colorTransform != null) {
-							colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier * colorTransform.redMultiplier;
-							colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier * colorTransform.greenMultiplier;
-							colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier * colorTransform.blueMultiplier;
-							colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier * colorTransform.alphaMultiplier;
-							colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset + colorTransform.redOffset;
-							colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset + colorTransform.greenOffset;
-							colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset + colorTransform.blueOffset;
-							colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset + colorTransform.alphaOffset;
-						} else {
-							colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier;
-							colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier;
-							colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier;
-							colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier;
-							colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset;
-							colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset;
-							colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset;
-							colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset;
+						// 如果平滑值不同，则产生新的绘制
+						if (index == 0) {
+							smoothing = data.smoothing;
+							// } else if (smoothing != data.smoothing) {
+							// return false;
 						}
-						this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
-					}
+						// 可以绘制，记录纹理ID
+						var id = mapIds.get(texture);
+						if (id == null) {
+							bitmapDatas.push(texture);
+							id = bitmapDatas.length - 1;
+							mapIds.set(texture, id);
+						}
+						// 根据顶点设置数据
+						for (i in 0...indices.length) {
+							ids[dataPerVertex6 + i] = id;
+							alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
+							if (colorTransform != null) {
+								colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier * colorTransform.redMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier * colorTransform.greenMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier * colorTransform.blueMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier * colorTransform.alphaMultiplier;
+								colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset + colorTransform.redOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset + colorTransform.greenOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset + colorTransform.blueOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset + colorTransform.alphaOffset;
+							} else {
+								colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier;
+								colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset;
+							}
+							this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
+						}
 
-					// 顶点坐标
-					var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
-					var len = Std.int(vertices.length / 2);
-					for (i in 0...len) {
-						var x = vertices[i * 2];
-						var y = vertices[i * 2 + 1];
-						this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
-						this.vertices[dataPerVertex + i * 2 + 1] = tileTransform.__transformY(x, y);
-						this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
-						this.uvtData[dataPerVertex + i * 2 + 1] = uvs[i * 2 + 1];
-					}
+						// 顶点坐标
+						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
+						var len = Std.int(vertices.length / 2);
+						for (i in 0...len) {
+							var x = vertices[i * 2];
+							var y = vertices[i * 2 + 1];
+							this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
+							this.vertices[dataPerVertex + i * 2 + 1] = tileTransform.__transformY(x, y);
+							this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
+							this.uvtData[dataPerVertex + i * 2 + 1] = uvs[i * 2 + 1];
+						}
 
-					dataPerVertex6 += indices.length;
-					dataPerVertex24 += indices.length * 4;
-					dataPerVertex += vertices.length;
-					this.indicesOffset = Std.int(dataPerVertex / 2);
-					this.index++;
+						dataPerVertex6 += indices.length;
+						dataPerVertex24 += indices.length * 4;
+						dataPerVertex += vertices.length;
+						this.indicesOffset = Std.int(dataPerVertex / 2);
+						this.index++;
+					}
 			}
 			data.index++;
 		}

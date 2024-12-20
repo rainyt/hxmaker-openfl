@@ -27,11 +27,19 @@ class SpineRender extends Scene {
 		// 获得spine精灵图
 		var spineAtlas:SpineTextureAtlas = cast assets.atlases.get("snowglobe-pro");
 		var data = spineAtlas.createSkeletonData(assets.strings.get("snowglobe-pro"));
-		var spine = new Spine(data);
-		this.addChild(spine);
-		spine.x = spine.y = 400;
-		spine.addEventListener(Event.UPDATE, (e) -> {
-			spine.update(1 / 60);
-		});
+		for (i in 0...100) {
+			var spine = new Spine(data);
+			this.addChild(spine);
+			spine.x = stage.stageWidth * Math.random();
+			spine.y = stage.stageHeight * Math.random();
+			spine.scaleX = spine.scaleY = 0.15;
+			this.addEventListener(Event.UPDATE, (e) -> {
+				spine.update(1 / 60);
+			});
+			for (animation in spine.skeleton.data.animations) {
+				trace(animation.name);
+			}
+			spine.animationState.setAnimationByName(0, "shake", true);
+		}
 	}
 }
