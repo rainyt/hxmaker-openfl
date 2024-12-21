@@ -40,13 +40,14 @@ class AllDisplayRender extends Scene {
 		this.addChild(spine);
 		spine.scaleX = spine.scaleY = 0.15;
 		spine.animationState.setAnimationByName(0, "idle", true);
-		spine.x = spine.y = 600;
+		spine.x = stage.stageWidth / 2;
+		spine.y = stage.stageHeight / 2;
 
 		// 文本
 		var label = new Label("Hello World");
 		this.addChild(label);
 		label.textFormat = new TextFormat(null, 56, 0xfff000);
-		label.x = stage.stageWidth / 2 - label.getTextWidth();
+		label.x = stage.stageWidth / 2 - label.getTextWidth() / 2;
 		label.y = stage.stageHeight / 2 - 300;
 
 		// 图片
@@ -60,7 +61,7 @@ class AllDisplayRender extends Scene {
 		graphic.beginFill(0xff0000);
 		graphic.drawTriangles([50, 0, 100, 100, 0, 100], [0, 1, 2], [0, 0, 0, 0, 0, 0]);
 		this.addChild(graphic);
-		graphic.x = stage.stageWidth / 2 - graphic.width - 400;
-		graphic.y = stage.stageHeight / 2 - graphic.height;
+		graphic.x = stage.stageWidth / 2 - graphic.width / 2;
+		graphic.y = stage.stageHeight / 2 - graphic.height / 2 + 300;
 	}
 }

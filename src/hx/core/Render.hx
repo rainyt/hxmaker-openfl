@@ -186,8 +186,8 @@ class Render implements IRender {
 	 * 渲染Label对象
 	 * @param image 
 	 */
-	public function renderLabel(label:Label):Void {
-		TextFieldRender.render(label, this);
+	public function renderLabel(label:Label, offScreenRender:Bool = false):Void {
+		TextFieldRender.render(label, offScreenRender ? null : this);
 	}
 
 	/**

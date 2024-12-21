@@ -82,18 +82,24 @@ class Text implements ITextFieldDataProvider {
 	/**
 	 * 文本宽度
 	 */
-	public var textWidth:Float = 0;
+	public var textWidth:Null<Float> = null;
 
 	/**
 	 * 文本高度
 	 */
-	public var textHeight:Float = 0;
+	public var textHeight:Null<Float> = null;
 
 	public function getTextWidth():Float {
+		if (this.textWidth == null) {
+			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
+		}
 		return this.textWidth;
 	}
 
 	public function getTextHeight():Float {
+		if (this.textWidth == null) {
+			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
+		}
 		return this.textHeight;
 	}
 
@@ -136,22 +142,24 @@ class Text implements ITextFieldDataProvider {
 					offestY += 60 * scale;
 				} else {
 					// 当空格处理
-					offestX += 30 * scale;
+					offestX += 30 * scale * 0.8;
 				}
 			}
 			label.updateAlignTranform();
 			label.__updateTransform(label.parent);
 		}
-		for (image in images) {
-			var __worldTransform = image.__worldTransform;
-			image.__worldAlpha = label.__worldAlpha * image.__alpha;
-			// 世界矩阵
-			__worldTransform.identity();
-			__worldTransform.scale(scale, scale);
-			__worldTransform.concat(image.__transform);
-			// var scale = 0.5;
-			__worldTransform.concat(label.__worldTransform);
-			ImageRender.render(image, render);
+		if (render != null) {
+			for (image in images) {
+				var __worldTransform = image.__worldTransform;
+				image.__worldAlpha = label.__worldAlpha * image.__alpha;
+				// 世界矩阵
+				__worldTransform.identity();
+				__worldTransform.scale(scale, scale);
+				__worldTransform.concat(image.__transform);
+				// var scale = 0.5;
+				__worldTransform.concat(label.__worldTransform);
+				ImageRender.render(image, render);
+			}
 		}
 	}
 }
