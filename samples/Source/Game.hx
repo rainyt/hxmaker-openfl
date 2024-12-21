@@ -1,3 +1,4 @@
+import test.Scale9GridRender;
 import test.AllDisplayRender;
 import hx.displays.TextFormat;
 import hx.displays.FPS;
@@ -25,6 +26,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.displays.Scene>> = [
+		Scale9GridRender,
 		AllDisplayRender,
 		SpineRender,
 		GraphicRender,

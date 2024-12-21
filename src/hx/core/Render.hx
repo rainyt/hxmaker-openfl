@@ -173,7 +173,11 @@ class Render implements IRender {
 	}
 
 	public function renderImage(image:Image):Void {
-		ImageRender.render(image, this);
+		if (image.scale9Grid != null) {
+			renderGraphics(image.getScale9GridGraphic());
+		} else {
+			ImageRender.render(image, this);
+		}
 	}
 
 	public function getMarix(display:DisplayObject):Matrix {
