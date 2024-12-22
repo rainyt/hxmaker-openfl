@@ -1,12 +1,12 @@
 package hx.render;
 
-import hx.displays.Graphic;
+import hx.display.Graphic;
 import hx.core.Render;
 
 /**
  * 图形渲染逻辑
  */
-@:access(hx.displays.Graphic)
+@:access(hx.display.Graphic)
 class GraphicRender {
 	/**
 	 * 渲染图形

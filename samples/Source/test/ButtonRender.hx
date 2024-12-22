@@ -1,11 +1,11 @@
 package test;
 
 import hx.events.Event;
-import hx.displays.TextFormat;
+import hx.display.TextFormat;
 import hx.utils.Assets;
-import hx.displays.DisplayObject;
-import hx.displays.Scene;
-import hx.displays.Button;
+import hx.display.DisplayObject;
+import hx.display.Scene;
+import hx.display.Button;
 
 class ButtonRender extends Scene {
 	/**

@@ -1,9 +1,9 @@
 package hx.render;
 
-import hx.displays.DisplayObject;
+import hx.display.DisplayObject;
 import hx.gemo.Matrix;
 import hx.core.Render;
-import hx.displays.Image;
+import hx.display.Image;
 
 /**
  * 图片渲染器支持

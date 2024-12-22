@@ -1,7 +1,7 @@
 package hx.core;
 
 import hx.utils.LoadData;
-import hx.displays.BitmapData;
+import hx.display.BitmapData;
 import hx.events.FutureErrorEvent;
 import openfl.Assets;
 import hx.utils.atlas.XmlAtlas;

@@ -3,12 +3,12 @@ package hx.render;
 import hx.utils.ColorUtils;
 import hx.gemo.ColorTransform;
 import openfl.utils.ObjectPool;
-import hx.displays.Image;
+import hx.display.Image;
 import hx.text.TextFieldContextBitmapData;
 import hx.providers.ITextFieldDataProvider;
 import openfl.text.TextField;
 import hx.core.Render;
-import hx.displays.Label;
+import hx.display.Label;
 
 /**
  * 文本渲染器，需要支持纹理渲染
@@ -51,7 +51,7 @@ class TextFieldRender {
 /**
  * 文本渲染显示对象
  */
-@:access(hx.displays.DisplayObject)
+@:access(hx.display.DisplayObject)
 class Text implements ITextFieldDataProvider {
 	/**
 	 * 回收池

@@ -1,7 +1,7 @@
 package hx.core;
 
 import openfl.display.BitmapData;
-import hx.displays.IBitmapData;
+import hx.display.IBitmapData;
 
 /**
  * OpenFL纹理

@@ -1,11 +1,11 @@
 package test;
 
-import hx.displays.DisplayObjectContainer;
-import hx.displays.DisplayObject;
+import hx.display.DisplayObjectContainer;
+import hx.display.DisplayObject;
 import hx.events.MouseEvent;
-import hx.displays.TextFormat;
-import hx.displays.Label;
-import hx.displays.Scene;
+import hx.display.TextFormat;
+import hx.display.Label;
+import hx.display.Scene;
 
 class LabelRender extends Scene {
 	override function onAddToStage() {

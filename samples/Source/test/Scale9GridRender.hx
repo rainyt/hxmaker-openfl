@@ -1,10 +1,10 @@
 package test;
 
-import hx.displays.DisplayObjectContainer;
+import hx.display.DisplayObjectContainer;
 import hx.gemo.Rectangle;
-import hx.displays.Image;
+import hx.display.Image;
 import hx.utils.Assets;
-import hx.displays.Scene;
+import hx.display.Scene;
 
 /**
  * 九宫格图处理

@@ -2,29 +2,29 @@ package hx.render;
 
 import hx.core.OpenFlBitmapData;
 import hx.gemo.Matrix;
-import hx.displays.Graphic;
+import hx.display.Graphic;
 import hx.core.Render;
 import openfl.display.BitmapData;
-import hx.displays.Image;
+import hx.display.Image;
 import openfl.Vector;
 
 /**
  * 图片缓存数据
  */
-@:access(hx.displays.Image)
-@:access(hx.displays.Graphic)
+@:access(hx.display.Image)
+@:access(hx.display.Graphic)
 @:access(hx.gemo.Matrix)
 class ImageBufferData {
 	/**
 	 * 只有1像素的位图
 	 */
-	public static var px1bitmapData(get, never):hx.displays.BitmapData;
+	public static var px1bitmapData(get, never):hx.display.BitmapData;
 
-	private static var __px1bitmapData:hx.displays.BitmapData;
+	private static var __px1bitmapData:hx.display.BitmapData;
 
-	private static function get_px1bitmapData():hx.displays.BitmapData {
+	private static function get_px1bitmapData():hx.display.BitmapData {
 		if (__px1bitmapData == null) {
-			__px1bitmapData = hx.displays.BitmapData.formData(new OpenFlBitmapData(new BitmapData(1, 1, false, 0xffffff)));
+			__px1bitmapData = hx.display.BitmapData.formData(new OpenFlBitmapData(new BitmapData(1, 1, false, 0xffffff)));
 		}
 		return __px1bitmapData;
 	}

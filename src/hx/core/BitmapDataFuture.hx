@@ -2,7 +2,7 @@ package hx.core;
 
 import hx.events.FutureErrorEvent;
 import openfl.utils.Assets;
-import hx.displays.BitmapData;
+import hx.display.BitmapData;
 import hx.utils.Future;
 
 /**

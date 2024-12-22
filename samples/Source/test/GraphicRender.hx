@@ -1,11 +1,11 @@
 package test;
 
-import hx.displays.Quad;
+import hx.display.Quad;
 import hx.events.Event;
-import hx.displays.Image;
+import hx.display.Image;
 import hx.utils.Assets;
-import hx.displays.Graphic;
-import hx.displays.Scene;
+import hx.display.Graphic;
+import hx.display.Scene;
 
 /**
  * 图形渲染用例

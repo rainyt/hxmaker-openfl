@@ -1,13 +1,13 @@
 package test;
 
-import hx.displays.DisplayObjectContainer;
+import hx.display.DisplayObjectContainer;
 import hx.events.MouseEvent;
-import hx.displays.TextFormat;
-import hx.displays.Label;
+import hx.display.TextFormat;
+import hx.display.Label;
 import hx.events.Event;
-import hx.displays.Image;
+import hx.display.Image;
 import hx.utils.Assets;
-import hx.displays.Scene;
+import hx.display.Scene;
 
 class WabbitRender extends Scene {
 	/**

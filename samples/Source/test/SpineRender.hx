@@ -1,12 +1,12 @@
 package test;
 
-import hx.displays.TextFormat;
-import hx.displays.FPS;
+import hx.display.TextFormat;
+import hx.display.FPS;
 import hx.events.Event;
-import hx.displays.Spine;
+import hx.display.Spine;
 import hx.utils.atlas.SpineTextureAtlas;
 import hx.utils.Assets;
-import hx.displays.Scene;
+import hx.display.Scene;
 
 class SpineRender extends Scene {
 	var assets:Assets = new Assets();

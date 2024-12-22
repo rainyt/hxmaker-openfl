@@ -1,15 +1,15 @@
 package test;
 
-import hx.displays.DisplayObject;
+import hx.display.DisplayObject;
 import hx.events.MouseEvent;
-import hx.displays.Quad;
-import hx.displays.TextFormat;
-import hx.displays.Label;
+import hx.display.Quad;
+import hx.display.TextFormat;
+import hx.display.Label;
 import hx.events.Event;
-import hx.displays.Image;
+import hx.display.Image;
 import hx.utils.Assets;
-import hx.displays.Scene;
-import hx.displays.DisplayObjectContainer;
+import hx.display.Scene;
+import hx.display.DisplayObjectContainer;
 
 /**
  * 测试图片渲染

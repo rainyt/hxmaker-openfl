@@ -1,7 +1,7 @@
 import test.Scale9GridRender;
 import test.AllDisplayRender;
-import hx.displays.TextFormat;
-import hx.displays.FPS;
+import hx.display.TextFormat;
+import hx.display.FPS;
 import test.SpineRender;
 import hx.events.KeyboardEvent;
 import hx.events.Keyboard;
@@ -9,8 +9,8 @@ import test.GraphicRender;
 import test.ButtonRender;
 import test.WabbitRender;
 import test.LabelRender;
-import hx.displays.Stage;
-import hx.displays.Scene;
+import hx.display.Stage;
+import hx.display.Scene;
 import test.ImageRender;
 
 /**
@@ -25,7 +25,7 @@ class Game extends Stage {
 	/**
 	 * 测试用例列表
 	 */
-	public static var tests:Array<Class<hx.displays.Scene>> = [
+	public static var tests:Array<Class<hx.display.Scene>> = [
 		Scale9GridRender,
 		AllDisplayRender,
 		SpineRender,

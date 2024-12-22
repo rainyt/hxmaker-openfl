@@ -2,7 +2,7 @@ package hx.core;
 
 import hx.utils.ContextStats;
 import hx.render.GraphicRender;
-import hx.displays.Graphic;
+import hx.display.Graphic;
 import hx.render.TextFieldRender;
 import hx.render.ImageBufferData;
 import hx.render.ImageRender;
@@ -11,23 +11,23 @@ import openfl.display.BitmapData;
 import openfl.display.ShaderParameter;
 import lime.graphics.opengl.GL;
 import openfl.display.Shader;
-import hx.displays.DisplayObject;
+import hx.display.DisplayObject;
 import openfl.geom.Matrix;
-import hx.displays.Quad;
+import hx.display.Quad;
 import openfl.text.TextFormat;
-import hx.displays.Label;
+import hx.display.Label;
 import openfl.utils.ObjectPool;
-import hx.displays.Image;
-import hx.displays.DisplayObjectContainer;
+import hx.display.Image;
+import hx.display.DisplayObjectContainer;
 import openfl.display.Sprite;
-import hx.displays.IRender;
+import hx.display.IRender;
 
 using Reflect;
 
 /**
  * OpenFL的渲染器支持
  */
-@:access(hx.displays.DisplayObject)
+@:access(hx.display.DisplayObject)
 @:access(openfl.geom.Matrix)
 class Render implements IRender {
 	/**

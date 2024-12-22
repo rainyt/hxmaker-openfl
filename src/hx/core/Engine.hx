@@ -5,13 +5,13 @@ import openfl.events.MouseEvent;
 import hx.utils.ScaleUtils;
 import haxe.Timer;
 import openfl.events.Event;
-import hx.displays.Stage;
+import hx.display.Stage;
 import openfl.display.Sprite;
 
 /**
  * OpenFL引擎上的引擎
  */
-@:access(hx.displays.Stage)
+@:access(hx.display.Stage)
 class Engine extends Sprite implements IEngine {
 	/**
 	 * 舞台对象

@@ -1,14 +1,14 @@
 package test;
 
-import hx.displays.Graphic;
-import hx.displays.Image;
-import hx.displays.TextFormat;
-import hx.displays.Label;
-import hx.displays.Spine;
+import hx.display.Graphic;
+import hx.display.Image;
+import hx.display.TextFormat;
+import hx.display.Label;
+import hx.display.Spine;
 import hx.utils.atlas.SpineTextureAtlas;
-import hx.displays.Quad;
+import hx.display.Quad;
 import hx.utils.Assets;
-import hx.displays.Scene;
+import hx.display.Scene;
 
 class AllDisplayRender extends Scene {
 	public var assets:Assets = new Assets();
@@ -46,7 +46,7 @@ class AllDisplayRender extends Scene {
 		// 文本
 		var label = new Label("Hello World");
 		this.addChild(label);
-		label.textFormat = new TextFormat(null, 56, 0xfff000);
+		label.textFormat = new TextFormat(null, 32, 0xfff000);
 		label.x = stage.stageWidth / 2 - label.getTextWidth() / 2;
 		label.y = stage.stageHeight / 2 - 300;
 

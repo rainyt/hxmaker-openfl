@@ -1,6 +1,6 @@
 package hx.text;
 
-import hx.displays.BitmapData;
+import hx.display.BitmapData;
 
 class FntFrame {
 	public var xoffset:Float = 0;
