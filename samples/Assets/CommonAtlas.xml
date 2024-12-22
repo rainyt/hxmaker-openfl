@@ -1,0 +1,5 @@
+<TextureAtlas build="Use zyeditui create.">
+    <SubTexture name="BiaoTiDi" height="111" width="1046" y="1" x="1" />
+    <SubTexture name="DiBuHengTiao" height="42" width="1015" y="114" x="1" />
+    <SubTexture name="s9_bg" height="48" slice9="10 29 34 28" width="61" y="1" x="1049" />
+</TextureAtlas>
