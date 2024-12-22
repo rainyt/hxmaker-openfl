@@ -26,12 +26,12 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		WabbitRender,
 		Scale9GridRender,
 		AllDisplayRender,
 		SpineRender,
 		GraphicRender,
 		ButtonRender,
-		WabbitRender,
 		ImageRender,
 		LabelRender
 	];

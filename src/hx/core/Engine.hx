@@ -13,6 +13,10 @@ import openfl.display.Sprite;
  */
 @:access(hx.display.Stage)
 class Engine extends Sprite implements IEngine {
+	@:noCompletion private var __stageWidth:Float = 0;
+
+	@:noCompletion private var __stageHeight:Float = 0;
+
 	/**
 	 * 舞台对象
 	 */
@@ -26,6 +30,8 @@ class Engine extends Sprite implements IEngine {
 		this.render = Type.createInstance(mainClasses, []);
 		this.render.__render = new hx.core.Render(this);
 		// 舞台尺寸计算
+		__stageWidth = stageWidth;
+		__stageHeight = stageHeight;
 		var scale = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, stageWidth, stageHeight);
 		this.scaleX = this.scaleY = scale;
 		render.__stageWidth = Std.int(this.stage.stageWidth / scale);
@@ -33,10 +39,19 @@ class Engine extends Sprite implements IEngine {
 		trace("Stage size and scale:", render.stageWidth, render.stageHeight, scale);
 		// 帧渲染事件
 		this.addEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
+		this.stage.addEventListener(Event.RESIZE, __onStageSizeEvent);
 		__lastTime = Timer.stamp();
 		this.render.onStageInit();
 		// 鼠标事件
 		__initMouseEvent();
+	}
+
+	private function __onStageSizeEvent(e:Event):Void {
+		var scale = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight);
+		this.scaleX = this.scaleY = scale;
+		render.__stageWidth = Std.int(this.stage.stageWidth / scale);
+		render.__stageHeight = Std.int(this.stage.stageHeight / scale);
+		render.dispatchEvent(new hx.events.Event(hx.events.Event.RESIZE));
 	}
 
 	private var __lastTime:Float = 0;
