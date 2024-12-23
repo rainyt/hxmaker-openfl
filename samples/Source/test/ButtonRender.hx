@@ -30,7 +30,7 @@ class ButtonRender extends Scene {
 	}
 
 	public function onLoaded() {
-		for (i in 0...3000) {
+		for (i in 0...1000) {
 			var button:Button = new Button("测试文案", {
 				up: assets.bitmapDatas.get("logo")
 			});

@@ -10,11 +10,13 @@ import hx.display.Image;
  */
 class ImageRender {
 	/**
-	 * 渲染图片
+	 * 渲染图片s
 	 * @param image 
 	 * @param render
 	 */
 	public static function render(image:Image, render:Render):Void {
+		if (image.data == null)
+			return;
 		// 当前渲染的图片缓存数据
 		var dataBuffer = render.imageBufferData[render.drawImageBuffDataIndex];
 		if (!dataBuffer.draw(image, render)) {

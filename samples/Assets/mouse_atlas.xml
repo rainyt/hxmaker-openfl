@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with TexturePacker https://www.codeandweb.com/texturepacker -->
+<!-- $TexturePacker:SmartUpdate:b84a97352b79f3d16a7c317646cf641e:9183285ca143a22b209da228b903470d:a5cecc92b7a83343c251227c51539326$ -->
+<TextureAtlas imagePath="mouse_atlas.png" width="993" height="177">
+    <SubTexture name="attack_00" x="861" y="1" width="64" height="49" frameX="-11" frameY="-28" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_01" x="927" y="1" width="65" height="48" frameX="-8" frameY="-29" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_02" x="619" y="54" width="67" height="47" frameX="-6" frameY="-31" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_03" x="756" y="53" width="64" height="46" frameX="-7" frameY="-32" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_04" x="1" y="77" width="67" height="67" frameX="-8" frameY="-8" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_05" x="1" y="1" width="67" height="74" frameX="-9" frameY="0" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_06" x="70" y="74" width="68" height="57" frameX="-11" frameY="-17" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_07" x="70" y="133" width="68" height="43" frameX="-19" frameY="-34" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_08" x="688" y="54" width="66" height="45" frameX="-15" frameY="-31" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="attack_09" x="915" y="52" width="64" height="49" frameX="-11" frameY="-28" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="dead_0" x="421" y="55" width="65" height="50" frameX="-11" frameY="-27" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="dead_1" x="140" y="58" width="71" height="53" frameX="-7" frameY="-20" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="dead_2" x="854" y="53" width="59" height="55" frameX="-9" frameY="-18" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="dead_3" x="70" y="1" width="56" height="71" frameX="-4" frameY="-16" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="dead_4" x="346" y="110" width="55" height="65" frameX="-4" frameY="-30" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="dead_5" x="128" y="1" width="69" height="55" frameX="-1" frameY="-43" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="dead_6" x="351" y="55" width="68" height="50" frameX="-6" frameY="-48" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_00" x="861" y="1" width="64" height="49" frameX="-11" frameY="-28" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_01" x="731" y="1" width="63" height="50" frameX="-11" frameY="-27" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_02" x="918" y="103" width="62" height="50" frameX="-11" frameY="-27" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_03" x="796" y="1" width="63" height="50" frameX="-10" frameY="-27" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_04" x="603" y="1" width="62" height="51" frameX="-10" frameY="-26" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_05" x="488" y="54" width="63" height="51" frameX="-9" frameY="-26" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_06" x="667" y="1" width="62" height="51" frameX="-9" frameY="-26" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_07" x="854" y="110" width="62" height="52" frameX="-9" frameY="-25" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_08" x="531" y="107" width="62" height="53" frameX="-9" frameY="-24" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_09" x="595" y="106" width="62" height="53" frameX="-9" frameY="-24" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_10" x="403" y="107" width="62" height="54" frameX="-9" frameY="-23" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_11" x="467" y="107" width="62" height="54" frameX="-10" frameY="-23" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_12" x="659" y="103" width="63" height="52" frameX="-10" frameY="-25" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_13" x="538" y="1" width="63" height="51" frameX="-11" frameY="-26" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="idle_14" x="553" y="54" width="64" height="50" frameX="-11" frameY="-27" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_00" x="277" y="112" width="67" height="52" frameX="-9" frameY="-14" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_01" x="199" y="1" width="67" height="54" frameX="-6" frameY="-19" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_02" x="724" y="101" width="63" height="52" frameX="-9" frameY="-25" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_03" x="208" y="113" width="67" height="53" frameX="-4" frameY="-23" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_04" x="213" y="57" width="67" height="53" frameX="-3" frameY="-20" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_05" x="471" y="1" width="65" height="51" frameX="-6" frameY="-18" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_06" x="336" y="1" width="66" height="52" frameX="-10" frameY="-14" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_07" x="268" y="1" width="66" height="53" frameX="-7" frameY="-19" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_08" x="789" y="101" width="63" height="52" frameX="-9" frameY="-25" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_09" x="282" y="56" width="67" height="52" frameX="-4" frameY="-23" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_10" x="140" y="113" width="66" height="54" frameX="-3" frameY="-20" frameWidth="91" frameHeight="101"/>
+    <SubTexture name="run_11" x="404" y="1" width="65" height="52" frameX="-6" frameY="-17" frameWidth="91" frameHeight="101"/>
+</TextureAtlas>

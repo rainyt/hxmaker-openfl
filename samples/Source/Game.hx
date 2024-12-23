@@ -1,3 +1,4 @@
+import test.MovieClipRender;
 import hx.display.Label;
 import test.BlendModeRender;
 import test.Scale9GridRender;
@@ -28,6 +29,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		MovieClipRender,
 		BlendModeRender,
 		WabbitRender,
 		Scale9GridRender,
