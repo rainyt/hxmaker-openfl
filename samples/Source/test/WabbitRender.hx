@@ -42,12 +42,6 @@ class WabbitRender extends Scene {
 		label.horizontalAlign = CENTER;
 		label.height = 50;
 		label.textFormat = new TextFormat(null, 46, 0xff0000);
-
-		this.stage.addEventListener(Event.RESIZE, onResize);
-	}
-
-	private function onResize(e:Event):Void {
-		trace("尺寸发生了变化", stage.stageWidth, stage.stageHeight);
 	}
 
 	public function onLoaded():Void {

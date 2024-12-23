@@ -1,5 +1,6 @@
 package hx.core;
 
+import openfl.geom.Rectangle;
 import openfl.events.KeyboardEvent;
 import openfl.events.MouseEvent;
 import hx.utils.ScaleUtils;
@@ -32,11 +33,6 @@ class Engine extends Sprite implements IEngine {
 		// 舞台尺寸计算
 		__stageWidth = stageWidth;
 		__stageHeight = stageHeight;
-		var scale = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, stageWidth, stageHeight);
-		this.scaleX = this.scaleY = scale;
-		render.__stageWidth = Std.int(this.stage.stageWidth / scale);
-		render.__stageHeight = Std.int(this.stage.stageHeight / scale);
-		trace("Stage size and scale:", render.stageWidth, render.stageHeight, scale);
 		// 帧渲染事件
 		this.addEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
 		this.stage.addEventListener(Event.RESIZE, __onStageSizeEvent);
@@ -44,6 +40,7 @@ class Engine extends Sprite implements IEngine {
 		this.render.onStageInit();
 		// 鼠标事件
 		__initMouseEvent();
+		__onStageSizeEvent(null);
 	}
 
 	private function __onStageSizeEvent(e:Event):Void {
@@ -52,6 +49,8 @@ class Engine extends Sprite implements IEngine {
 		render.__stageWidth = Std.int(this.stage.stageWidth / scale);
 		render.__stageHeight = Std.int(this.stage.stageHeight / scale);
 		render.dispatchEvent(new hx.events.Event(hx.events.Event.RESIZE));
+		trace("Stage size and scale:", render.stageWidth, render.stageHeight, scale);
+		this.scrollRect = new Rectangle(0, 0, render.__stageWidth, render.stageHeight);
 	}
 
 	private var __lastTime:Float = 0;
@@ -71,7 +70,6 @@ class Engine extends Sprite implements IEngine {
 	private function __initMouseEvent():Void {
 		this.stage.addEventListener(MouseEvent.MOUSE_DOWN, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
-		// this.stage.addEventListener(MouseEvent.CLICK, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
 		this.stage.addEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
@@ -102,5 +100,20 @@ class Engine extends Sprite implements IEngine {
 					render.handleMouseEvent(engineEvent);
 				}
 		}
+	}
+
+	/**
+	 * 释放引擎
+	 */
+	public function dispose():Void {
+		// 删除所有跟stage有关的事件
+		this.stage.removeEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
+		this.stage.removeEventListener(Event.RESIZE, __onStageSizeEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_DOWN, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
+		this.stage.removeEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
+		this.stage.removeEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
 	}
 }
