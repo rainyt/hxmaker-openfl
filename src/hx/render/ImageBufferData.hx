@@ -1,5 +1,6 @@
 package hx.render;
 
+import hx.display.BlendMode;
 import hx.core.OpenFlBitmapData;
 import hx.gemo.Matrix;
 import hx.display.Graphic;
@@ -80,6 +81,11 @@ class ImageBufferData {
 	public var smoothing:Bool = false;
 
 	/**
+	 * 渲染模式
+	 */
+	public var blendMode:BlendMode = null;
+
+	/**
 	 * 数据索引
 	 */
 	public var index = 0;
@@ -151,8 +157,9 @@ class ImageBufferData {
 						// 如果平滑值不同，则产生新的绘制
 						if (index == 0) {
 							smoothing = data.smoothing;
-							// } else if (smoothing != data.smoothing) {
-							// return false;
+							blendMode = graphic.blendMode;
+						} else if (blendMode != graphic.blendMode) {
+							return false;
 						}
 						// 可以绘制，记录纹理ID
 						var id = mapIds.get(texture);
@@ -226,8 +233,9 @@ class ImageBufferData {
 		// 如果平滑值不同，则产生新的绘制
 		if (index == 0) {
 			smoothing = image.smoothing;
-			// } else if (smoothing != image.smoothing) {
-			// return false;
+			blendMode = image.blendMode;
+		} else if (blendMode != image.blendMode) {
+			return false;
 		}
 		// 可以绘制，记录纹理ID
 		var id = mapIds.get(texture);

@@ -79,6 +79,16 @@ class Render implements IRender {
 			createImageBufferData(drawImageBuffDataIndex);
 			ContextStats.statsVertexCount(data.indices.length);
 			ContextStats.statsDrawCall();
+			switch data.blendMode {
+				case ADD:
+					shape.blendMode = ADD;
+				case MULTIPLY:
+					shape.blendMode = MULTIPLY;
+				case NORMAL:
+					shape.blendMode = NORMAL;
+				case SCREEN:
+					shape.blendMode = SCREEN;
+			}
 		}
 	}
 

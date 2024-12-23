@@ -1,3 +1,4 @@
+import test.BlendModeRender;
 import test.Scale9GridRender;
 import test.AllDisplayRender;
 import hx.display.TextFormat;
@@ -26,6 +27,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		BlendModeRender,
 		WabbitRender,
 		Scale9GridRender,
 		AllDisplayRender,
