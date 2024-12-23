@@ -104,6 +104,31 @@ class MultiTextureShader extends GraphicsShader {
 		}";
 	#end
 
+	@:glVertexHeader("attribute float openfl_Alpha_multi;
+		attribute vec4 openfl_ColorMultiplier_muti;
+		attribute vec4 openfl_ColorOffset_muti;
+		attribute vec4 openfl_Position;
+		attribute vec2 openfl_TextureCoord;
+		attribute float openfl_TextureId;
+		uniform mat4 openfl_Matrix;
+		uniform vec2 openfl_TextureSize;
+		uniform sampler2D uSampler0;
+		uniform sampler2D uSampler1;
+		uniform sampler2D uSampler2;
+		uniform sampler2D uSampler3;
+		uniform sampler2D uSampler4;
+		uniform sampler2D uSampler5;
+		uniform sampler2D uSampler6;
+		uniform sampler2D uSampler7;
+		uniform sampler2D uSampler8;
+		uniform sampler2D uSampler9;
+		uniform sampler2D uSampler10;
+		uniform sampler2D uSampler11;
+		uniform sampler2D uSampler12;
+		uniform sampler2D uSampler13;
+		uniform sampler2D uSampler14;
+		uniform sampler2D uSampler15;
+		uniform sampler2D uSampler16;")
 	public function new(supportedMultiTextureUnits:Int, code:ByteArray = null) {
 		__glVertexSource = vertexSource;
 

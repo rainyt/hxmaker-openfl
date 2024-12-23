@@ -130,7 +130,7 @@ class Render implements IRender {
 		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
 		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
 		supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
-		defalutShader = new MultiTextureShader(supportedMultiTextureUnits);
+		defalutShader = new MultiTextureShader(Std.int(Math.min(16, supportedMultiTextureUnits)));
 	}
 
 	public function clear():Void {

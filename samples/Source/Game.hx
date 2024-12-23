@@ -1,3 +1,5 @@
+import hx.events.MouseEvent;
+import hx.display.Quad;
 import hx.events.Event;
 import test.MovieClipRender;
 import hx.display.Label;
@@ -59,6 +61,23 @@ class Game extends Stage {
 		this.addChild(descText);
 		descText.textFormat = new TextFormat(null, 26, 0xffffff);
 
+		var lastButton = new Quad(100, 100, 0xff0000);
+		this.addChild(lastButton);
+		lastButton.y = stageHeight - lastButton.height;
+		lastButton.data = 0xff0000;
+		lastButton.alpha = 1;
+		lastButton.addEventListener(MouseEvent.CLICK, (e) -> {
+			last();
+		});
+
+		var nextButton = new Quad(100, 100, 0xff0000);
+		this.addChild(nextButton);
+		nextButton.x = stageWidth - nextButton.width;
+		nextButton.y = stageHeight - nextButton.height;
+		nextButton.addEventListener(MouseEvent.CLICK, (e) -> {
+			next();
+		});
+
 		this.showScene(0);
 		this.stage.addEventListener(Event.RESIZE, onStageSize);
 		onStageSize(null);
@@ -71,20 +90,28 @@ class Game extends Stage {
 		descText.y = stage.stageHeight - descText.getTextHeight() - 15;
 	}
 
+	private function next():Void {
+		index++;
+		if (index >= tests.length) {
+			index = 0;
+		}
+		showScene(index);
+	}
+
+	private function last():Void {
+		index--;
+		if (index < 0) {
+			index = tests.length - 1;
+		}
+		showScene(index);
+	}
+
 	private function onKeyUp(e:KeyboardEvent):Void {
 		switch e.keyCode {
 			case Keyboard.A:
-				index--;
-				if (index < 0) {
-					index = tests.length - 1;
-				}
-				showScene(index);
+				last();
 			case Keyboard.D:
-				index++;
-				if (index >= tests.length) {
-					index = 0;
-				}
-				showScene(index);
+				next();
 		}
 	}
 
