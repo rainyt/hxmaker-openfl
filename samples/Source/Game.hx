@@ -1,3 +1,4 @@
+import hx.display.Label;
 import test.BlendModeRender;
 import test.Scale9GridRender;
 import test.AllDisplayRender;
@@ -38,13 +39,29 @@ class Game extends Stage {
 		LabelRender
 	];
 
+	var title = new Label("Samples Name");
+
 	override function onStageInit() {
 		super.onStageInit();
-		this.showScene(0);
 		this.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);
+
 		var fps = new FPS();
 		fps.label.textFormat = new TextFormat(null, 32, 0xff0000);
 		this.addChild(fps);
+
+		title.textFormat = new TextFormat(null, 30, 0xffffff);
+		this.addChild(title);
+		title.textFormat = new TextFormat(null, 26, 0xffffff);
+		title.x = stage.stageWidth / 2 - title.getTextWidth() / 2;
+		title.y = stage.stageHeight - title.getTextHeight() - 55;
+
+		var descText = new Label("使用A/D切换样品（Use A/D to switch samples）");
+		this.addChild(descText);
+		descText.textFormat = new TextFormat(null, 26, 0xffffff);
+		descText.x = stage.stageWidth / 2 - descText.getTextWidth() / 2;
+		descText.y = stage.stageHeight - descText.getTextHeight() - 15;
+
+		this.showScene(0);
 	}
 
 	private function onKeyUp(e:KeyboardEvent):Void {
@@ -65,8 +82,11 @@ class Game extends Stage {
 	}
 
 	public function showScene(index:Int):Void {
-		this.removeChildren();
+		if (this.getChildAt(0) is Scene)
+			this.removeChildAt(0);
 		var scene:Scene = Type.createInstance(tests[index], []);
 		this.addChildAt(scene, 0);
+		title.data = Type.getClassName(Type.getClass(scene)) + " Samples";
+		title.x = stage.stageWidth / 2 - title.getTextWidth() / 2;
 	}
 }

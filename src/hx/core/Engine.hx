@@ -37,10 +37,10 @@ class Engine extends Sprite implements IEngine {
 		this.addEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
 		this.stage.addEventListener(Event.RESIZE, __onStageSizeEvent);
 		__lastTime = Timer.stamp();
+		__onStageSizeEvent(null);
 		this.render.onStageInit();
 		// 鼠标事件
 		__initMouseEvent();
-		__onStageSizeEvent(null);
 	}
 
 	private function __onStageSizeEvent(e:Event):Void {
