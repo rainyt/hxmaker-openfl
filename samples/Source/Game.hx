@@ -1,3 +1,4 @@
+import hx.events.Event;
 import test.MovieClipRender;
 import hx.display.Label;
 import test.BlendModeRender;
@@ -42,6 +43,7 @@ class Game extends Stage {
 	];
 
 	var title = new Label("Samples Name");
+	var descText = new Label("使用A/D切换样品（Use A/D to switch samples）");
 
 	override function onStageInit() {
 		super.onStageInit();
@@ -51,19 +53,22 @@ class Game extends Stage {
 		fps.label.textFormat = new TextFormat(null, 32, 0xff0000);
 		this.addChild(fps);
 
-		title.textFormat = new TextFormat(null, 30, 0xffffff);
 		this.addChild(title);
 		title.textFormat = new TextFormat(null, 26, 0xffffff);
-		title.x = stage.stageWidth / 2 - title.getTextWidth() / 2;
-		title.y = stage.stageHeight - title.getTextHeight() - 55;
 
-		var descText = new Label("使用A/D切换样品（Use A/D to switch samples）");
 		this.addChild(descText);
 		descText.textFormat = new TextFormat(null, 26, 0xffffff);
-		descText.x = stage.stageWidth / 2 - descText.getTextWidth() / 2;
-		descText.y = stage.stageHeight - descText.getTextHeight() - 15;
 
 		this.showScene(0);
+		this.stage.addEventListener(Event.RESIZE, onStageSize);
+		onStageSize(null);
+	}
+
+	private function onStageSize(e:Event):Void {
+		title.x = stage.stageWidth / 2 - title.getTextWidth() / 2;
+		title.y = stage.stageHeight - title.getTextHeight() - 55;
+		descText.x = stage.stageWidth / 2 - descText.getTextWidth() / 2;
+		descText.y = stage.stageHeight - descText.getTextHeight() - 15;
 	}
 
 	private function onKeyUp(e:KeyboardEvent):Void {

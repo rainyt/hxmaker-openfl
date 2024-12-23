@@ -29,6 +29,7 @@ class MovieClipRender extends Scene {
 		box = new DisplayObjectContainer();
 		this.addChild(box);
 		assets.loadAtlas("assets/mouse_atlas.png", "assets/mouse_atlas.xml");
+		assets.loadAtlas("assets/elfThunder.png", "assets/elfThunder.xml");
 		assets.onComplete((data) -> {
 			this.onLoaded();
 		}).onError(err -> {
@@ -54,8 +55,8 @@ class MovieClipRender extends Scene {
 	}
 
 	private function createBunny(counts = 5000):Void {
-		var bitmapDatas = assets.atlases.get("mouse_atlas").getBitmapDatasByName("run");
 		for (i in 0...counts) {
+			var bitmapDatas = assets.atlases.get(Std.random(2) == 1 ? "mouse_atlas" : "elfThunder").getBitmapDatasByName("run");
 			var bunny = new McBunny(bitmapDatas);
 			box.addChild(bunny);
 			bunny.x = Math.random() * this.stage.stageWidth;
@@ -63,6 +64,7 @@ class MovieClipRender extends Scene {
 			bunny.speedX = Math.random() * 5;
 			bunny.speedY = (Math.random() * 5) - 2.5;
 			bunnys.push(bunny);
+			bunny.play();
 		}
 		label.data = "数量：" + bunnys.length;
 	}
