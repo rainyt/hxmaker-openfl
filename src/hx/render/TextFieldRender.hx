@@ -150,14 +150,17 @@ class Text implements ITextFieldDataProvider {
 		}
 		if (render != null) {
 			for (image in images) {
-				var __worldTransform = image.__worldTransform;
-				image.__worldAlpha = label.__worldAlpha * image.__alpha;
-				// 世界矩阵
-				__worldTransform.identity();
-				__worldTransform.scale(scale, scale);
-				__worldTransform.concat(image.__transform);
-				// var scale = 0.5;
-				__worldTransform.concat(label.__worldTransform);
+				if (label.__transformDirty) {
+					var __worldTransform = image.__worldTransform;
+					image.__worldAlpha = label.__worldAlpha * image.__alpha;
+					image.setTransformDirty(true);
+					// 世界矩阵
+					__worldTransform.identity();
+					__worldTransform.scale(scale, scale);
+					__worldTransform.concat(image.__transform);
+					// var scale = 0.5;
+					__worldTransform.concat(label.__worldTransform);
+				}
 				ImageRender.render(image, render);
 			}
 		}

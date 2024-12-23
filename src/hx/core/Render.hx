@@ -188,6 +188,7 @@ class Render implements IRender {
 		} else {
 			ImageRender.render(image, this);
 		}
+		ContextStats.statsVisibleDisplayCounts();
 	}
 
 	public function getMarix(display:DisplayObject):Matrix {
@@ -202,6 +203,7 @@ class Render implements IRender {
 	 */
 	public function renderLabel(label:Label, offScreenRender:Bool = false):Void {
 		TextFieldRender.render(label, offScreenRender ? null : this);
+		ContextStats.statsVisibleDisplayCounts();
 	}
 
 	/**
@@ -210,6 +212,7 @@ class Render implements IRender {
 	 */
 	public function renderGraphics(graphics:Graphic):Void {
 		GraphicRender.render(graphics, this);
+		ContextStats.statsVisibleDisplayCounts();
 	}
 
 	/**
