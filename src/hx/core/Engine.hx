@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.utils.ContextStats;
 import openfl.geom.Rectangle;
 import openfl.events.KeyboardEvent;
 import openfl.events.MouseEvent;
@@ -60,11 +61,14 @@ class Engine extends Sprite implements IEngine {
 	private var __lastMouseY = 0.;
 
 	private function __onRenderEnterFrame(e:Event):Void {
+		ContextStats.statsCpuStart();
 		var now = Timer.stamp();
 		var dt = now - __lastTime;
 		__lastTime = now;
 		this.render.onUpdate(dt);
+		ContextStats.reset();
 		this.render.render();
+		ContextStats.statsCpu();
 	}
 
 	private function __initMouseEvent():Void {
