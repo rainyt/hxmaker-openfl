@@ -34,7 +34,7 @@ class GraphicRender extends Scene {
 
 	public function onLoaded() {
 		// 图形渲染
-		for (i in 0...1000) {
+		for (i in 0...25) {
 			var graphic = new Graphic();
 			this.addChild(graphic);
 			graphic.clear();
