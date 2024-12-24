@@ -35,7 +35,7 @@ class Render implements IRender {
 	/**
 	 * 默认的着色器支持
 	 */
-	public var defalutShader:Shader;
+	public static var defalutShader:Shader;
 
 	/**
 	 * 图片的缓存数据
@@ -121,16 +121,15 @@ class Render implements IRender {
 	 */
 	public var supportedMultiTextureUnits:Int = 1;
 
-	public function new(engine:Engine) {
+	public function new() {
 		this.__stage.mouseChildren = this.__stage.mouseEnabled = false;
-		engine.stage.addChild(this.__stage);
-		// this.engine = engine;
-		// this.engine.addChild(__stage);
 		// 使用多纹理支持
-		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
-		supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
-		defalutShader = new MultiTextureShader(Std.int(Math.min(16, supportedMultiTextureUnits)));
+		if (defalutShader == null) {
+			var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+			var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
+			supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
+			defalutShader = new MultiTextureShader(Std.int(Math.min(16, supportedMultiTextureUnits)));
+		}
 	}
 
 	public function clear():Void {
