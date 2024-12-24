@@ -1,5 +1,7 @@
 package;
 
+import hx.display.Label;
+import hx.display.Quad;
 import hx.core.Engine;
 import hx.core.Hxmaker;
 import hx.display.MakerDisplay;
@@ -13,8 +15,13 @@ class Main extends Sprite {
 	public function new() {
 		super();
 		this.stage.color = 0x404040;
-		var engine = Hxmaker.init(Engine, 1920, 1080);
-		engine.initOpenFLRoot(this);
-		engine.addToStage(new Game());
+		// var engine = Hxmaker.init(Engine, 1920, 1080);
+		// engine.initOpenFLRoot(this);
+		// engine.addToStage(new Game());
+
+		var hxmaker = new MakerDisplay(1000, 1000);
+		hxmaker.container.addChild(new Quad(100, 100, 0xff0000));
+		hxmaker.container.addChild(new Label("你好"));
+		this.addChild(hxmaker);
 	}
 }
