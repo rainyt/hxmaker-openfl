@@ -1,7 +1,6 @@
 package hx.core;
 
 import openfl.display.GraphicsShader;
-import openfl.display.Shader;
 import openfl.utils.ByteArray;
 import openfl.utils.ObjectPool;
 

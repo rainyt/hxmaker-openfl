@@ -126,6 +126,7 @@ class ImageBufferData {
 		setArrayLength(alphas, dataPerVertex6);
 		setArrayLength(colorMultiplier, dataPerVertex24);
 		setArrayLength(colorOffset, dataPerVertex24);
+		setArrayLength(drawDisplayList, index);
 		uvtData.length = dataPerVertex;
 	}
 

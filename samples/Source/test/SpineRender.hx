@@ -29,7 +29,7 @@ class SpineRender extends Scene {
 		// 获得spine精灵图
 		var spineAtlas:SpineTextureAtlas = cast assets.atlases.get("snowglobe-pro");
 		var data = spineAtlas.createSkeletonData(assets.strings.get("snowglobe-pro"));
-		for (i in 0...100) {
+		for (i in 0...50) {
 			var spine = new Spine(data);
 			this.addChild(spine);
 			spine.x = stage.stageWidth * Math.random();
