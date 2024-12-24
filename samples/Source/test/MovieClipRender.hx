@@ -47,14 +47,23 @@ class MovieClipRender extends Scene {
 	public function onLoaded():Void {
 		this.createBunny();
 		this.addEventListener(Event.UPDATE, onUpdateEvent);
-		this.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
+	}
+
+	override function onAddToStage() {
+		super.onAddToStage();
+		this.stage.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
+	}
+
+	override function onRemoveToStage() {
+		super.onRemoveToStage();
+		this.stage.removeEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
 	}
 
 	private function onMouseDown(e:MouseEvent):Void {
-		createBunny(5000);
+		createBunny(100);
 	}
 
-	private function createBunny(counts = 5000):Void {
+	private function createBunny(counts = 500):Void {
 		for (i in 0...counts) {
 			var bitmapDatas = assets.atlases.get(Std.random(2) == 1 ? "mouse_atlas" : "elfThunder").getBitmapDatasByName("run");
 			var bunny = new McBunny(bitmapDatas);

@@ -1,5 +1,8 @@
 package test;
 
+import hx.utils.atlas.SpineTextureAtlas;
+import hx.display.Spine;
+import hx.display.MovieClip;
 import hx.display.DisplayObjectContainer;
 import hx.events.MouseEvent;
 import hx.display.TextFormat;
@@ -9,7 +12,7 @@ import hx.display.Image;
 import hx.utils.Assets;
 import hx.display.Scene;
 
-class WabbitRender extends Scene {
+class SpineDuckRender extends Scene {
 	/**
 	 * 资源管理器
 	 */
@@ -17,7 +20,7 @@ class WabbitRender extends Scene {
 
 	var label = new Label();
 
-	var bunnys:Array<Bunny> = [];
+	var bunnys:Array<SpineBunny> = [];
 
 	var gravity = 0.5;
 
@@ -27,9 +30,8 @@ class WabbitRender extends Scene {
 		super.onStageInit();
 		box = new DisplayObjectContainer();
 		this.addChild(box);
-		for (i in 0...6) {
-			assets.loadBitmapData("assets/wabbit_alpha_" + (i + 1) + ".png");
-		}
+		assets.loadSpineAtlas("assets/spine/onionDuck.png", "assets/spine/onionDuck.atlas");
+		assets.loadString("assets/spine/onionDuck.json");
 		assets.onComplete((data) -> {
 			this.onLoaded();
 		}).onError(err -> {
@@ -60,18 +62,22 @@ class WabbitRender extends Scene {
 	}
 
 	private function onMouseDown(e:MouseEvent):Void {
-		createBunny(100);
+		createBunny(50);
 	}
 
-	private function createBunny(counts = 500):Void {
+	private function createBunny(counts = 50):Void {
 		for (i in 0...counts) {
-			var bunny = new Bunny(assets.bitmapDatas.get("wabbit_alpha_" + (Std.random(6) + 1)));
+			// var bitmapDatas = assets.atlases.get(Std.random(2) == 1 ? "mouse_atlas" : "elfThunder").getBitmapDatasByName("run");
+			var spineAtlas:SpineTextureAtlas = cast assets.atlases.get("onionDuck");
+			var bunny = new SpineBunny(spineAtlas.createSkeletonData(assets.strings.get("onionDuck")));
 			box.addChild(bunny);
 			bunny.x = Math.random() * this.stage.stageWidth;
 			bunny.y = Math.random() * this.stage.stageHeight;
 			bunny.speedX = Math.random() * 5;
 			bunny.speedY = (Math.random() * 5) - 2.5;
+			bunny.scaleX = bunny.scaleY = 0.5;
 			bunnys.push(bunny);
+			bunny.animationState.setAnimationByName(0, "run", true);
 		}
 		label.data = "数量：" + bunnys.length;
 	}
@@ -105,9 +111,9 @@ class WabbitRender extends Scene {
 }
 
 /**
- * 兔子
+ * Spine
  */
-class Bunny extends Image {
+class SpineBunny extends Spine {
 	public var speedX:Float = 1;
 	public var speedY:Float = 1;
 }
