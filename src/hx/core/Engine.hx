@@ -1,5 +1,9 @@
 package hx.core;
 
+import hx.gemo.Matrix;
+import hx.display.DisplayObjectContainer;
+import hx.display.IRender;
+import openfl.Lib;
 import openfl.system.System;
 import hx.utils.ContextStats;
 import openfl.geom.Rectangle;
@@ -14,45 +18,114 @@ import openfl.display.Sprite;
 /**
  * OpenFL引擎上的引擎
  */
+@:access(hx.display.DisplayObjectContainer)
 @:access(hx.display.Stage)
-class Engine extends Sprite implements IEngine {
+class Engine implements IEngine {
 	@:noCompletion private var __stageWidth:Float = 0;
 
 	@:noCompletion private var __stageHeight:Float = 0;
 
+	public function new() {}
+
 	/**
-	 * 舞台对象
+	 * 渲染
 	 */
-	public var render:Stage;
+	public var renderer:IRender;
+
+	public var stage:openfl.display.Stage;
+
+	/**
+	 * 舞台列表
+	 */
+	public var stages:Array<Stage> = [];
+
+	/**
+	 * 添加舞台
+	 * @param stage 
+	 */
+	public function addToStage(stage:Stage):Void {
+		if (stages.indexOf(stage) == -1) {
+			stages.push(stage);
+		}
+		stage.__stageWidth = this.stageWidth;
+		stage.__stageHeight = this.stageHeight;
+		stage.onStageInit();
+	}
+
+	/**
+	 * 移除舞台
+	 * @param stage 
+	 */
+	public function removeToStage(stage:Stage):Void {
+		stages.remove(stage);
+	}
+
+	/**
+	 * 初始化OpenFL的渲染，避免异常
+	 * @param root 
+	 */
+	public function initOpenFLRoot(root:Sprite):Void {
+		root.graphics.beginFill(0x404040, 1);
+		root.graphics.drawRect(-1, 0, 1, 1);
+		root.graphics.endFill();
+	}
 
 	/**
 	 * 初始化引擎入口类
 	 * @param mainClasses 
 	 */
-	public function init(mainClasses:Class<Stage>, stageWidth:Int, stageHeight:Int):Void {
-		this.render = Type.createInstance(mainClasses, []);
-		this.render.__render = new hx.core.Render(this);
+	public function init(stageWidth:Int, stageHeight:Int):Void {
+		this.stage = Lib.current.stage;
+		// 初始化渲染器
+		this.renderer = new hx.core.Render(this);
 		// 舞台尺寸计算
 		__stageWidth = stageWidth;
 		__stageHeight = stageHeight;
-		// 帧渲染事件
-		this.addEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
-		this.stage.addEventListener(Event.RESIZE, __onStageSizeEvent);
 		__lastTime = Timer.stamp();
 		__onStageSizeEvent(null);
-		this.render.onStageInit();
-		// 鼠标事件
-		__initMouseEvent();
+		__initStageEvent();
+	}
+
+	private function onAddedToStage(e:Event):Void {
+		__onStageSizeEvent(null);
+		__initStageEvent();
+	}
+
+	private function onRemovedFromStage(e:Event):Void {
+		__removeStageEvent();
+	}
+
+	/**
+	 * 缩放比例
+	 */
+	public var scaleFactor:Float = 1;
+
+	@:noCompletion private var ____stageWidth:Float = 0;
+	@:noCompletion private var ____stageHeight:Float = 0;
+
+	public var stageWidth(get, never):Float;
+
+	private function get_stageWidth():Float {
+		return ____stageWidth;
+	}
+
+	public var stageHeight(get, never):Float;
+
+	private function get_stageHeight():Float {
+		return ____stageHeight;
 	}
 
 	private function __onStageSizeEvent(e:Event):Void {
-		var scale = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight);
-		this.scaleX = this.scaleY = scale;
-		render.__stageWidth = Std.int(this.stage.stageWidth / scale);
-		render.__stageHeight = Std.int(this.stage.stageHeight / scale);
-		render.dispatchEvent(new hx.events.Event(hx.events.Event.RESIZE));
-		trace("Stage size and scale:", render.stageWidth, render.stageHeight, scale);
-		this.scrollRect = new Rectangle(0, 0, render.__stageWidth, render.stageHeight);
+		scaleFactor = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight);
+		____stageWidth = Std.int(this.stage.stageWidth / scaleFactor);
+		____stageHeight = Std.int(this.stage.stageHeight / scaleFactor);
+		var render = cast(renderer, Render);
+		render.stage.scaleX = render.stage.scaleY = scaleFactor;
+		for (stage in stages) {
+			stage.__stageWidth = this.stageWidth;
+			stage.__stageHeight = this.stageHeight;
+			stage.dispatchEvent(new hx.events.Event(hx.events.Event.RESIZE));
+		}
 	}
 
 	private var __lastTime:Float = 0;
@@ -64,13 +137,21 @@ class Engine extends Sprite implements IEngine {
 	private var __time = 1.;
 
 	private function __onRenderEnterFrame(e:Event):Void {
+		if (render == null)
+			return;
 		ContextStats.statsCpuStart();
 		var now = Timer.stamp();
 		var dt = now - __lastTime;
 		__lastTime = now;
-		this.render.onUpdate(dt);
+		for (stage in stages) {
+			stage.onUpdate(dt);
+		}
 		ContextStats.reset();
-		this.render.render();
+		renderer.clear();
+		for (stage in stages) {
+			this.render(stage);
+		}
+		renderer.endFill();
 		ContextStats.statsCpu();
 		__time += dt;
 		if (__time > 1) {
@@ -79,7 +160,15 @@ class Engine extends Sprite implements IEngine {
 		}
 	}
 
-	private function __initMouseEvent():Void {
+	private function __initStageEvent():Void {
+		#if cpp
+		this.stage.frameRate = 61;
+		#else
+		this.stage.frameRate = 60;
+		#end
+		// 帧渲染事件
+		this.stage.addEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
+		this.stage.addEventListener(Event.RESIZE, __onStageSizeEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_DOWN, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
@@ -88,28 +177,54 @@ class Engine extends Sprite implements IEngine {
 		this.stage.addEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
 	}
 
+	private function __removeStageEvent():Void {
+		this.stage.removeEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
+		this.stage.removeEventListener(Event.RESIZE, __onStageSizeEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_DOWN, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
+		this.stage.removeEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
+		this.stage.removeEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
+	}
+
 	private function __onKeyboardEvent(e:KeyboardEvent):Void {
 		var engineEvent:hx.events.KeyboardEvent = new hx.events.KeyboardEvent(e.type);
 		engineEvent.keyCode = e.keyCode;
-		render.handleKeyboardEvent(engineEvent);
+		for (stage in stages) {
+			stage.handleKeyboardEvent(engineEvent);
+		}
 	}
 
 	private function __onMouseEvent(e:MouseEvent):Void {
+		var openflRenderer:hx.core.Render = cast this.renderer;
 		var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(e.type);
-		engineEvent.stageX = this.mouseX;
-		engineEvent.stageY = this.mouseY;
-		render.handleMouseEvent(engineEvent);
+		engineEvent.stageX = openflRenderer.stage.mouseX;
+		engineEvent.stageY = openflRenderer.stage.mouseY;
+		var i = stages.length;
+		while (i-- > 0) {
+			var stage = stages[i];
+			if (stage.handleMouseEvent(engineEvent)) {
+				break;
+			}
+		}
 		switch e.type {
 			case MouseEvent.MOUSE_DOWN:
-				__lastMouseX = this.mouseX;
-				__lastMouseY = this.mouseY;
+				__lastMouseX = openflRenderer.stage.mouseX;
+				__lastMouseY = openflRenderer.stage.mouseY;
 			case MouseEvent.MOUSE_UP:
 				// 判断距离
-				if (Math.sqrt(Math.pow(__lastMouseX - this.mouseX, 2) + Math.pow(__lastMouseY - this.mouseY, 2)) < 10) {
+				if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 10) {
 					var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(hx.events.MouseEvent.CLICK);
-					engineEvent.stageX = this.mouseX;
-					engineEvent.stageY = this.mouseY;
-					render.handleMouseEvent(engineEvent);
+					engineEvent.stageX = openflRenderer.stage.mouseX;
+					engineEvent.stageY = openflRenderer.stage.mouseY;
+					var i = stages.length;
+					while (i-- > 0) {
+						var stage = stages[i];
+						if (stage.handleMouseEvent(engineEvent)) {
+							break;
+						}
+					}
 				}
 		}
 	}
@@ -119,13 +234,19 @@ class Engine extends Sprite implements IEngine {
 	 */
 	public function dispose():Void {
 		// 删除所有跟stage有关的事件
-		this.stage.removeEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
-		this.stage.removeEventListener(Event.RESIZE, __onStageSizeEvent);
-		this.stage.removeEventListener(MouseEvent.MOUSE_DOWN, __onMouseEvent);
-		this.stage.removeEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
-		this.stage.removeEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
-		this.stage.removeEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
-		this.stage.removeEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
-		this.stage.removeEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
+		__removeStageEvent();
+	}
+
+	/**
+	 * 引擎渲染逻辑
+	 * @param display 
+	 * @param parentMatrix
+	 */
+	public function render(display:DisplayObjectContainer, ?parentMatrix:Matrix):Void {
+		if (display.__dirty) {
+			display.__updateTransform(display);
+			renderer.renderDisplayObjectContainer(display);
+			display.__dirty = false;
+		}
 	}
 }

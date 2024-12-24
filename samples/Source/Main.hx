@@ -1,17 +1,20 @@
 package;
 
+import hx.core.Engine;
+import hx.core.Hxmaker;
+import hx.display.MakerDisplay;
+import openfl.display.Sprite;
 import openfl.display.FPS;
 
 /**
  * 使用`hxmaker`游戏引擎
  */
-class Main extends hx.core.Engine {
+class Main extends Sprite {
 	public function new() {
 		super();
-		this.graphics.beginFill(0x404040);
-		this.graphics.drawRect(0, 0, stage.stageWidth, stage.stageHeight);
-		this.graphics.endFill();
 		this.stage.color = 0x404040;
-		this.init(Game, 1920, 1080);
+		var engine = Hxmaker.init(Engine, 1920, 1080);
+		engine.initOpenFLRoot(this);
+		engine.addToStage(new Game());
 	}
 }

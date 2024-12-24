@@ -114,7 +114,7 @@ class Render implements IRender {
 	/**
 	 * 游戏引擎对象
 	 */
-	public var engine:Engine;
+	// public var engine:Engine;
 
 	/**
 	 * 多纹理支持的纹理单元数量
@@ -123,13 +123,9 @@ class Render implements IRender {
 
 	public function new(engine:Engine) {
 		this.__stage.mouseChildren = this.__stage.mouseEnabled = false;
-		this.engine = engine;
-		this.engine.addChild(__stage);
-		#if cpp
-		engine.stage.frameRate = 61;
-		#else
-		engine.stage.frameRate = 60;
-		#end
+		engine.stage.addChild(this.__stage);
+		// this.engine = engine;
+		// this.engine.addChild(__stage);
 		// 使用多纹理支持
 		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
 		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
