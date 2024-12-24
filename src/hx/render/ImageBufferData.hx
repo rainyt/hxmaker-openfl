@@ -129,6 +129,7 @@ class ImageBufferData {
 		indices.length = dataPerVertex6;
 		setArrayLength(ids, dataPerVertex6);
 		setArrayLength(alphas, dataPerVertex6);
+		setArrayLength(hasColorTransform, dataPerVertex6);
 		setArrayLength(colorMultiplier, dataPerVertex24);
 		setArrayLength(colorOffset, dataPerVertex24);
 		setArrayLength(drawDisplayList, index);
