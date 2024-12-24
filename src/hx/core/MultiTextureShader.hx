@@ -20,12 +20,14 @@ class MultiTextureShader extends GraphicsShader {
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
+		attribute float openfl_HasColorTransform_muti;
 
 		varying float openfl_Alphav;
 		varying vec4 openfl_ColorMultiplierv;
 		varying vec4 openfl_ColorOffsetv;
 		varying vec2 openfl_TextureCoordv;
 		varying float openfl_TextureIdv;
+		varying float openfl_HasColorTransform_mutiv;
 		
 		uniform mat4 openfl_Matrix;
 		uniform vec2 openfl_TextureSize;
@@ -35,9 +37,14 @@ class MultiTextureShader extends GraphicsShader {
 			openfl_Alphav = openfl_Alpha_multi;
             openfl_TextureCoordv = openfl_TextureCoord;
             openfl_TextureIdv = openfl_TextureId;
+			openfl_HasColorTransform_mutiv = openfl_HasColorTransform_muti;
 
-			openfl_ColorMultiplierv = openfl_ColorMultiplier_muti;
-			openfl_ColorOffsetv = openfl_ColorOffset_muti / 255.0;
+			if (openfl_HasColorTransform_muti > 0.5) {
+
+				openfl_ColorMultiplierv = openfl_ColorMultiplier_muti;
+				openfl_ColorOffsetv = openfl_ColorOffset_muti / 255.0;
+
+			}
 
             gl_Position = openfl_Matrix * openfl_Position;
 
@@ -57,6 +64,7 @@ class MultiTextureShader extends GraphicsShader {
 		varying vec4 openfl_ColorMultiplierv;
 		varying vec4 openfl_ColorOffsetv;
 		varying vec2 openfl_TextureCoordv;
+		varying float openfl_HasColorTransform_mutiv;
 		varying float openfl_TextureIdv;
 
 		uniform sampler2D SAMPLER_INJECT;
@@ -74,7 +82,7 @@ class MultiTextureShader extends GraphicsShader {
 
 			gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
 
-		} else {
+		} else if (openfl_HasColorTransform_mutiv > 0.5) {
 
 			color = vec4 (color.rgb / color.a, color.a);
 
@@ -96,6 +104,10 @@ class MultiTextureShader extends GraphicsShader {
 
 			}
 
+		} else {
+
+			gl_FragColor = color * openfl_Alphav;
+
 		}
 
 		// gl_FragColor = vec4(1.,0.,0.,1.);
@@ -106,6 +118,7 @@ class MultiTextureShader extends GraphicsShader {
 	@:glVertexHeader("attribute float openfl_Alpha_multi;
 		attribute vec4 openfl_ColorMultiplier_muti;
 		attribute vec4 openfl_ColorOffset_muti;
+		attribute bool openfl_HasColorTransform_muti;
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
