@@ -119,7 +119,7 @@ class Render implements IRender {
 	/**
 	 * 多纹理支持的纹理单元数量
 	 */
-	public var supportedMultiTextureUnits:Int = 1;
+	public static var supportedMultiTextureUnits:Int = 1;
 
 	public function new() {
 		this.__stage.mouseChildren = this.__stage.mouseEnabled = false;

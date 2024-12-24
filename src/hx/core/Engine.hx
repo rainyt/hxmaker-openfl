@@ -144,15 +144,21 @@ class Engine implements IEngine {
 		var now = Timer.stamp();
 		var dt = now - __lastTime;
 		__lastTime = now;
+		var __dirty = false;
 		for (stage in stages) {
 			stage.onUpdate(dt);
+			if (stage.__dirty) {
+				__dirty = true;
+			}
 		}
 		ContextStats.reset();
-		renderer.clear();
-		for (stage in stages) {
-			this.render(stage);
+		if (__dirty) {
+			renderer.clear();
+			for (stage in stages) {
+				this.render(stage);
+			}
+			renderer.endFill();
 		}
-		renderer.endFill();
 		ContextStats.statsCpu();
 		__time += dt;
 		if (__time > 1) {
@@ -244,10 +250,8 @@ class Engine implements IEngine {
 	 * @param parentMatrix
 	 */
 	public function render(display:DisplayObjectContainer, ?parentMatrix:Matrix):Void {
-		if (display.__dirty) {
-			display.__updateTransform(display);
-			renderer.renderDisplayObjectContainer(display);
-			display.__dirty = false;
-		}
+		display.__updateTransform(display);
+		renderer.renderDisplayObjectContainer(display);
+		display.__dirty = false;
 	}
 }

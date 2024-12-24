@@ -169,7 +169,7 @@ class ImageBufferData {
 					if (data.currentBitmapData != null) {
 						var texture = data.currentBitmapData.data.getTexture();
 						if (index == 0 || !mapIds.exists(texture)) {
-							if (bitmapDatas.length >= render.supportedMultiTextureUnits) {
+							if (bitmapDatas.length >= Render.supportedMultiTextureUnits) {
 								return false;
 							}
 						}
@@ -272,7 +272,7 @@ class ImageBufferData {
 	public function draw(image:Image, render:Render):Bool {
 		var texture = image.data.data.getTexture();
 		if (index == 0 || !mapIds.exists(texture)) {
-			if (bitmapDatas.length >= render.supportedMultiTextureUnits) {
+			if (bitmapDatas.length >= Render.supportedMultiTextureUnits) {
 				return false;
 			}
 		}
