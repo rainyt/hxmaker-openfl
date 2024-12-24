@@ -1,5 +1,7 @@
 package hx.core;
 
+import hx.render.CustomDisplayObjectRender;
+import hx.display.CustomDisplayObject;
 import hx.utils.ContextStats;
 import hx.render.GraphicRender;
 import hx.display.Graphic;
@@ -178,9 +180,23 @@ class Render implements IRender {
 				renderLabel(cast object);
 			} else if (object is Graphic) {
 				renderGraphics(cast object);
+			} else if (object is CustomDisplayObject) {
+				renderCustomDisplayObject(cast object);
 			}
 		}
 		container.__dirty = false;
+	}
+
+	/**
+	 * 渲染自定义对象
+	 * @param displayObject 
+	 */
+	public function renderCustomDisplayObject(displayObject:CustomDisplayObject):Void {
+		this.endFillImageDataBuffer();
+		if (displayObject.root != null) {
+			CustomDisplayObjectRender.render(displayObject, this);
+		}
+		ContextStats.statsVisibleDisplayCounts();
 	}
 
 	public function renderImage(image:Image):Void {
