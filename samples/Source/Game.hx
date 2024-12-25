@@ -60,6 +60,9 @@ class Game extends Stage {
 		var fps = new FPS();
 		fps.label.textFormat = new TextFormat(null, 32, 0xff0000);
 		this.addChild(fps);
+		fps.addEventListener(Event.UPDATE, (e) -> {
+			fps.x = stageWidth - fps.width - 10;
+		});
 
 		this.addChild(title);
 		title.textFormat = new TextFormat(null, 26, 0xffffff);
@@ -84,9 +87,18 @@ class Game extends Stage {
 			next();
 		});
 
+		// 左侧菜单
+		var leftMenu = new ui.Menus();
+		this.addChild(leftMenu);
+
 		this.showScene(0);
 		this.stage.addEventListener(Event.RESIZE, onStageSize);
 		onStageSize(null);
+
+		this.stage.addEventListener("changeScene", (e:Event) -> {
+			index = tests.indexOf(e.data);
+			showScene(index);
+		});
 	}
 
 	private function onStageSize(e:Event):Void {
