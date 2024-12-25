@@ -1,3 +1,4 @@
+import test.LayoutRender;
 import test.CustomRender;
 import test.SpineDuckRender;
 import hx.events.MouseEvent;
@@ -34,6 +35,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		LayoutRender,
 		CustomRender,
 		SpineDuckRender,
 		ButtonRender,
