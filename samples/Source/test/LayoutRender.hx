@@ -1,5 +1,7 @@
 package test;
 
+import hx.layout.FlowLayout;
+import hx.display.Box;
 import hx.layout.VerticalLayout;
 import hx.display.Quad;
 import hx.layout.HorizontalLayout;
@@ -12,6 +14,17 @@ import hx.display.Scene;
 class LayoutRender extends Scene {
 	override function onStageInit() {
 		super.onStageInit();
+
+		// 虚拟盒子 + 流布局
+		var virvaulBox = new Box();
+		virvaulBox.layout = new FlowLayout();
+		for (i in 0...50) {
+			var quad = new Quad(100, 100, Std.random(0xffffff));
+			virvaulBox.addChild(quad);
+		}
+		virvaulBox.width = stage.stageWidth;
+		this.addChild(virvaulBox);
+		virvaulBox.y = stage.stageHeight - virvaulBox.height - 100;
 
 		// 横向布局
 		var box = new Sprite();
