@@ -1,3 +1,6 @@
+import hx.layout.AnchorLayoutData;
+import hx.layout.AnchorLayout;
+import test.AnchorLayoutRender;
 import test.LayoutRender;
 import test.CustomRender;
 import test.SpineDuckRender;
@@ -35,6 +38,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		AnchorLayoutRender,
 		LayoutRender,
 		CustomRender,
 		SpineDuckRender,
@@ -60,19 +64,26 @@ class Game extends Stage {
 		var fps = new FPS();
 		fps.label.textFormat = new TextFormat(null, 32, 0xff0000);
 		this.addChild(fps);
-		fps.addEventListener(Event.UPDATE, (e) -> {
-			fps.x = stageWidth - fps.width - 10;
-		});
+		fps.layoutData = AnchorLayoutData.topRight(0, 0);
+
+		this.layout = new AnchorLayout();
 
 		this.addChild(title);
 		title.textFormat = new TextFormat(null, 26, 0xffffff);
+		title.layoutData = AnchorLayoutData.bottomCenter(55, 0);
 
 		this.addChild(descText);
 		descText.textFormat = new TextFormat(null, 26, 0xffffff);
+		descText.width = descText.getTextWidth();
+		descText.layoutData = AnchorLayoutData.bottomCenter(15, 0);
+
+		// 左侧菜单
+		var leftMenu = new ui.Menus();
+		leftMenu.layoutData = AnchorLayoutData.fillVertical(0);
 
 		var lastButton = new Quad(100, 100, 0xff0000);
 		this.addChild(lastButton);
-		lastButton.y = stageHeight - lastButton.height;
+		lastButton.layoutData = AnchorLayoutData.bottomLeft(0, leftMenu.width);
 		lastButton.data = 0xff0000;
 		lastButton.alpha = 1;
 		lastButton.addEventListener(MouseEvent.CLICK, (e) -> {
@@ -81,31 +92,19 @@ class Game extends Stage {
 
 		var nextButton = new Quad(100, 100, 0xff0000);
 		this.addChild(nextButton);
-		nextButton.x = stageWidth - nextButton.width;
-		nextButton.y = stageHeight - nextButton.height;
+		nextButton.layoutData = AnchorLayoutData.bottomRight();
 		nextButton.addEventListener(MouseEvent.CLICK, (e) -> {
 			next();
 		});
 
-		// 左侧菜单
-		var leftMenu = new ui.Menus();
 		this.addChild(leftMenu);
 
 		this.showScene(0);
-		this.stage.addEventListener(Event.RESIZE, onStageSize);
-		onStageSize(null);
 
 		this.stage.addEventListener("changeScene", (e:Event) -> {
 			index = tests.indexOf(e.data);
 			showScene(index);
 		});
-	}
-
-	private function onStageSize(e:Event):Void {
-		title.x = stage.stageWidth / 2 - title.getTextWidth() / 2;
-		title.y = stage.stageHeight - title.getTextHeight() - 55;
-		descText.x = stage.stageWidth / 2 - descText.getTextWidth() / 2;
-		descText.y = stage.stageHeight - descText.getTextHeight() - 15;
 	}
 
 	private function next():Void {
@@ -140,5 +139,7 @@ class Game extends Stage {
 		this.addChildAt(scene, 0);
 		title.data = Type.getClassName(Type.getClass(scene)) + " Samples";
 		title.x = stage.stageWidth / 2 - title.getTextWidth() / 2;
+		title.width = title.getTextWidth();
+		this.updateLayout();
 	}
 }

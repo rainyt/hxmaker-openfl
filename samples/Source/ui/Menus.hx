@@ -1,5 +1,7 @@
 package ui;
 
+import hx.layout.AnchorLayoutData;
+import hx.layout.AnchorLayout;
 import hx.events.Event;
 import hx.events.MouseEvent;
 import hx.display.TextFormat;
@@ -15,11 +17,13 @@ import hx.display.DisplayObject;
  * 左侧栏功能模块
  */
 class Menus extends Box {
-	override function onStageInit() {
-		super.onStageInit();
+	override function onInit() {
+		super.onInit();
+		this.layout = new AnchorLayout();
 		this.width = 250;
-		this.height = stage.stageHeight;
+		// this.height = stage.stageHeight;
 		var bg = new Quad(this.width, this.height, 0x282828);
+		bg.layoutData = AnchorLayoutData.fill();
 		this.addChild(bg);
 		var box = new Box();
 		this.addChild(box);
