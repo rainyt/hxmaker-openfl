@@ -1,5 +1,8 @@
 package test;
 
+import hx.display.Box;
+import hx.layout.AnchorLayoutData;
+import hx.layout.AnchorLayout;
 import hx.display.Graphic;
 import hx.display.Image;
 import hx.display.TextFormat;
@@ -32,36 +35,42 @@ class AllDisplayRender extends Scene {
 		// Quad
 		var quad = new Quad(200, 200, 0xfff000);
 		this.addChild(quad);
+		quad.layoutData = AnchorLayoutData.topLeft(0, 250);
+
+		this.layout = new AnchorLayout();
 
 		// Spine
 		var spineAtlas:SpineTextureAtlas = cast assets.atlases.get("snowglobe-pro");
 		var data = spineAtlas.createSkeletonData(assets.strings.get("snowglobe-pro"));
 		var spine = new Spine(data);
-		this.addChild(spine);
+		var box = new Box();
+		box.width = box.height = 1;
+		this.addChild(box);
+		box.addChild(spine);
 		spine.scaleX = spine.scaleY = 0.15;
 		spine.animationState.setAnimationByName(0, "idle", true);
-		spine.x = stage.stageWidth / 2;
-		spine.y = stage.stageHeight / 2;
+		// 让spine居中
+		trace("spine", spine.getBounds());
+		box.layoutData = AnchorLayoutData.center();
 
 		// 文本
 		var label = new Label("Hello World");
 		this.addChild(label);
 		label.textFormat = new TextFormat(null, 32, 0xfff000);
-		label.x = stage.stageWidth / 2 - label.getTextWidth() / 2;
-		label.y = stage.stageHeight / 2 - 300;
+		label.width = label.getTextWidth();
+		spine.layoutData = AnchorLayoutData.center(0, -300);
 
 		// 图片
 		var image = new Image(assets.bitmapDatas.get("logo"));
 		this.addChild(image);
-		image.x = stage.stageWidth - image.width;
-		image.y = stage.stageHeight - image.height;
+		image.layoutData = AnchorLayoutData.bottomRight();
 
 		// 图形
 		var graphic:Graphic = new Graphic();
 		graphic.beginFill(0xff0000);
 		graphic.drawTriangles([50, 0, 100, 100, 0, 100], [0, 1, 2], [0, 0, 0, 0, 0, 0]);
 		this.addChild(graphic);
-		graphic.x = stage.stageWidth / 2 - graphic.width / 2;
-		graphic.y = stage.stageHeight / 2 - graphic.height / 2 + 300;
+		trace("graphic", graphic.getBounds());
+		graphic.layoutData = AnchorLayoutData.center(0, 300);
 	}
 }
