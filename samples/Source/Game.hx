@@ -39,8 +39,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
-		XmlRender
-		,
+		XmlRender,
 		AnchorLayoutRender,
 		LayoutRender,
 		CustomRender,
@@ -62,6 +61,10 @@ class Game extends Stage {
 
 	override function onStageInit() {
 		super.onStageInit();
+
+		// 设置默认字体
+		TextFormat.defaultFont = "assets/font/SourceHanSansSC-Bold.otf";
+
 		this.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);
 
 		var fps = new FPS();

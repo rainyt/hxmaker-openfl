@@ -73,8 +73,7 @@ class TextFieldContextBitmapData {
 		bitmapData = new BitmapData(textureWidth, textureHeight, true, 0x0);
 		rects = new MaxRectsBinPack(textureWidth, textureHeight, false);
 		bitmapData.disposeImage();
-		// var fontPath = #if ios "assets/" + ZConfig.fontName #else ZConfig.fontName #end;
-		var fontPath = null;
+		var fontPath = #if ios "assets/" + hx.display.TextFormat.defaultFont #else hx.display.TextFormat.defaultFont #end;
 		__textFormat = new TextFormat(fontPath, size, 0xffffff);
 		__textFormat.leading = Std.int(size / 2);
 		__textField = new TextField();
