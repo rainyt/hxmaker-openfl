@@ -131,6 +131,10 @@ class Text implements ITextFieldDataProvider {
 					image.x = offestX;
 					image.y = offestY;
 					offestX += fntFrame.xadvance * scale;
+					if (label.__width != null && offestX > label.width) {
+						offestX = 0;
+						offestY += 60 * scale;
+					}
 					if (offestX > textWidth)
 						textWidth = offestX;
 					if (offestY + fntFrame.data.rect.height * scale > textHeight) {

@@ -1,0 +1,16 @@
+<Scene>
+    <!-- 精灵图鉴 -->
+    <atlas path="assets/CommonAtlas" />
+    <Quad left="0" top="0" bottom="0" right="0" color="0x0" alpha="0.8" />
+    <Box width="1046" top="100" bottom="100" centerX="0" centerY="0">
+        <Image src="CommonAtlas:s9_bg" left="20" right="20" height="95%" bottom="0" />
+        <Image src="CommonAtlas:BiaoTiDi" />
+        <Image id="img" src="assets/logo.jpg" right="60" centerY="0" scaleX="1.5" scaleY="1.5" />
+        <Label width="300" text="内容标题" color="0xffffff" fontSize="56" height="60" centerX="0" y="25"
+            hAlign="center" vAlign="center" />
+        <Label
+            text="你好，这是hxmaker的UI简易布局测试样例。测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容"
+            color="0xffffff" fontSize="36" left="60" width="500"
+            centerY="50" hAlign="left" vAlign="center" />
+    </Box>
+</Scene>

@@ -1,3 +1,4 @@
+import test.XmlRender;
 import hx.layout.AnchorLayoutData;
 import hx.layout.AnchorLayout;
 import test.AnchorLayoutRender;
@@ -38,6 +39,8 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		XmlRender
+		,
 		AnchorLayoutRender,
 		LayoutRender,
 		CustomRender,
@@ -139,7 +142,6 @@ class Game extends Stage {
 		this.addChildAt(scene, 0);
 		title.data = Type.getClassName(Type.getClass(scene)) + " Samples";
 		title.x = stage.stageWidth / 2 - title.getTextWidth() / 2;
-		title.width = title.getTextWidth();
 		this.updateLayout();
 	}
 }
