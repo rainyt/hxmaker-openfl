@@ -113,6 +113,8 @@ class Render implements IRender {
 
 	private var __pool:ObjectPool<EngineSprite> = new ObjectPool<EngineSprite>(() -> {
 		return new EngineSprite();
+	}, (sprite) -> {
+		sprite.scrollRect = null;
 	});
 
 	/**
@@ -191,18 +193,18 @@ class Render implements IRender {
 			var shape = endFillImageDataBuffer();
 			if (shape != null) {
 				// 遮罩
-				if (shape.scrollRect == null) {
-					var ret = new hx.gemo.Rectangle();
-					container.makeRect.transform(ret, container.__worldTransform);
-					__maskRect.setTo(ret.x, ret.y, ret.width, ret.height);
-					shape.scrollRect = __maskRect;
-					shape.x = ret.x;
-					shape.y = ret.y;
-				}
+				__retRect.setTo(0, 0, 0, 0);
+				container.makeRect.transform(__retRect, container.__worldTransform);
+				__maskRect.setTo(__retRect.x, __retRect.y, __retRect.width, __retRect.height);
+				shape.scrollRect = __maskRect;
+				shape.x = __retRect.x;
+				shape.y = __retRect.y;
 			}
 		}
 		container.__dirty = false;
 	}
+
+	private static var __retRect:hx.gemo.Rectangle = new hx.gemo.Rectangle();
 
 	private static var __maskRect:Rectangle = new Rectangle();
 
