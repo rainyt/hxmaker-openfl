@@ -74,43 +74,43 @@ class MultiTextureShader extends GraphicsShader {
 		void main(void) {
 
 			vec4 color;
-		//vec4 color = texture2D (openfl_Texture, openfl_TextureCoordv);
-		float vTextureId = openfl_TextureIdv;
-		color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);
+			//vec4 color = texture2D (openfl_Texture, openfl_TextureCoordv);
+			float vTextureId = openfl_TextureIdv;
+			color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);
 
-		if (color.a == 0.0) {
-
-			gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
-
-		} else if (openfl_HasColorTransform_mutiv > 0.5) {
-
-			color = vec4 (color.rgb / color.a, color.a);
-
-			mat4 colorMultiplier = mat4 (0);
-			colorMultiplier[0][0] = openfl_ColorMultiplierv.x;
-			colorMultiplier[1][1] = openfl_ColorMultiplierv.y;
-			colorMultiplier[2][2] = openfl_ColorMultiplierv.z;
-			colorMultiplier[3][3] = 1.0; // openfl_ColorMultiplierv.w;
-
-			color = clamp (openfl_ColorOffsetv + (color * colorMultiplier), 0.0, 1.0);
-
-			if (color.a > 0.0) {
-
-				gl_FragColor = vec4 (color.rgb * color.a * openfl_Alphav, color.a * openfl_Alphav);
-
-			} else {
+			if (color.a == 0.0) {
 
 				gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
 
+			} else if (openfl_HasColorTransform_mutiv > 0.5) {
+
+				color = vec4 (color.rgb / color.a, color.a);
+
+				mat4 colorMultiplier = mat4 (0);
+				colorMultiplier[0][0] = openfl_ColorMultiplierv.x;
+				colorMultiplier[1][1] = openfl_ColorMultiplierv.y;
+				colorMultiplier[2][2] = openfl_ColorMultiplierv.z;
+				colorMultiplier[3][3] = 1.0; // openfl_ColorMultiplierv.w;
+
+				color = clamp (openfl_ColorOffsetv + (color * colorMultiplier), 0.0, 1.0);
+
+				if (color.a > 0.0) {
+
+					gl_FragColor = vec4 (color.rgb * color.a * openfl_Alphav, color.a * openfl_Alphav);
+
+				} else {
+
+					gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
+
+				}
+
+			} else {
+
+				gl_FragColor = color * openfl_Alphav;
+
 			}
 
-		} else {
-
-			gl_FragColor = color * openfl_Alphav;
-
-		}
-
-		// gl_FragColor = vec4(1.,0.,0.,1.);
+			// gl_FragColor = vec4(1.,0.,0.,1.);
 
 		}";
 	#end

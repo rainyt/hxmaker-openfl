@@ -12,5 +12,13 @@
             text="你好，这是hxmaker的UI简易布局测试样例。测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容测试长文本内容"
             color="0xffffff" fontSize="36" left="60" width="500"
             centerY="50" hAlign="left" vAlign="center" />
+        <HBox id="hbox" gap="30" bottom="50" centerX="0">
+            <Button id="btn_clean_text" src="assets/logo.jpg" text="清空纹理字" color="0xff0000"
+                height="60" />
+            <Button id="btn_new_view" src="assets/logo.jpg" text="打开新的窗口" color="0xff0000"
+                height="60"
+            />
+            <Button id="btn_view" src="assets/logo.jpg" text="按钮文案" color="0xff0000" height="60" />
+        </HBox>
     </Box>
 </Scene>
