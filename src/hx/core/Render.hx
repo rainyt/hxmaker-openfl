@@ -1,5 +1,7 @@
 package hx.core;
 
+import openfl.geom.Rectangle;
+import openfl.display.Shape;
 import hx.render.CustomDisplayObjectRender;
 import hx.display.CustomDisplayObject;
 import hx.utils.ContextStats;
@@ -51,7 +53,7 @@ class Render implements IRender {
 	 * 绘制图片缓存数据
 	 * @param data 
 	 */
-	public function renderImageBuffData(data:ImageBufferData):Void {
+	public function renderImageBuffData(data:ImageBufferData):Sprite {
 		if (data.index > 0) {
 			// 图形绘制
 			data.endFill();
@@ -93,7 +95,9 @@ class Render implements IRender {
 				case SCREEN:
 					shape.blendMode = SCREEN;
 			}
+			return shape;
 		}
+		return null;
 	}
 
 	/**
@@ -163,6 +167,10 @@ class Render implements IRender {
 	}
 
 	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
+		// 如果存在遮罩时，需要结束掉之前的所有绘制
+		if (container.makeRect != null) {
+			endFillImageDataBuffer();
+		}
 		for (object in container.children) {
 			if (!object.visible || object.alpha == 0) {
 				continue;
@@ -179,8 +187,24 @@ class Render implements IRender {
 				renderCustomDisplayObject(cast object);
 			}
 		}
+		if (container.makeRect != null) {
+			var shape = endFillImageDataBuffer();
+			if (shape != null) {
+				// 遮罩
+				if (shape.scrollRect == null) {
+					var ret = new hx.gemo.Rectangle();
+					container.makeRect.transform(ret, container.__worldTransform);
+					__maskRect.setTo(ret.x, ret.y, ret.width, ret.height);
+					shape.scrollRect = __maskRect;
+					shape.x = ret.x;
+					shape.y = ret.y;
+				}
+			}
+		}
 		container.__dirty = false;
 	}
+
+	private static var __maskRect:Rectangle = new Rectangle();
 
 	/**
 	 * 渲染自定义对象
@@ -230,8 +254,8 @@ class Render implements IRender {
 	/**
 	 * 最终写入图片缓冲区
 	 */
-	public function endFillImageDataBuffer():Void {
-		this.renderImageBuffData(this.imageBufferData[this.drawImageBuffDataIndex]);
+	public function endFillImageDataBuffer():Sprite {
+		return this.renderImageBuffData(this.imageBufferData[this.drawImageBuffDataIndex]);
 	}
 
 	/**
