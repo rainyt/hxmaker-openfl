@@ -172,7 +172,7 @@ class Render implements IRender {
 
 	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
 		// 如果存在遮罩时，需要结束掉之前的所有绘制
-		if (container.makeRect != null) {
+		if (container.maskRect != null) {
 			endFillImageDataBuffer();
 		}
 		for (object in container.children) {
@@ -191,12 +191,12 @@ class Render implements IRender {
 				renderCustomDisplayObject(cast object);
 			}
 		}
-		if (container.makeRect != null) {
+		if (container.maskRect != null) {
 			var shape = endFillImageDataBuffer();
 			if (shape != null) {
 				// 遮罩
 				__retRect.setTo(0, 0, 0, 0);
-				container.makeRect.transform(__retRect, container.__worldTransform);
+				container.maskRect.transform(__retRect, container.__worldTransform);
 				__maskRect.setTo(__retRect.x, __retRect.y, __retRect.width, __retRect.height);
 				shape.scrollRect = __maskRect;
 				shape.x = __retRect.x;
