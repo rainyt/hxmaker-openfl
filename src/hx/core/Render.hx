@@ -114,6 +114,8 @@ class Render implements IRender {
 	private var __pool:ObjectPool<EngineSprite> = new ObjectPool<EngineSprite>(() -> {
 		return new EngineSprite();
 	}, (sprite) -> {
+		sprite.x = 0;
+		sprite.y = 0;
 		sprite.scrollRect = null;
 	});
 

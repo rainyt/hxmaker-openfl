@@ -302,65 +302,65 @@ class ImageBufferData {
 		var isUvsDirty = isBad || image.__uvsDirty;
 
 		// if (displayObject != image || image.__transformDirty) {
-		if (isColorDirty) {
-			// 6个顶点数据
-			for (i in 0...6) {
-				ids[dataPerVertex6 + i] = id;
-				alphas[dataPerVertex6 + i] = image.__worldAlpha;
-				if (image.__colorTransform != null) {
-					hasColorTransform[dataPerVertex6 + i] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
-					colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
-					colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
-					colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
-					colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
-					colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
-					colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
-					colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
-				} else {
-					hasColorTransform[dataPerVertex6 + i] = 0;
-					colorMultiplier[dataPerVertex24 + i * 4] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
-					colorOffset[dataPerVertex24 + i * 4] = 0;
-					colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
-					colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
-					colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
-				}
+		// if (isColorDirty) {
+		// 6个顶点数据
+		for (i in 0...6) {
+			ids[dataPerVertex6 + i] = id;
+			alphas[dataPerVertex6 + i] = image.__worldAlpha;
+			if (image.__colorTransform != null) {
+				hasColorTransform[dataPerVertex6 + i] = 1;
+				colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
+				colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
+				colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
+				colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
+				colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
+				colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
+				colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
+				colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
+			} else {
+				hasColorTransform[dataPerVertex6 + i] = 0;
+				colorMultiplier[dataPerVertex24 + i * 4] = 1;
+				colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
+				colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
+				colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
+				colorOffset[dataPerVertex24 + i * 4] = 0;
+				colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
+				colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
+				colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
 			}
 		}
+		// }
 
-		if (isTransformDirty) {
-			// 坐标顶点
-			var tileWidth:Float = image.data.rect != null ? image.data.rect.width : image.data.data.getWidth();
-			var tileHeight:Float = image.data.rect != null ? image.data.rect.height : image.data.data.getHeight();
-			var tileTransform = @:privateAccess image.__worldTransform;
-			var x = @:privateAccess tileTransform.__transformX(0, 0);
-			var y = @:privateAccess tileTransform.__transformY(0, 0);
-			var x2 = @:privateAccess tileTransform.__transformX(tileWidth, 0);
-			var y2 = @:privateAccess tileTransform.__transformY(tileWidth, 0);
-			var x3 = @:privateAccess tileTransform.__transformX(0, tileHeight);
-			var y3 = @:privateAccess tileTransform.__transformY(0, tileHeight);
-			var x4 = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
-			var y4 = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
-			vertices[dataPerVertex] = x;
-			vertices[dataPerVertex + 1] = y;
-			vertices[dataPerVertex + 2] = (x2);
-			vertices[dataPerVertex + 3] = (y2);
-			vertices[dataPerVertex + 4] = (x3);
-			vertices[dataPerVertex + 5] = (y3);
-			vertices[dataPerVertex + 6] = (x4);
-			vertices[dataPerVertex + 7] = (y4);
+		// if (isTransformDirty) {
+		// 坐标顶点
+		var tileWidth:Float = image.data.rect != null ? image.data.rect.width : image.data.data.getWidth();
+		var tileHeight:Float = image.data.rect != null ? image.data.rect.height : image.data.data.getHeight();
+		var tileTransform = @:privateAccess image.__worldTransform;
+		var x = @:privateAccess tileTransform.__transformX(0, 0);
+		var y = @:privateAccess tileTransform.__transformY(0, 0);
+		var x2 = @:privateAccess tileTransform.__transformX(tileWidth, 0);
+		var y2 = @:privateAccess tileTransform.__transformY(tileWidth, 0);
+		var x3 = @:privateAccess tileTransform.__transformX(0, tileHeight);
+		var y3 = @:privateAccess tileTransform.__transformY(0, tileHeight);
+		var x4 = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
+		var y4 = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
+		vertices[dataPerVertex] = x;
+		vertices[dataPerVertex + 1] = y;
+		vertices[dataPerVertex + 2] = (x2);
+		vertices[dataPerVertex + 3] = (y2);
+		vertices[dataPerVertex + 4] = (x3);
+		vertices[dataPerVertex + 5] = (y3);
+		vertices[dataPerVertex + 6] = (x4);
+		vertices[dataPerVertex + 7] = (y4);
 
-			// 顶点
-			indices[dataPerVertex6] = (indicesOffset);
-			indices[dataPerVertex6 + 1] = (indicesOffset + 1);
-			indices[dataPerVertex6 + 2] = (indicesOffset + 2);
-			indices[dataPerVertex6 + 3] = (indicesOffset + 1);
-			indices[dataPerVertex6 + 4] = (indicesOffset + 2);
-			indices[dataPerVertex6 + 5] = (indicesOffset + 3);
-		}
+		// 顶点
+		indices[dataPerVertex6] = (indicesOffset);
+		indices[dataPerVertex6 + 1] = (indicesOffset + 1);
+		indices[dataPerVertex6 + 2] = (indicesOffset + 2);
+		indices[dataPerVertex6 + 3] = (indicesOffset + 1);
+		indices[dataPerVertex6 + 4] = (indicesOffset + 2);
+		indices[dataPerVertex6 + 5] = (indicesOffset + 3);
+		// }
 
 		// UVs
 		if (isUvsDirty) {
