@@ -1,5 +1,6 @@
 package test;
 
+import hx.gemo.ColorTransform;
 import hx.display.DisplayObject;
 import hx.events.MouseEvent;
 import hx.display.Quad;
@@ -40,19 +41,6 @@ class ImageRender extends Scene {
 	 * 当资源加载完成时
 	 */
 	public function onLoaded():Void {
-		trace("加载完成");
-		// 显示一张图片
-		var image:Image = new Image(assets.bitmapDatas.get("logo"));
-		this.addChild(image);
-		image.x = 500;
-		image.y = 500;
-		image.scaleX = 1;
-		image.rotation = 75;
-
-		// return;
-
-		trace("图片矩阵", image.width, image.height, image.getBounds());
-
 		// 容器加图片显示对象
 		var box = new DisplayObjectContainer();
 		this.addChild(box);
@@ -139,6 +127,19 @@ class ImageRender extends Scene {
 		// var quad = new Quad(400, 50, 0xffff00);
 		// this.addChild(quad);
 		// quad.y = 400;
+
+		// 显示一张图片
+		var image:Image = new Image(assets.bitmapDatas.get("logo"));
+		this.addChild(image);
+		image.x = 500;
+		image.y = 500;
+		image.scaleX = 1;
+		image.rotation = 75;
+		image.colorTransform = new ColorTransform(0, 0, 0, 1, 255, 255, 255, 0);
+
+		// return;
+
+		trace("图片矩阵", image.width, image.height, image.getBounds());
 
 		this.addEventListener(MouseEvent.CLICK, (e:MouseEvent) -> {
 			trace("点击到了", e.target);
