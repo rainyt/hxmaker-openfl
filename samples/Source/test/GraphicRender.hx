@@ -72,6 +72,11 @@ class GraphicRender extends Scene {
 			line.lineTo(Math.random() * stage.stageWidth, Math.random() * stage.stageHeight);
 		}
 
+		line.moveTo(stage.stageWidth / 2, stage.stageHeight / 2);
+		for (i in 0...10) {
+			line.lineTo(Math.random() * stage.stageWidth, Math.random() * stage.stageHeight);
+		}
+
 		this.addChild(line);
 
 		this.addEventListener(Event.UPDATE, (e) -> {
