@@ -39,6 +39,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		GraphicRender,
 		XmlRender,
 		AnchorLayoutRender,
 		LayoutRender,
@@ -51,7 +52,6 @@ class Game extends Stage {
 		Scale9GridRender,
 		AllDisplayRender,
 		SpineRender,
-		GraphicRender,
 		ImageRender,
 		LabelRender
 	];

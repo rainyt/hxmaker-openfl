@@ -61,6 +61,19 @@ class GraphicRender extends Scene {
 		image.y = stage.stageHeight / 2;
 		this.addChild(image);
 
+		// 线段绘制
+		var line = new Graphic();
+		line.beginLineStyle(0xff0000, 2);
+		line.moveTo(300, 100);
+		line.lineTo(400, 130);
+		line.lineTo(500, 600);
+		line.lineTo(500, 100);
+		for (i in 0...10) {
+			line.lineTo(Math.random() * stage.stageWidth, Math.random() * stage.stageHeight);
+		}
+
+		this.addChild(line);
+
 		this.addEventListener(Event.UPDATE, (e) -> {
 			image.rotation++;
 		});
