@@ -2,7 +2,7 @@ package test;
 
 import hx.events.Event;
 import hx.display.TextFormat;
-import hx.utils.Assets;
+import hx.assets.Assets;
 import hx.display.DisplayObject;
 import hx.display.Scene;
 import hx.display.Button;

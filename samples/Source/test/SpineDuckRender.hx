@@ -1,6 +1,6 @@
 package test;
 
-import hx.utils.atlas.SpineTextureAtlas;
+import hx.assets.SpineTextureAtlas;
 import hx.display.Spine;
 import hx.display.MovieClip;
 import hx.display.DisplayObjectContainer;
@@ -9,7 +9,7 @@ import hx.display.TextFormat;
 import hx.display.Label;
 import hx.events.Event;
 import hx.display.Image;
-import hx.utils.Assets;
+import hx.assets.Assets;
 import hx.display.Scene;
 
 class SpineDuckRender extends Scene {

@@ -1,11 +1,11 @@
 package hx.core;
 
-import hx.utils.LoadData;
+import hx.assets.LoadData;
 import hx.display.BitmapData;
 import hx.events.FutureErrorEvent;
 import openfl.Assets;
-import hx.utils.atlas.XmlAtlas;
-import hx.utils.Future;
+import hx.assets.XmlAtlas;
+import hx.assets.Future;
 
 /**
  * 加载纹理图集

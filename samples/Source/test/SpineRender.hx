@@ -1,8 +1,8 @@
 package test;
 
 import hx.display.Spine;
-import hx.utils.atlas.SpineTextureAtlas;
-import hx.utils.Assets;
+import hx.assets.SpineTextureAtlas;
+import hx.assets.Assets;
 import hx.display.Scene;
 
 class SpineRender extends Scene {

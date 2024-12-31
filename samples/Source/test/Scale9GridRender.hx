@@ -3,7 +3,7 @@ package test;
 import hx.display.DisplayObjectContainer;
 import hx.gemo.Rectangle;
 import hx.display.Image;
-import hx.utils.Assets;
+import hx.assets.Assets;
 import hx.display.Scene;
 
 /**

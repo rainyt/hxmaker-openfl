@@ -1,7 +1,7 @@
 package test;
 
 import hx.ui.UIManager;
-import hx.utils.Assets;
+import hx.assets.Assets;
 import hx.ui.UIAssets;
 import hx.display.Box;
 import hx.layout.AnchorLayout;

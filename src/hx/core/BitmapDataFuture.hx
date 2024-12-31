@@ -3,7 +3,7 @@ package hx.core;
 import hx.events.FutureErrorEvent;
 import openfl.utils.Assets;
 import hx.display.BitmapData;
-import hx.utils.Future;
+import hx.assets.Future;
 
 /**
  * 纹理加载器

@@ -3,7 +3,7 @@ package test;
 import hx.display.Quad;
 import hx.events.Event;
 import hx.display.Image;
-import hx.utils.Assets;
+import hx.assets.Assets;
 import hx.display.Graphic;
 import hx.display.Scene;
 

@@ -8,9 +8,9 @@ import hx.display.Image;
 import hx.display.TextFormat;
 import hx.display.Label;
 import hx.display.Spine;
-import hx.utils.atlas.SpineTextureAtlas;
+import hx.assets.SpineTextureAtlas;
 import hx.display.Quad;
-import hx.utils.Assets;
+import hx.assets.Assets;
 import hx.display.Scene;
 
 class AllDisplayRender extends Scene {

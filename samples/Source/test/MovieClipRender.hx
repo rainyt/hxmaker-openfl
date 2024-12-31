@@ -7,7 +7,7 @@ import hx.display.TextFormat;
 import hx.display.Label;
 import hx.events.Event;
 import hx.display.Image;
-import hx.utils.Assets;
+import hx.assets.Assets;
 import hx.display.Scene;
 
 class MovieClipRender extends Scene {
