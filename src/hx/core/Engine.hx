@@ -174,6 +174,8 @@ class Engine implements IEngine {
 		this.stage.frameRate = 60;
 		#end
 		// 帧渲染事件
+		this.stage.addEventListener(Event.ACTIVATE, __onActivate);
+		this.stage.addEventListener(Event.DEACTIVATE, __onDeactivate);
 		this.stage.addEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
 		this.stage.addEventListener(Event.RESIZE, __onStageSizeEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_DOWN, __onMouseEvent);
@@ -182,6 +184,18 @@ class Engine implements IEngine {
 		this.stage.addEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
 		this.stage.addEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
 		this.stage.addEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
+	}
+
+	private function __onActivate(e:Event):Void {
+		for (stage in stages) {
+			stage.onActivate();
+		}
+	}
+
+	private function __onDeactivate(e:Event):Void {
+		for (stage in stages) {
+			stage.onDeactivate();
+		}
 	}
 
 	private function __removeStageEvent():Void {

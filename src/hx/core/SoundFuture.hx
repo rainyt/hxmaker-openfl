@@ -8,7 +8,11 @@ import hx.assets.Future;
 class SoundFuture extends Future<Sound, String> {
 	override function post() {
 		super.post();
-		Assets.loadSound(getLoadData()).onComplete((sound) -> {
+		var path = getLoadData();
+        #if cpp
+		path = StringTools.replace(path, ".mp3", ".ogg");
+        #end
+		Assets.loadSound(path).onComplete((sound) -> {
 			var data = new Sound();
 			data.root = new OpenFLSound(sound);
 			this.completeValue(data);
