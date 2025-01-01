@@ -1,5 +1,7 @@
 package hx.core;
 
+import hx.events.SoundEvent;
+import hx.display.EventDispatcher;
 import openfl.events.Event;
 import openfl.media.SoundChannel;
 import hx.assets.ISoundChannel;
@@ -20,7 +22,7 @@ class OpenFLSound implements ISound {
 	}
 }
 
-class OpenFLSoundChannel implements ISoundChannel {
+class OpenFLSoundChannel extends EventDispatcher implements ISoundChannel {
 	public var channel:SoundChannel;
 
 	public var isLoop:Bool = false;
@@ -33,6 +35,7 @@ class OpenFLSoundChannel implements ISoundChannel {
 				if (this.isLoop) {
 					this.channel = sound.play();
 				}
+				this.dispatchEvent(new SoundEvent(SoundEvent.SOUND_COMPLETE));
 			});
 		}
 	}
