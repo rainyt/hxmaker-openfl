@@ -4,7 +4,7 @@ import hx.display.DisplayObject;
 import hx.display.BlendMode;
 import hx.core.OpenFlBitmapData;
 import hx.gemo.Matrix;
-import hx.display.Graphic;
+import hx.display.Graphics;
 import hx.core.Render;
 import openfl.display.BitmapData;
 import hx.display.Image;
@@ -14,7 +14,7 @@ import openfl.Vector;
  * 图片缓存数据
  */
 @:access(hx.display.Image)
-@:access(hx.display.Graphic)
+@:access(hx.display.Graphics)
 @:access(hx.gemo.Matrix)
 class ImageBufferData {
 	/**
@@ -148,10 +148,10 @@ class ImageBufferData {
 	 * @param render 
 	 * @return Bool
 	 */
-	public function drawGraphic(graphic:Graphic, render:Render):Bool {
-		var data = graphic.__graphicDrawData;
+	public function drawGraphic(graphic:Graphics, render:Render):Bool {
+		var data = graphic.__graphicsDrawData;
 		var len = data.draws.length;
-		while (graphic.__graphicDrawData.index < len) {
+		while (graphic.__graphicsDrawData.index < len) {
 			var command = data.draws[data.index];
 			if (command == null) {
 				// 当命令为空时，则意味着渲染已结束
@@ -261,7 +261,7 @@ class ImageBufferData {
 			}
 			data.index++;
 		}
-		graphic.__graphicDrawData.index = 0;
+		graphic.__graphicsDrawData.index = 0;
 		return true;
 	}
 

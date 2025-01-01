@@ -6,7 +6,7 @@ import hx.render.CustomDisplayObjectRender;
 import hx.display.CustomDisplayObject;
 import hx.utils.ContextStats;
 import hx.render.GraphicRender;
-import hx.display.Graphic;
+import hx.display.Graphics;
 import hx.render.TextFieldRender;
 import hx.render.ImageBufferData;
 import hx.render.ImageRender;
@@ -185,7 +185,7 @@ class Render implements IRender {
 				renderDisplayObjectContainer(cast object);
 			} else if (object is Label) {
 				renderLabel(cast object);
-			} else if (object is Graphic) {
+			} else if (object is Graphics) {
 				renderGraphics(cast object);
 			} else if (object is CustomDisplayObject) {
 				renderCustomDisplayObject(cast object);
@@ -250,7 +250,7 @@ class Render implements IRender {
 	 * 渲染三角形图形
 	 * @param graphics 
 	 */
-	public function renderGraphics(graphics:Graphic):Void {
+	public function renderGraphics(graphics:Graphics):Void {
 		GraphicRender.render(graphics, this);
 		ContextStats.statsVisibleDisplayCounts();
 	}

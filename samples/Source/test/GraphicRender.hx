@@ -4,7 +4,7 @@ import hx.display.Quad;
 import hx.events.Event;
 import hx.display.Image;
 import hx.assets.Assets;
-import hx.display.Graphic;
+import hx.display.Graphics;
 import hx.display.Scene;
 
 /**
@@ -35,7 +35,7 @@ class GraphicRender extends Scene {
 	public function onLoaded() {
 		// 图形渲染
 		for (i in 0...25) {
-			var graphic = new Graphic();
+			var graphic = new Graphics();
 			this.addChild(graphic);
 			graphic.clear();
 			graphic.beginBitmapData(assets.bitmapDatas.get("logo"));
@@ -62,7 +62,7 @@ class GraphicRender extends Scene {
 		this.addChild(image);
 
 		// 线段绘制
-		var line = new Graphic();
+		var line = new Graphics();
 		line.beginLineStyle(0xff0000, 2);
 		line.moveTo(300, 100);
 		line.lineTo(400, 130);

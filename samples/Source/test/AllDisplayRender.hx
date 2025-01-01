@@ -3,7 +3,7 @@ package test;
 import hx.display.Box;
 import hx.layout.AnchorLayoutData;
 import hx.layout.AnchorLayout;
-import hx.display.Graphic;
+import hx.display.Graphics;
 import hx.display.Image;
 import hx.display.TextFormat;
 import hx.display.Label;
@@ -66,7 +66,7 @@ class AllDisplayRender extends Scene {
 		image.layoutData = AnchorLayoutData.bottomRight();
 
 		// 图形
-		var graphic:Graphic = new Graphic();
+		var graphic:Graphics = new Graphics();
 		graphic.beginFill(0xff0000);
 		graphic.drawTriangles([50, 0, 100, 100, 0, 100], [0, 1, 2], [0, 0, 0, 0, 0, 0]);
 		this.addChild(graphic);
