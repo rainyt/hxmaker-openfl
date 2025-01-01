@@ -45,7 +45,7 @@ class Engine implements IEngine {
 	 */
 	public function addToStage(stage:Stage):Void {
 		if (stages.indexOf(stage) == -1) {
-			stages.push(stage);
+			stages.insert(stages.length - 1, stage);
 		}
 		stage.__stageWidth = this.stageWidth;
 		stage.__stageHeight = this.stageHeight;
