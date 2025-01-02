@@ -75,10 +75,12 @@ class Engine implements IEngine {
 	 * @param mainClasses 
 	 */
 	public function init(stageWidth:Int, stageHeight:Int):Void {
-		this.stage = Lib.current.stage;
-		// 初始化渲染器
-		this.renderer = new hx.core.Render();
-		this.stage.addChild(cast(this.renderer, Render).stage);
+		if (this.stage == null) {
+			this.stage = Lib.current.stage;
+			// 初始化渲染器
+			this.renderer = new hx.core.Render();
+			this.stage.addChild(cast(this.renderer, Render).stage);
+		}
 		// 舞台尺寸计算
 		__stageWidth = stageWidth;
 		__stageHeight = stageHeight;
