@@ -64,6 +64,7 @@ class Render implements IRender {
 			var openfl_ColorMultiplier:ShaderParameter<Float> = defalutShader.data.openfl_ColorMultiplier_muti;
 			var openfl_ColorOffer:ShaderParameter<Float> = defalutShader.data.openfl_ColorOffset_muti;
 			var openfl_HasColorTransform:ShaderParameter<Float> = defalutShader.data.openfl_HasColorTransform_muti;
+			var openfl_blendMode_add:ShaderParameter<Float> = defalutShader.data.openfl_blendMode_add;
 			var offests:Array<Float> = [];
 			var mapIds:Map<BitmapData, Int> = [];
 			for (index => data in data.bitmapDatas) {
@@ -76,6 +77,7 @@ class Render implements IRender {
 			openfl_ColorMultiplier.value = data.colorMultiplier;
 			openfl_TextureId.value = data.ids;
 			openfl_Alpha.value = data.alphas;
+			openfl_blendMode_add.value = data.addBlendModes;
 			openfl_HasColorTransform.value = data.hasColorTransform;
 			shape.graphics.beginShaderFill(defalutShader);
 			shape.graphics.drawTriangles(data.vertices, data.indices, data.uvtData);

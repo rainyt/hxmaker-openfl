@@ -21,6 +21,7 @@ class MultiTextureShader extends GraphicsShader {
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
 		attribute float openfl_HasColorTransform_muti;
+		attribute float openfl_blendMode_add;
 
 		varying float openfl_Alphav;
 		varying vec4 openfl_ColorMultiplierv;
@@ -28,6 +29,7 @@ class MultiTextureShader extends GraphicsShader {
 		varying vec2 openfl_TextureCoordv;
 		varying float openfl_TextureIdv;
 		varying float openfl_HasColorTransform_mutiv;
+		varying float openfl_blendMode_addv;
 		
 		uniform mat4 openfl_Matrix;
 		uniform vec2 openfl_TextureSize;
@@ -38,6 +40,7 @@ class MultiTextureShader extends GraphicsShader {
             openfl_TextureCoordv = openfl_TextureCoord;
             openfl_TextureIdv = openfl_TextureId;
 			openfl_HasColorTransform_mutiv = openfl_HasColorTransform_muti;
+			openfl_blendMode_addv = openfl_blendMode_add;
 
 			if (openfl_HasColorTransform_muti > 0.5) {
 
@@ -66,6 +69,7 @@ class MultiTextureShader extends GraphicsShader {
 		varying vec2 openfl_TextureCoordv;
 		varying float openfl_HasColorTransform_mutiv;
 		varying float openfl_TextureIdv;
+		varying float openfl_blendMode_addv;
 
 		uniform sampler2D SAMPLER_INJECT;
 
@@ -110,6 +114,10 @@ class MultiTextureShader extends GraphicsShader {
 
 			}
 
+			if(openfl_blendMode_addv > 0.5){
+				gl_FragColor.a = 0.;
+			}
+
 			// gl_FragColor = vec4(1.,0.,0.,1.);
 
 		}";
@@ -122,6 +130,7 @@ class MultiTextureShader extends GraphicsShader {
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
+		attribute float openfl_blendMode_add;
 		uniform mat4 openfl_Matrix;
 		uniform vec2 openfl_TextureSize;
 		uniform sampler2D uSampler0;

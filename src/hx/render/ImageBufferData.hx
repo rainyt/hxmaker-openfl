@@ -42,6 +42,11 @@ class ImageBufferData {
 	public var alphas:Array<Float> = [];
 
 	/**
+	 * 叠加渲染支持
+	 */
+	public var addBlendModes:Array<Float> = [];
+
+	/**
 	 * 是否包含颜色转换
 	 */
 	public var hasColorTransform:Array<Float> = [];
@@ -164,7 +169,7 @@ class ImageBufferData {
 				case BEGIN_BITMAP_DATA(bitmapData, smoothing):
 					data.currentBitmapData = bitmapData;
 					data.smoothing = smoothing;
-				case DRAW_TRIANGLE(vertices, indices, uvs, alpha, colorTransform):
+				case DRAW_TRIANGLE(vertices, indices, uvs, alpha, colorTransform, applyBlendAddMode):
 					// 开始绘制三角形
 					if (data.currentBitmapData != null) {
 						var texture = data.currentBitmapData.data.getTexture();
@@ -191,6 +196,7 @@ class ImageBufferData {
 						for (i in 0...indices.length) {
 							ids[dataPerVertex6 + i] = id;
 							alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
+							addBlendModes[dataPerVertex6 + i] = applyBlendAddMode ? 1 : 0;
 							if (colorTransform != null) {
 								hasColorTransform[dataPerVertex6 + i] = 1;
 								colorMultiplier[dataPerVertex24 + i * 4] = colorTransform.redMultiplier;
@@ -281,7 +287,11 @@ class ImageBufferData {
 			smoothing = image.smoothing;
 			blendMode = image.blendMode;
 		} else if (blendMode != image.blendMode) {
-			return false;
+			if (blendMode == ADD || blendMode == NORMAL) {
+				if (image.blendMode != ADD && image.blendMode != NORMAL) {
+					return false;
+				}
+			}
 		}
 		// 可以绘制，记录纹理ID
 		var id = mapIds.get(texture);
@@ -307,6 +317,7 @@ class ImageBufferData {
 		for (i in 0...6) {
 			ids[dataPerVertex6 + i] = id;
 			alphas[dataPerVertex6 + i] = image.__worldAlpha;
+			addBlendModes[dataPerVertex6 + i] = image.blendMode == ADD ? 1 : 0;
 			if (image.__colorTransform != null) {
 				hasColorTransform[dataPerVertex6 + i] = 1;
 				colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
