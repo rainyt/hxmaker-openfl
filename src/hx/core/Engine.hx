@@ -25,6 +25,10 @@ class Engine implements IEngine {
 
 	@:noCompletion private var __stageHeight:Float = 0;
 
+	public var touchX:Float = 0;
+
+	public var touchY:Float = 0;
+
 	public function new() {}
 
 	/**
@@ -220,6 +224,8 @@ class Engine implements IEngine {
 	}
 
 	private function __onMouseEvent(e:MouseEvent):Void {
+		touchX = e.stageX / scaleFactor;
+		touchY = e.stageY / scaleFactor;
 		var openflRenderer:hx.core.Render = cast this.renderer;
 		var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(e.type);
 		engineEvent.stageX = openflRenderer.stage.mouseX;
