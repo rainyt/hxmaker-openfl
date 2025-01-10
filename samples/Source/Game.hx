@@ -1,3 +1,4 @@
+import test.BitmapLabelRender;
 import test.XmlRender;
 import hx.layout.AnchorLayoutData;
 import hx.layout.AnchorLayout;
@@ -39,6 +40,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		BitmapLabelRender,
 		GraphicRender,
 		XmlRender,
 		AnchorLayoutRender,
