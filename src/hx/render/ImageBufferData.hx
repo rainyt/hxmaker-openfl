@@ -127,6 +127,7 @@ class ImageBufferData {
 		setArrayLength(bitmapDatas, 0);
 		mapIds.clear();
 		isBad = false;
+		blendMode = null;
 	}
 
 	public function endFill():Void {
@@ -183,7 +184,13 @@ class ImageBufferData {
 							smoothing = data.smoothing;
 							blendMode = graphic.blendMode;
 						} else if (blendMode != graphic.blendMode) {
-							return false;
+							if (blendMode == ADD || blendMode == NORMAL) {
+								if (graphic.blendMode != ADD && graphic.blendMode != NORMAL) {
+									return false;
+								}
+							} else {
+								return false;
+							}
 						}
 						// 可以绘制，记录纹理ID
 						var id = mapIds.get(texture);
@@ -291,6 +298,8 @@ class ImageBufferData {
 				if (image.blendMode != ADD && image.blendMode != NORMAL) {
 					return false;
 				}
+			} else {
+				return false;
 			}
 		}
 		// 可以绘制，记录纹理ID

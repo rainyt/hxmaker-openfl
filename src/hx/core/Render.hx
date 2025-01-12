@@ -119,6 +119,7 @@ class Render implements IRender {
 		sprite.x = 0;
 		sprite.y = 0;
 		sprite.scrollRect = null;
+		sprite.blendMode = NORMAL;
 	});
 
 	/**

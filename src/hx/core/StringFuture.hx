@@ -11,7 +11,14 @@ import hx.assets.Future;
 class StringFuture extends Future<String, String> {
 	override function post() {
 		super.post();
-		var loader = new URLLoader(new URLRequest(getLoadData()));
+		var version = lime.utils.Assets.cache.version;
+		var url:String = getLoadData();
+		if (url.indexOf("?") != -1) {
+			url += "&v=" + version;
+		} else {
+			url += "?v=" + version;
+		}
+		var loader = new URLLoader(new URLRequest(url));
 		loader.addEventListener(Event.COMPLETE, (e) -> {
 			this.completeValue(loader.data);
 		});
