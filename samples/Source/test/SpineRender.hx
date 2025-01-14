@@ -1,5 +1,6 @@
 package test;
 
+import hx.gemo.ColorTransform;
 import hx.display.Spine;
 import hx.assets.SpineTextureAtlas;
 import hx.assets.Assets;
@@ -36,6 +37,7 @@ class SpineRender extends Scene {
 				trace(animation.name);
 			}
 			spine.animationState.setAnimationByName(0, "shake", true);
+			spine.colorTransform = new ColorTransform(1, 0, 0, 1);
 		}
 	}
 }

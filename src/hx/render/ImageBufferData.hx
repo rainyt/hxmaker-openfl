@@ -244,6 +244,17 @@ class ImageBufferData {
 								colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
 								colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
 							}
+							if (graphic.colorTransform != null) {
+								hasColorTransform[dataPerVertex6 + i] = 1;
+								colorMultiplier[dataPerVertex24 + i * 4] *= graphic.colorTransform.redMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 1] *= graphic.colorTransform.greenMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 2] *= graphic.colorTransform.blueMultiplier;
+								colorMultiplier[dataPerVertex24 + i * 4 + 3] *= graphic.colorTransform.alphaMultiplier;
+								colorOffset[dataPerVertex24 + i * 4] += graphic.colorTransform.redOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 1] += graphic.colorTransform.greenOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 2] += graphic.colorTransform.blueOffset;
+								colorOffset[dataPerVertex24 + i * 4 + 3] += graphic.colorTransform.alphaOffset;
+							}
 							this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
 						}
 
