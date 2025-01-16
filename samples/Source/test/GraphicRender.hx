@@ -69,6 +69,7 @@ class GraphicRender extends Scene {
 		line.lineTo(500, 600);
 		line.lineTo(500, 100);
 		for (i in 0...10) {
+			line.beginLineStyle(Std.random(0xffffff), 2);
 			line.lineTo(Math.random() * stage.stageWidth, Math.random() * stage.stageHeight);
 		}
 
