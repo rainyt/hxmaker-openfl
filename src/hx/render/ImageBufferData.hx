@@ -192,6 +192,9 @@ class ImageBufferData {
 								return false;
 							}
 						}
+						if (!applyBlendAddMode && graphic.blendMode == ADD) {
+							applyBlendAddMode = true;
+						}
 						// 可以绘制，记录纹理ID
 						var id = mapIds.get(texture);
 						if (id == null) {

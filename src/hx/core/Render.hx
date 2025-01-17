@@ -89,7 +89,7 @@ class Render implements IRender {
 			ContextStats.statsDrawCall();
 			switch data.blendMode {
 				case ADD:
-					shape.blendMode = ADD;
+					// shape.blendMode = ADD;
 				case MULTIPLY:
 					shape.blendMode = MULTIPLY;
 				case NORMAL:

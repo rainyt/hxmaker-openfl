@@ -66,6 +66,21 @@ class Game extends Stage {
 	override function onStageInit() {
 		super.onStageInit();
 
+		// var quad = new Quad(300, 300, 0xff0000);
+		// this.addChild(quad);
+		// quad.blendMode = ADD;
+
+		// var quad = new Quad(300, 300, 0xff0000);
+		// this.addChild(quad);
+		// quad.x = 300;
+
+		// var fps = new FPS();
+		// fps.label.textFormat = new TextFormat(null, 32, 0xff0000);
+		// this.addChild(fps);
+		// fps.y = 300;
+
+		// return;
+
 		// 设置默认字体
 		TextFormat.defaultFont = "assets/font/SourceHanSansSC-Bold.otf";
 
