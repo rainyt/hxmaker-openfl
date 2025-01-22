@@ -231,6 +231,11 @@ class Engine implements IEngine {
 		engineEvent.stageX = openflRenderer.stage.mouseX;
 		engineEvent.stageY = openflRenderer.stage.mouseY;
 		var i = stages.length;
+
+		if (e.type == MouseEvent.MOUSE_WHEEL) {
+			engineEvent.delta = e.delta;
+		}
+
 		while (i-- > 0) {
 			var stage = stages[i];
 			if (stage.handleMouseEvent(engineEvent)) {
