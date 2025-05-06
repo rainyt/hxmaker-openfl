@@ -64,4 +64,12 @@ class MakerDisplay extends openfl.display.Sprite {
 			return super.addChildAt(child, index);
 		}
 	}
+
+	override private function get_width():Float {
+		return container.__stageWidth;
+	}
+
+	override private function get_height():Float {
+		return container.__stageHeight;
+	}
 }
