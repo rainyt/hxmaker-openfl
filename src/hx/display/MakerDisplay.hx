@@ -1,5 +1,6 @@
 package hx.display;
 
+import haxe.Timer;
 import openfl.Lib;
 import openfl.events.Event;
 import openfl.geom.Rectangle;
@@ -32,10 +33,16 @@ class MakerDisplay extends openfl.display.Sprite {
 		this.scrollRect = new Rectangle(0, 0, width, height);
 		this.addChild(renderer.stage);
 		container.onStageInit();
+		__time = Timer.stamp();
 	}
 
+	private var __time:Float = 0;
+
 	override private function __enterFrame(deltaTime:Int):Void {
-		container.onUpdate(deltaTime / 1000);
+		var now:Float = Timer.stamp();
+		var currentDeltaTime:Float = now - __time;
+		__time = now;
+		container.onUpdate(currentDeltaTime);
 		if (container.__dirty) {
 			renderer.clear();
 			container.__updateTransform(container);
