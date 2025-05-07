@@ -228,42 +228,46 @@ class Engine implements IEngine {
 	}
 
 	private function __onMouseEvent(e:MouseEvent):Void {
-		touchX = e.stageX / scaleFactor;
-		touchY = e.stageY / scaleFactor;
-		var openflRenderer:hx.core.Render = cast this.renderer;
-		var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(e.type);
-		engineEvent.stageX = openflRenderer.stage.mouseX;
-		engineEvent.stageY = openflRenderer.stage.mouseY;
-		var i = stages.length;
+		if (e.type == MouseEvent.MOUSE_UP)
+			trace("click", e.target);
+		if (e.target == stage || e.target is hx.display.MakerDisplay) {
+			touchX = e.stageX / scaleFactor;
+			touchY = e.stageY / scaleFactor;
+			var openflRenderer:hx.core.Render = cast this.renderer;
+			var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(e.type);
+			engineEvent.stageX = openflRenderer.stage.mouseX;
+			engineEvent.stageY = openflRenderer.stage.mouseY;
+			var i = stages.length;
 
-		if (e.type == MouseEvent.MOUSE_WHEEL) {
-			engineEvent.delta = e.delta;
-		}
-
-		while (i-- > 0) {
-			var stage = stages[i];
-			if (stage.handleMouseEvent(engineEvent)) {
-				break;
+			if (e.type == MouseEvent.MOUSE_WHEEL) {
+				engineEvent.delta = e.delta;
 			}
-		}
-		switch e.type {
-			case MouseEvent.MOUSE_DOWN:
-				__lastMouseX = openflRenderer.stage.mouseX;
-				__lastMouseY = openflRenderer.stage.mouseY;
-			case MouseEvent.MOUSE_UP:
-				// 判断距离
-				if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 10) {
-					var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(hx.events.MouseEvent.CLICK);
-					engineEvent.stageX = openflRenderer.stage.mouseX;
-					engineEvent.stageY = openflRenderer.stage.mouseY;
-					var i = stages.length;
-					while (i-- > 0) {
-						var stage = stages[i];
-						if (stage.handleMouseEvent(engineEvent)) {
-							break;
+
+			while (i-- > 0) {
+				var stage = stages[i];
+				if (stage.handleMouseEvent(engineEvent)) {
+					break;
+				}
+			}
+			switch e.type {
+				case MouseEvent.MOUSE_DOWN:
+					__lastMouseX = openflRenderer.stage.mouseX;
+					__lastMouseY = openflRenderer.stage.mouseY;
+				case MouseEvent.MOUSE_UP:
+					// 判断距离
+					if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 10) {
+						var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(hx.events.MouseEvent.CLICK);
+						engineEvent.stageX = openflRenderer.stage.mouseX;
+						engineEvent.stageY = openflRenderer.stage.mouseY;
+						var i = stages.length;
+						while (i-- > 0) {
+							var stage = stages[i];
+							if (stage.handleMouseEvent(engineEvent)) {
+								break;
+							}
 						}
 					}
-				}
+			}
 		}
 	}
 

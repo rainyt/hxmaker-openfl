@@ -38,6 +38,7 @@ class MakerDisplay extends openfl.display.Sprite {
 		this.addEventListener(Event.ADDED_TO_STAGE, onAddToStage);
 		this.addEventListener(Event.REMOVED_FROM_STAGE, onRemoveFromStage);
 		container.customRender = true;
+		// this.mouseChildren = false;
 	}
 
 	private function onAddToStage(event:Event):Void {
@@ -67,13 +68,13 @@ class MakerDisplay extends openfl.display.Sprite {
 	override private function set_width(value:Float):Float {
 		container.__stageWidth = value;
 		this.scrollRect = new Rectangle(0, 0, value, height);
-		return super.set_width(value);
+		return value;
 	}
 
 	override private function set_height(value:Float):Float {
 		container.__stageHeight = value;
 		this.scrollRect = new Rectangle(0, 0, width, value);
-		return super.set_height(value);
+		return value;
 	}
 
 	override function addChildAt(child:openfl.display.DisplayObject, index:Int):openfl.display.DisplayObject {
