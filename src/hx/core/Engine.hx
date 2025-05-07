@@ -153,9 +153,11 @@ class Engine implements IEngine {
 		__lastTime = now;
 		var __dirty = false;
 		for (stage in stages) {
-			stage.onUpdate(dt);
-			if (stage.__dirty) {
-				__dirty = true;
+			if (!stage.customRender) {
+				stage.onUpdate(dt);
+				if (stage.__dirty) {
+					__dirty = true;
+				}
 			}
 		}
 		ContextStats.reset();
