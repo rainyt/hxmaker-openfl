@@ -1,5 +1,6 @@
 package hx.display;
 
+import hx.core.Hxmaker;
 import haxe.Timer;
 import openfl.Lib;
 import openfl.events.Event;
@@ -34,6 +35,17 @@ class MakerDisplay extends openfl.display.Sprite {
 		this.addChild(renderer.stage);
 		container.onStageInit();
 		__time = Timer.stamp();
+		this.addEventListener(Event.ADDED_TO_STAGE, onAddToStage);
+		this.addEventListener(Event.REMOVED_FROM_STAGE, onRemoveFromStage);
+		container.customRender = true;
+	}
+
+	private function onAddToStage(event:Event):Void {
+		Hxmaker.engine.addToStage(container);
+	}
+
+	private function onRemoveFromStage(event:Event):Void {
+		Hxmaker.engine.removeToStage(container);
 	}
 
 	private var __time:Float = 0;

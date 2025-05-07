@@ -79,6 +79,7 @@ class Engine implements IEngine {
 	 * @param mainClasses 
 	 */
 	public function init(stageWidth:Int, stageHeight:Int):Void {
+		trace("[HXMAKER] init", stageWidth, stageHeight);
 		if (this.stage == null) {
 			this.stage = Lib.current.stage;
 			// 初始化渲染器
@@ -161,7 +162,8 @@ class Engine implements IEngine {
 		if (__dirty) {
 			renderer.clear();
 			for (stage in stages) {
-				this.render(stage);
+				if (!stage.customRender)
+					this.render(stage);
 			}
 			renderer.endFill();
 		}
