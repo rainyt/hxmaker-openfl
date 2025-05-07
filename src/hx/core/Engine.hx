@@ -229,7 +229,6 @@ class Engine implements IEngine {
 
 	private function __onMouseEvent(e:MouseEvent):Void {
 		if (e.type == MouseEvent.MOUSE_UP)
-			trace("click", e.target);
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
 			touchX = e.stageX / scaleFactor;
 			touchY = e.stageY / scaleFactor;
