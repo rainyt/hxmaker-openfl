@@ -92,4 +92,45 @@ class MakerDisplay extends openfl.display.Sprite {
 	override private function get_height():Float {
 		return container.__stageHeight;
 	}
+
+	#if !flash
+	/**
+	 * 重写触摸事件，用于实现在TouchImageBatchsContainer状态中，允许穿透点击
+	 * @param x 
+	 * @param y 
+	 * @param shapeFlag 
+	 * @param stack 
+	 * @param interactiveOnly 
+	 * @param hitObject 
+	 * @return Bool
+	 */
+	override private function __hitTest(x:Float, y:Float, shapeFlag:Bool, stack:Array<openfl.display.DisplayObject>, interactiveOnly:Bool, hitObject:openfl.display.DisplayObject):Bool {
+		if (!hitObject.visible || width == 0 || height == 0 || !this.mouseEnabled)
+			return false;
+		if (mask != null && !mask.__hitTestMask(x, y))
+			return false;
+		__getRenderTransform();
+		var px = @:privateAccess __renderTransform.__transformInverseX(x, y);
+		var py = @:privateAccess __renderTransform.__transformInverseY(x, y);
+		if (px > 0 && py > 0 && px <= this.width && py <= this.height) {
+			if (__scrollRect != null && !__scrollRect.contains(px, py)) {
+				return false;
+			}
+
+			if (stack != null && !interactiveOnly) {
+				stack.push(hitObject);
+			}
+
+			var childTouch = super.__hitTest(x, y, false, stack, interactiveOnly, hitObject);
+			if (!childTouch) {
+				if (stack != null)
+					stack.push(this);
+				return true;
+			}
+			return childTouch;
+		}
+
+		return false;
+	}
+	#end
 }
