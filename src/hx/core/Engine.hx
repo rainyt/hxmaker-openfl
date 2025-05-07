@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.display.MakerDisplay;
 import hx.gemo.Matrix;
 import hx.display.DisplayObjectContainer;
 import hx.display.IRender;
@@ -228,14 +229,21 @@ class Engine implements IEngine {
 	}
 
 	private function __onMouseEvent(e:MouseEvent):Void {
-		if (e.type == MouseEvent.MOUSE_UP)
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
 			touchX = e.stageX / scaleFactor;
 			touchY = e.stageY / scaleFactor;
 			var openflRenderer:hx.core.Render = cast this.renderer;
 			var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(e.type);
-			engineEvent.stageX = openflRenderer.stage.mouseX;
-			engineEvent.stageY = openflRenderer.stage.mouseY;
+			var mouseX = openflRenderer.stage.mouseX;
+			var mouseY = openflRenderer.stage.mouseY;
+			// 如果是MakerDisplay对象，则使用相对MakerDisplay对象的坐标
+			if (e.target is hx.display.MakerDisplay) {
+				var makerDisplay:hx.display.MakerDisplay = cast e.target;
+				mouseX = makerDisplay.mouseX;
+				mouseY = makerDisplay.mouseY;
+			}
+			engineEvent.stageX = mouseX;
+			engineEvent.stageY = mouseY;
 			var i = stages.length;
 
 			if (e.type == MouseEvent.MOUSE_WHEEL) {
@@ -256,8 +264,8 @@ class Engine implements IEngine {
 					// 判断距离
 					if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 10) {
 						var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(hx.events.MouseEvent.CLICK);
-						engineEvent.stageX = openflRenderer.stage.mouseX;
-						engineEvent.stageY = openflRenderer.stage.mouseY;
+						engineEvent.stageX = mouseX;
+						engineEvent.stageY = mouseY;
 						var i = stages.length;
 						while (i-- > 0) {
 							var stage = stages[i];
