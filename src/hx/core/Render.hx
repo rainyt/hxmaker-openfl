@@ -173,6 +173,20 @@ class Render implements IRender {
 		return data;
 	}
 
+	public function renderDisplayObject(object:DisplayObject):Void {
+		if (object is Image) {
+			renderImage(cast object);
+		} else if (object is DisplayObjectContainer) {
+			renderDisplayObjectContainer(cast object);
+		} else if (object is Label) {
+			renderLabel(cast object);
+		} else if (object is Graphics) {
+			renderGraphics(cast object);
+		} else if (object is CustomDisplayObject) {
+			renderCustomDisplayObject(cast object);
+		}
+	}
+
 	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
 		// 如果存在遮罩时，需要结束掉之前的所有绘制
 		if (container.maskRect != null) {
@@ -182,17 +196,10 @@ class Render implements IRender {
 			if (!object.visible || object.alpha == 0) {
 				continue;
 			}
-			if (object is Image) {
-				renderImage(cast object);
-			} else if (object is DisplayObjectContainer) {
-				renderDisplayObjectContainer(cast object);
-			} else if (object is Label) {
-				renderLabel(cast object);
-			} else if (object is Graphics) {
-				renderGraphics(cast object);
-			} else if (object is CustomDisplayObject) {
-				renderCustomDisplayObject(cast object);
+			if (object.background != null) {
+				renderDisplayObject(object.background);
 			}
+			renderDisplayObject(object);
 		}
 		if (container.maskRect != null) {
 			var shape = endFillImageDataBuffer();

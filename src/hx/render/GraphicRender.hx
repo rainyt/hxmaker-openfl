@@ -14,6 +14,9 @@ class GraphicRender {
 	 * @param renderer 
 	 */
 	public static function render(graphic:Graphics, renderer:Render) {
+		if (graphic.__graphicsDirty) {
+			graphic.updateGraphics();
+		}
 		var dataBuffer = renderer.imageBufferData[renderer.drawImageBuffDataIndex];
 		if (!dataBuffer.drawGraphic(graphic, renderer)) {
 			renderer.renderImageBuffData(dataBuffer);

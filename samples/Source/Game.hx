@@ -1,3 +1,4 @@
+import test.ScrollRender;
 import test.ListViewRender;
 import test.BitmapLabelRender;
 import test.XmlRender;
@@ -41,6 +42,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		ScrollRender,
 		ListViewRender,
 		BitmapLabelRender,
 		GraphicRender,
@@ -65,6 +67,11 @@ class Game extends Stage {
 
 	override function onStageInit() {
 		super.onStageInit();
+
+		var view = new ScrollRender();
+		this.addChild(view);
+
+		return;
 
 		// var quad = new Quad(300, 300, 0xff0000);
 		// this.addChild(quad);
