@@ -332,7 +332,10 @@ class ImageBufferData {
 		}
 		var isColorDirty = isBad || image.__colorTransformDirty;
 		var isTransformDirty = isBad || image.__transformDirty;
-		var isUvsDirty = isBad || image.__uvsDirty;
+		
+		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
+		// var isUvsDirty = isBad || image.__uvsDirty;
+		var isUvsDirty = true;
 
 		// if (displayObject != image || image.__transformDirty) {
 		// if (isColorDirty) {
