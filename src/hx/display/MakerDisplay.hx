@@ -104,11 +104,13 @@ class MakerDisplay extends openfl.display.Sprite {
 	 * @param hitObject 
 	 * @return Bool
 	 */
-	override private function __hitTest(x:Float, y:Float, shapeFlag:Bool, stack:Array<openfl.display.DisplayObject>, interactiveOnly:Bool, hitObject:openfl.display.DisplayObject):Bool {
+	override private function __hitTest(x:Float, y:Float, shapeFlag:Bool, stack:Array<openfl.display.DisplayObject>, interactiveOnly:Bool,
+			hitObject:openfl.display.DisplayObject):Bool {
 		if (!hitObject.visible || width == 0 || height == 0 || !this.mouseEnabled)
 			return false;
 		if (mask != null && !mask.__hitTestMask(x, y))
 			return false;
+
 		__getRenderTransform();
 		var px = @:privateAccess __renderTransform.__transformInverseX(x, y);
 		var py = @:privateAccess __renderTransform.__transformInverseY(x, y);
@@ -117,17 +119,21 @@ class MakerDisplay extends openfl.display.Sprite {
 				return false;
 			}
 
-			if (stack != null && !interactiveOnly) {
-				stack.push(hitObject);
-			}
+			if (container.hitTestWorldPoint(this.mouseX, this.mouseY)) {
+				if (stack != null && !interactiveOnly) {
+					stack.push(hitObject);
+				}
 
-			var childTouch = super.__hitTest(x, y, false, stack, interactiveOnly, hitObject);
-			if (!childTouch) {
-				if (stack != null)
-					stack.push(this);
-				return true;
+				var childTouch = super.__hitTest(x, y, false, stack, interactiveOnly, hitObject);
+				if (!childTouch) {
+					if (stack != null)
+						stack.push(this);
+					return true;
+				}
+				return childTouch;
+			} else {
+				return false;
 			}
-			return childTouch;
 		}
 
 		return false;
