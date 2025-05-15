@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.shader.MultiTextureShader;
 import openfl.geom.Rectangle;
 import openfl.display.Shape;
 import hx.render.CustomDisplayObjectRender;
@@ -13,7 +14,6 @@ import hx.render.ImageRender;
 import openfl.display.ShaderInput;
 import openfl.display.BitmapData;
 import openfl.display.ShaderParameter;
-import lime.graphics.opengl.GL;
 import openfl.display.Shader;
 import hx.display.DisplayObject;
 import openfl.geom.Matrix;
@@ -136,10 +136,7 @@ class Render implements IRender {
 		this.__stage.mouseChildren = this.__stage.mouseEnabled = false;
 		// 使用多纹理支持
 		if (defalutShader == null) {
-			var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-			var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
-			supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
-			defalutShader = new MultiTextureShader(Std.int(Math.min(16, supportedMultiTextureUnits)));
+			defalutShader = new MultiTextureShader();
 		}
 	}
 

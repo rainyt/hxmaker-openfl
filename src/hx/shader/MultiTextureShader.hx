@@ -1,8 +1,9 @@
-package hx.core;
+package hx.shader;
 
 import openfl.display.GraphicsShader;
 import openfl.utils.ByteArray;
 import openfl.utils.ObjectPool;
+import lime.graphics.opengl.GL;
 
 using StringTools;
 
@@ -98,6 +99,8 @@ class MultiTextureShader extends GraphicsShader {
 
 				color = clamp (openfl_ColorOffsetv + (color * colorMultiplier), 0.0, 1.0);
 
+				::CUSTOM_FRAGMENT_SHADER::
+
 				if (color.a > 0.0) {
 
 					gl_FragColor = vec4 (color.rgb * color.a * openfl_Alphav, color.a * openfl_Alphav);
@@ -110,6 +113,8 @@ class MultiTextureShader extends GraphicsShader {
 
 			} else {
 
+				::CUSTOM_FRAGMENT_SHADER::
+
 				gl_FragColor = color * openfl_Alphav;
 
 			}
@@ -117,8 +122,6 @@ class MultiTextureShader extends GraphicsShader {
 			if(openfl_blendMode_addv > 0.5){
 				gl_FragColor.a = 0.;
 			}
-
-			// gl_FragColor = vec4(1.,0.,0.,1.);
 
 		}";
 	#end
@@ -150,7 +153,11 @@ class MultiTextureShader extends GraphicsShader {
 		uniform sampler2D uSampler14;
 		uniform sampler2D uSampler15;
 		uniform sampler2D uSampler16;")
-	public function new(supportedMultiTextureUnits:Int, code:ByteArray = null) {
+	public function new(customVertexSource:String = null, customFragmentSource:String = null) {
+		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
+		var supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
+		supportedMultiTextureUnits = Std.int(Math.min(16, supportedMultiTextureUnits));
 		__glVertexSource = vertexSource;
 
 		__glFragmentSource = fragmentSource;
@@ -177,10 +184,10 @@ class MultiTextureShader extends GraphicsShader {
 			}
 		}
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);", uSamplerBodyBuffer);
-
+		__glFragmentSource = __glFragmentSource.replace("::CUSTOM_FRAGMENT_SHADER::", customFragmentSource != null ? customFragmentSource : "");
 		trace("shader:", __glFragmentSource);
 
-		super(code);
+		super(null);
 		this.__initGL();
 	}
 }
