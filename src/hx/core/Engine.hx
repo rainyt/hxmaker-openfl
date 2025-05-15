@@ -293,7 +293,7 @@ class Engine implements IEngine {
 	 */
 	public function render(display:DisplayObjectContainer, ?parentMatrix:Matrix):Void {
 		display.__updateTransform(display);
-		renderer.renderDisplayObjectContainer(display);
+		renderer.renderDisplayObject(display);
 		display.__dirty = false;
 	}
 }

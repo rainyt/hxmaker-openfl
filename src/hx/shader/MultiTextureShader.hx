@@ -13,6 +13,11 @@ using StringTools;
 #end
 // TODO: Currently this feature needs macro for optimization
 class MultiTextureShader extends GraphicsShader {
+	/**
+	 * 多纹理支持的纹理单元数量
+	 */
+	public static var supportedMultiTextureUnits:Int = 1;
+
 	@:noCompletion private static var __pool:ObjectPool<MultiTextureShader>;
 
 	public static var vertexSource:String = "attribute float openfl_Alpha_multi;
@@ -156,7 +161,7 @@ class MultiTextureShader extends GraphicsShader {
 	public function new(customVertexSource:String = null, customFragmentSource:String = null) {
 		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
 		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
-		var supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
+		supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
 		supportedMultiTextureUnits = Std.int(Math.min(16, supportedMultiTextureUnits));
 		__glVertexSource = vertexSource;
 

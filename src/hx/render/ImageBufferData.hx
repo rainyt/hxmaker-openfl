@@ -1,5 +1,6 @@
 package hx.render;
 
+import hx.shader.MultiTextureShader;
 import hx.display.DisplayObject;
 import hx.display.BlendMode;
 import hx.core.OpenFlBitmapData;
@@ -175,7 +176,7 @@ class ImageBufferData {
 					if (data.currentBitmapData != null) {
 						var texture = data.currentBitmapData.data.getTexture();
 						if (index == 0 || !mapIds.exists(texture)) {
-							if (bitmapDatas.length >= Render.supportedMultiTextureUnits) {
+							if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
 								return false;
 							}
 						}
@@ -299,7 +300,7 @@ class ImageBufferData {
 	public function draw(image:Image, render:Render):Bool {
 		var texture = image.data.data.getTexture();
 		if (index == 0 || !mapIds.exists(texture)) {
-			if (bitmapDatas.length >= Render.supportedMultiTextureUnits) {
+			if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
 				return false;
 			}
 		}

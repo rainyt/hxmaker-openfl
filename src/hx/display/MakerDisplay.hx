@@ -59,7 +59,7 @@ class MakerDisplay extends openfl.display.Sprite {
 		if (container.__dirty) {
 			renderer.clear();
 			container.__updateTransform(container);
-			renderer.renderDisplayObjectContainer(container);
+			renderer.renderDisplayObject(container);
 			container.__dirty = false;
 			renderer.endFill();
 		}

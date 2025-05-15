@@ -40,6 +40,11 @@ class Render implements IRender {
 	public static var defalutShader:Shader;
 
 	/**
+	 * 当前渲染的着色器
+	 */
+	public static var currentShader:Shader;
+
+	/**
 	 * 图片的缓存数据
 	 */
 	public var imageBufferData:Array<ImageBufferData> = [];
@@ -59,17 +64,19 @@ class Render implements IRender {
 			data.endFill();
 			var shape:Sprite = __pool.get();
 			shape.graphics.clear();
-			var openfl_TextureId:ShaderParameter<Float> = defalutShader.data.openfl_TextureId;
-			var openfl_Alpha:ShaderParameter<Float> = defalutShader.data.openfl_Alpha_multi;
-			var openfl_ColorMultiplier:ShaderParameter<Float> = defalutShader.data.openfl_ColorMultiplier_muti;
-			var openfl_ColorOffer:ShaderParameter<Float> = defalutShader.data.openfl_ColorOffset_muti;
-			var openfl_HasColorTransform:ShaderParameter<Float> = defalutShader.data.openfl_HasColorTransform_muti;
-			var openfl_blendMode_add:ShaderParameter<Float> = defalutShader.data.openfl_blendMode_add;
+			if (currentShader == null)
+				currentShader = defalutShader;
+			var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
+			var openfl_Alpha:ShaderParameter<Float> = currentShader.data.openfl_Alpha_multi;
+			var openfl_ColorMultiplier:ShaderParameter<Float> = currentShader.data.openfl_ColorMultiplier_muti;
+			var openfl_ColorOffer:ShaderParameter<Float> = currentShader.data.openfl_ColorOffset_muti;
+			var openfl_HasColorTransform:ShaderParameter<Float> = currentShader.data.openfl_HasColorTransform_muti;
+			var openfl_blendMode_add:ShaderParameter<Float> = currentShader.data.openfl_blendMode_add;
 			var offests:Array<Float> = [];
 			var mapIds:Map<BitmapData, Int> = [];
 			for (index => data in data.bitmapDatas) {
 				mapIds.set(data, index);
-				var sampler:ShaderInput<BitmapData> = defalutShader.data.getProperty('uSampler$index');
+				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
 				sampler.input = data;
 				sampler.filter = LINEAR;
 			}
@@ -79,7 +86,7 @@ class Render implements IRender {
 			openfl_Alpha.value = data.alphas;
 			openfl_blendMode_add.value = data.addBlendModes;
 			openfl_HasColorTransform.value = data.hasColorTransform;
-			shape.graphics.beginShaderFill(defalutShader);
+			shape.graphics.beginShaderFill(currentShader);
 			shape.graphics.drawTriangles(data.vertices, data.indices, data.uvtData);
 			shape.graphics.endFill();
 			__stage.addChild(shape);
@@ -97,6 +104,7 @@ class Render implements IRender {
 				case SCREEN:
 					shape.blendMode = SCREEN;
 			}
+			// currentShader = null;
 			return shape;
 		}
 		return null;
@@ -126,11 +134,6 @@ class Render implements IRender {
 	 * 游戏引擎对象
 	 */
 	// public var engine:Engine;
-
-	/**
-	 * 多纹理支持的纹理单元数量
-	 */
-	public static var supportedMultiTextureUnits:Int = 1;
 
 	public function new() {
 		this.__stage.mouseChildren = this.__stage.mouseEnabled = false;
@@ -171,6 +174,12 @@ class Render implements IRender {
 	}
 
 	public function renderDisplayObject(object:DisplayObject):Void {
+		// 自定义着色器支持
+		var renderShader = currentShader;
+		if (object.shader != currentShader) {
+			endFillImageDataBuffer();
+			currentShader = object.shader;
+		}
 		if (object is Image) {
 			renderImage(cast object);
 		} else if (object is DisplayObjectContainer) {
@@ -182,13 +191,16 @@ class Render implements IRender {
 		} else if (object is CustomDisplayObject) {
 			renderCustomDisplayObject(cast object);
 		}
+		if (object.shader != null) {
+			endFillImageDataBuffer();
+			currentShader = renderShader;
+		}
 	}
 
 	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
 		// 如果存在遮罩时，需要结束掉之前的所有绘制
-		if (container.maskRect != null) {
+		if (container.maskRect != null)
 			endFillImageDataBuffer();
-		}
 		for (object in container.children) {
 			if (!object.visible || object.alpha == 0) {
 				continue;
