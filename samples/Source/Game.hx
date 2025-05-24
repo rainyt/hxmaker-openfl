@@ -68,10 +68,10 @@ class Game extends Stage {
 	override function onStageInit() {
 		super.onStageInit();
 
-		var view = new ScrollRender();
-		this.addChild(view);
+		// var view = new ScrollRender();
+		// this.addChild(view);
 
-		return;
+		// return;
 
 		// var quad = new Quad(300, 300, 0xff0000);
 		// this.addChild(quad);
