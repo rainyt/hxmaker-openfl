@@ -299,7 +299,8 @@ class ImageBufferData {
 	 */
 	public function draw(image:Image, render:Render):Bool {
 		var texture = image.data.data.getTexture();
-		if (index == 0 || !mapIds.exists(texture)) {
+		var id = mapIds.get(texture);
+		if (index == 0 || id != null) {
 			if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
 				return false;
 			}
@@ -318,7 +319,6 @@ class ImageBufferData {
 			}
 		}
 		// 可以绘制，记录纹理ID
-		var id = mapIds.get(texture);
 		if (id == null) {
 			bitmapDatas.push(texture);
 			id = bitmapDatas.length - 1;

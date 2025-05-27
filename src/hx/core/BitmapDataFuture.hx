@@ -12,7 +12,13 @@ import hx.assets.Future;
 class BitmapDataFuture extends Future<BitmapData, String> {
 	override function post() {
 		super.post();
-		#if cpp
+		#if zygameui
+		zygame.utils.AssetsUtils.loadBitmapData(path, false).onComplete(function(data:openfl.display.BitmapData):Void {
+			this.completeValue(BitmapData.formData(new OpenFlBitmapData(data)));
+		}).onError(err->{
+			errorValue(FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.getLoadData()));
+		});
+		#elseif cpp
 		Assets.loadBitmapData(this.getLoadData(), false).onComplete((data) -> {
 			this.completeValue(BitmapData.formData(new OpenFlBitmapData(data)));
 		}).onError(err -> {
