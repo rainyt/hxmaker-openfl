@@ -298,13 +298,11 @@ class ImageBufferData {
 	 * @param image 
 	 */
 	public function draw(image:Image, render:Render):Bool {
+		if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
+			return false;
+		}
 		var texture = image.data.data.getTexture();
 		var id = mapIds.get(texture);
-		if (index == 0 || id != null) {
-			if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
-				return false;
-			}
-		}
 		// 如果平滑值不同，则产生新的绘制
 		if (index == 0) {
 			smoothing = image.smoothing;
@@ -333,41 +331,43 @@ class ImageBufferData {
 		}
 		var isColorDirty = isBad || image.__colorTransformDirty;
 		var isTransformDirty = isBad || image.__transformDirty;
-		
+
 		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
 		// var isUvsDirty = isBad || image.__uvsDirty;
 		var isUvsDirty = true;
+		// TODO 同isUvsDirty，需要想办法优化解决所有可能发生的情况
+		var isColorDirty = true;
 
 		// if (displayObject != image || image.__transformDirty) {
-		// if (isColorDirty) {
-		// 6个顶点数据
-		for (i in 0...6) {
-			ids[dataPerVertex6 + i] = id;
-			alphas[dataPerVertex6 + i] = image.__worldAlpha;
-			addBlendModes[dataPerVertex6 + i] = image.blendMode == ADD ? 1 : 0;
-			if (image.__colorTransform != null) {
-				hasColorTransform[dataPerVertex6 + i] = 1;
-				colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
-				colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
-				colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
-				colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
-				colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
-				colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
-				colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
-				colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
-			} else {
-				hasColorTransform[dataPerVertex6 + i] = 0;
-				colorMultiplier[dataPerVertex24 + i * 4] = 1;
-				colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
-				colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
-				colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
-				colorOffset[dataPerVertex24 + i * 4] = 0;
-				colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
-				colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
-				colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
+		if (isColorDirty) {
+			// 6个顶点数据
+			for (i in 0...6) {
+				ids[dataPerVertex6 + i] = id;
+				alphas[dataPerVertex6 + i] = image.__worldAlpha;
+				addBlendModes[dataPerVertex6 + i] = image.blendMode == ADD ? 1 : 0;
+				if (image.__colorTransform != null) {
+					hasColorTransform[dataPerVertex6 + i] = 1;
+					colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
+					colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
+				} else {
+					hasColorTransform[dataPerVertex6 + i] = 0;
+					colorMultiplier[dataPerVertex24 + i * 4] = 1;
+					colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
+					colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
+					colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
+					colorOffset[dataPerVertex24 + i * 4] = 0;
+					colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
+					colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
+					colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
+				}
 			}
 		}
-		// }
 
 		// if (isTransformDirty) {
 		// 坐标顶点
