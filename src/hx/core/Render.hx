@@ -31,6 +31,7 @@ using Reflect;
 /**
  * OpenFL的渲染器支持
  */
+@:keep
 @:access(hx.display.DisplayObject)
 @:access(openfl.geom.Matrix)
 class Render implements IRender {

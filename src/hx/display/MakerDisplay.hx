@@ -11,6 +11,7 @@ import hx.core.Engine;
 /**
  * hxmaker渲染器
  */
+@:keep
 @:access(hx.display.Stage)
 class MakerDisplay extends openfl.display.Sprite {
 	/**
