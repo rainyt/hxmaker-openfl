@@ -103,17 +103,18 @@ class Text implements ITextFieldDataProvider {
 		return this.textHeight;
 	}
 
-	public function reset():Void {
-		for (image in images) {
-			__images_pool.release(image);
-		}
+	public function release():Void {
+		// for (image in images) {
+		// __images_pool.release(image);
+		// }
+		// trace("__images_pool", __images_pool.activeObjects);
 		images = [];
 	}
 
 	public function drawText(context:TextFieldContextBitmapData, render:Render, isReset:Bool = false):Void {
 		var scale = label.textFormat.size / 60;
 		if (isReset) {
-			this.reset();
+			this.release();
 			var chars = this.text.split("");
 			var offestX = 0.;
 			var offestY = 0.;
@@ -122,7 +123,8 @@ class Text implements ITextFieldDataProvider {
 			for (char in chars) {
 				var fntFrame = context.getAtlas().getCharFntFrame(char);
 				if (fntFrame != null) {
-					var image = __images_pool.get();
+					// var image = __images_pool.get();
+					var image = new Image();
 					image.data = fntFrame.data;
 					images.push(image);
 					// 追加到渲染区域

@@ -181,7 +181,6 @@ class Render implements IRender {
 					__pool.release(cast display);
 			}
 		}
-		trace(__pool.activeObjects);
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);
 		__stage.removeChildren();
