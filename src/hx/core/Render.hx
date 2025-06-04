@@ -116,7 +116,7 @@ class Render implements IRender {
 	 */
 	@:noCompletion private var __stage:Sprite = new Sprite();
 
-	@:noCompletion private var __maskSprite:Sprite;
+	@:noCompletion private var __maskSprite:EngineSprite;
 
 	/**
 	 * 设置遮罩行为
@@ -124,7 +124,8 @@ class Render implements IRender {
 	 */
 	public function setMask(isMask:Bool):Void {
 		if (isMask) {
-			__maskSprite = new Sprite();
+			__maskSprite = new EngineSprite();
+			__maskSprite.isPool = false;
 			this.__stage.addChild(__maskSprite);
 		} else {
 			__maskSprite = null;
@@ -167,9 +168,20 @@ class Render implements IRender {
 		for (i in 0...__stage.numChildren) {
 			var display = __stage.getChildAt(i);
 			if (display is EngineSprite) {
-				__pool.release(cast display);
+				var sprite:EngineSprite = cast display;
+				if (!sprite.isPool && sprite.numChildren > 0) {
+					for (i in 0...sprite.numChildren) {
+						var child:openfl.display.DisplayObject = sprite.getChildAt(i);
+						if (child is EngineSprite) {
+							__pool.release(cast child);
+						}
+					}
+					sprite.removeChildren();
+				} else if (sprite.isPool)
+					__pool.release(cast display);
 			}
 		}
+		trace(__pool.activeObjects);
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);
 		__stage.removeChildren();
