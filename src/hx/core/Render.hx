@@ -90,7 +90,7 @@ class Render implements IRender {
 			shape.graphics.beginShaderFill(currentShader);
 			shape.graphics.drawTriangles(data.vertices, data.indices, data.uvtData);
 			shape.graphics.endFill();
-			__stage.addChild(shape);
+			stage.addChild(shape);
 			drawImageBuffDataIndex++;
 			createImageBufferData(drawImageBuffDataIndex);
 			ContextStats.statsVertexCount(data.indices.length);
@@ -116,9 +116,27 @@ class Render implements IRender {
 	 */
 	@:noCompletion private var __stage:Sprite = new Sprite();
 
+	@:noCompletion private var __maskSprite:Sprite;
+
+	/**
+	 * 设置遮罩行为
+	 * @param isMask 
+	 */
+	public function setMask(isMask:Bool):Void {
+		if (isMask) {
+			__maskSprite = new Sprite();
+			this.__stage.addChild(__maskSprite);
+		} else {
+			__maskSprite = null;
+		}
+	}
+
 	public var stage(get, never):Sprite;
 
 	private function get_stage():Sprite {
+		if (__maskSprite != null) {
+			return __maskSprite;
+		}
 		return __stage;
 	}
 
@@ -200,8 +218,10 @@ class Render implements IRender {
 
 	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
 		// 如果存在遮罩时，需要结束掉之前的所有绘制
-		if (container.maskRect != null)
+		if (container.maskRect != null) {
 			endFillImageDataBuffer();
+			this.setMask(true);
+		}
 		for (object in container.children) {
 			if (!object.visible || object.alpha == 0) {
 				continue;
@@ -213,15 +233,15 @@ class Render implements IRender {
 		}
 		if (container.maskRect != null) {
 			var shape = endFillImageDataBuffer();
-			if (shape != null) {
-				// 遮罩
-				__retRect.setTo(0, 0, 0, 0);
-				container.maskRect.transform(__retRect, container.__worldTransform);
-				__maskRect.setTo(__retRect.x, __retRect.y, __retRect.width, __retRect.height);
-				shape.scrollRect = __maskRect;
-				shape.x = __retRect.x;
-				shape.y = __retRect.y;
-			}
+			// 遮罩
+			__retRect.setTo(0, 0, 0, 0);
+			container.maskRect.transform(__retRect, container.__worldTransform);
+			__maskRect.setTo(__retRect.x, __retRect.y, __retRect.width, __retRect.height);
+			// shape.scrollRect = __maskRect;
+			__maskSprite.x = __retRect.x;
+			__maskSprite.y = __retRect.y;
+			__maskSprite.scrollRect = __maskRect;
+			this.setMask(false);
 		}
 		container.__dirty = false;
 	}
