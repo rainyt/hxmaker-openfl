@@ -1,5 +1,6 @@
 package hx.render;
 
+import hx.gemo.Rectangle;
 import hx.utils.ColorUtils;
 import hx.gemo.ColorTransform;
 import openfl.utils.ObjectPool;
@@ -66,6 +67,11 @@ class Text implements ITextFieldDataProvider {
 	public var images:Array<Image> = [];
 
 	/**
+	 * 每个字符的边界
+	 */
+	public var charBounds:Array<Rectangle> = [];
+
+	/**
 	 * 应用的显示对象
 	 */
 	public var label:Label;
@@ -103,6 +109,14 @@ class Text implements ITextFieldDataProvider {
 		return this.textHeight;
 	}
 
+	public function getChatBounds(index:Int):Rectangle {
+		trace("index", index, charBounds.length, charBounds[index]);
+		if (index < 0 || index > images.length) {
+			return null;
+		}
+		return charBounds[index];
+	}
+
 	public function release():Void {
 		// for (image in images) {
 		// __images_pool.release(image);
@@ -120,6 +134,7 @@ class Text implements ITextFieldDataProvider {
 			var offestY = 0.;
 			textWidth = 0;
 			textHeight = 0;
+			charBounds = [];
 			for (char in chars) {
 				var fntFrame = context.getAtlas().getCharFntFrame(char);
 				if (fntFrame != null) {
@@ -142,12 +157,16 @@ class Text implements ITextFieldDataProvider {
 					if (offestY + fntFrame.data.rect.height * scale > textHeight) {
 						textHeight = offestY + fntFrame.data.rect.height * scale;
 					}
+					charBounds.push(new Rectangle(offestX - fntFrame.xadvance * scale, offestY, fntFrame.data.rect.width * scale,
+						fntFrame.data.rect.height * scale));
 				} else if (char == "\n") {
 					// 换行处理
+					charBounds.push(null);
 					offestX = 0;
 					offestY += 60 * scale;
 				} else {
 					// 当空格处理
+					charBounds.push(new Rectangle(offestX, offestY, 30 * scale * 0.8, 60 * scale));
 					offestX += 30 * scale * 0.8;
 				}
 			}
