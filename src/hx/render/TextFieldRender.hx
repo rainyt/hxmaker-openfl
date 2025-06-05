@@ -110,7 +110,6 @@ class Text implements ITextFieldDataProvider {
 	}
 
 	public function getChatBounds(index:Int):Rectangle {
-		trace("index", index, charBounds.length, charBounds[index]);
 		if (index < 0 || index > images.length) {
 			return null;
 		}
