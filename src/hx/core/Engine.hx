@@ -250,10 +250,11 @@ class Engine implements IEngine {
 				engineEvent.delta = e.delta;
 			}
 
+			var needHitTest = true;
 			while (i-- > 0) {
 				var stage = stages[i];
-				if (stage.handleMouseEvent(engineEvent)) {
-					break;
+				if (stage.handleMouseEvent(engineEvent, needHitTest)) {
+					needHitTest = false;
 				}
 			}
 			switch e.type {
@@ -267,10 +268,11 @@ class Engine implements IEngine {
 						engineEvent.stageX = mouseX;
 						engineEvent.stageY = mouseY;
 						var i = stages.length;
+						var needHitTest = true;
 						while (i-- > 0) {
 							var stage = stages[i];
-							if (stage.handleMouseEvent(engineEvent)) {
-								break;
+							if (stage.handleMouseEvent(engineEvent, needHitTest)) {
+								needHitTest = false;
 							}
 						}
 					}
