@@ -221,7 +221,7 @@ class Engine implements IEngine {
 	}
 
 	private function __onKeyboardEvent(e:KeyboardEvent):Void {
-		var engineEvent:hx.events.KeyboardEvent = new hx.events.KeyboardEvent(e.type);
+		var engineEvent:hx.events.KeyboardEvent = new hx.events.KeyboardEvent(e.type, false, true);
 		engineEvent.keyCode = e.keyCode;
 		for (stage in stages) {
 			stage.handleKeyboardEvent(engineEvent);
