@@ -86,6 +86,9 @@ class TextFieldContextBitmapData {
 	 * @param text 
 	 */
 	public function drawText(text:String):Void {
+		if (text == null)
+			return;
+
 		#if (text_debug && stack_printf)
 		var list = haxe.CallStack.callStack();
 		if (list != null && list.length > 0) {
