@@ -104,6 +104,12 @@ class Render implements IRender {
 					shape.blendMode = NORMAL;
 				case SCREEN:
 					shape.blendMode = SCREEN;
+				case DIFFERENCE:
+					shape.blendMode = DIFFERENCE;
+				case SUBTRACT:
+					shape.blendMode = SUBTRACT;
+				case INVERT:
+					shape.blendMode = INVERT;
 			}
 			// currentShader = null;
 			return shape;
