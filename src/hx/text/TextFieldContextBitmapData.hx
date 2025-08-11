@@ -63,7 +63,7 @@ class TextFieldContextBitmapData {
 	private var req = ~/[\ud04e-\ue50e]+/;
 	#end
 
-	public function new(size:Int = 36, textureWidth:Int = 2048, textureHeight:Int = 2048, offestX:Int = 0, offestY:Int = 0) {
+	public function new(size:Int = 36, textureWidth:Int = 2048, textureHeight:Int = 2048, offestX:Int = 1, offestY:Int = 1) {
 		this.__textureWidth = textureWidth;
 		this.__textureHeight = textureHeight;
 		this.__offestX = offestX;
@@ -129,7 +129,7 @@ class TextFieldContextBitmapData {
 		if (caches.length == 0)
 			return;
 
-		#if cpp
+		#if (cpp || html5)
 		for (s in caches) {
 			__cacheText(s);
 		}

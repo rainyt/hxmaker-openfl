@@ -38,7 +38,10 @@ class TextFieldRender {
 			var context = getTextFieldContextBitmapData();
 			if (textField.text != label.data) {
 				textField.text = label.data;
-				context.drawText(textField.text);
+				if (Label.onGlobalCharFilter != null)
+					context.drawText(Label.onGlobalCharFilter(textField.text));
+				else
+					context.drawText(textField.text);
 				// 进行渲染，使用多个image组成
 				textField.drawText(__contextBitmapData, render, true);
 			} else {
@@ -128,7 +131,11 @@ class Text implements ITextFieldDataProvider {
 		var scale = label.textFormat.size / 60;
 		if (isReset) {
 			this.release();
-			var chars = this.text.split("");
+			var allText = this.text;
+			if (Label.onGlobalCharFilter != null) {
+				allText = Label.onGlobalCharFilter(allText);
+			}
+			var chars = allText.split("");
 			var offestX = 0.;
 			var offestY = 0.;
 			textWidth = 0;
