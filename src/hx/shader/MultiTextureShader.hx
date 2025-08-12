@@ -81,6 +81,13 @@ class MultiTextureShader extends GraphicsShader {
 
 		uniform vec2 openfl_TextureSize;
 
+		vec4 readColor(vec2 uv) {
+			float vTextureId = openfl_TextureIdv;
+			vec4 color;
+			color = texture2D(SAMPLER_INJECT, uv);
+			return color;
+		}
+
 		void main(void) {
 
 			vec4 color;
@@ -189,6 +196,7 @@ class MultiTextureShader extends GraphicsShader {
 			}
 		}
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);", uSamplerBodyBuffer);
+		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, uv);", uSamplerBodyBuffer.replace("openfl_TextureCoordv", "uv"));
 		__glFragmentSource = __glFragmentSource.replace("::CUSTOM_FRAGMENT_SHADER::", customFragmentSource != null ? customFragmentSource : "");
 		trace("shader:", __glFragmentSource);
 
