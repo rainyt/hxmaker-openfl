@@ -38,7 +38,7 @@ class TextFieldRender {
 			var context = getTextFieldContextBitmapData();
 			if (textField.text != label.data) {
 				textField.text = label.data;
-				if (Label.onGlobalCharFilter != null)
+				if (label.charFilterEnabled && Label.onGlobalCharFilter != null)
 					context.drawText(Label.onGlobalCharFilter(textField.text));
 				else
 					context.drawText(textField.text);
@@ -132,7 +132,7 @@ class Text implements ITextFieldDataProvider {
 		if (isReset) {
 			this.release();
 			var allText = this.text;
-			if (Label.onGlobalCharFilter != null) {
+			if (label.charFilterEnabled && Label.onGlobalCharFilter != null) {
 				allText = Label.onGlobalCharFilter(allText);
 			}
 			var chars = allText.split("");
@@ -154,7 +154,7 @@ class Text implements ITextFieldDataProvider {
 					image.x = offestX;
 					image.y = offestY;
 					offestX += fntFrame.xadvance * scale;
-					if (label.__width != null && offestX > label.width) {
+					if (label.wordWrap && label.__width != null && offestX > label.width) {
 						offestX = 0;
 						offestY += 60 * scale;
 					}
