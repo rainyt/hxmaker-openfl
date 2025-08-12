@@ -1,7 +1,7 @@
 package hx.core;
 
 import hx.display.MakerDisplay;
-import hx.gemo.Matrix;
+import hx.geom.Matrix;
 import hx.display.DisplayObjectContainer;
 import hx.display.IRender;
 import openfl.Lib;

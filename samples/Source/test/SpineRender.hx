@@ -1,6 +1,6 @@
 package test;
 
-import hx.gemo.ColorTransform;
+import hx.geom.ColorTransform;
 import hx.display.Spine;
 import hx.assets.SpineTextureAtlas;
 import hx.assets.Assets;

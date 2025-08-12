@@ -1,7 +1,7 @@
 package hx.render;
 
 import hx.display.DisplayObject;
-import hx.gemo.Matrix;
+import hx.geom.Matrix;
 import hx.core.Render;
 import hx.display.Image;
 

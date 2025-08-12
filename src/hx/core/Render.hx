@@ -263,7 +263,7 @@ class Render implements IRender {
 		container.__dirty = false;
 	}
 
-	private static var __retRect:hx.gemo.Rectangle = new hx.gemo.Rectangle();
+	private static var __retRect:hx.geom.Rectangle = new hx.geom.Rectangle();
 
 	private static var __maskRect:Rectangle = new Rectangle();
 
@@ -289,7 +289,7 @@ class Render implements IRender {
 	}
 
 	public function getMarix(display:DisplayObject):Matrix {
-		var hm:hx.gemo.Matrix = display.__worldTransform;
+		var hm:hx.geom.Matrix = display.__worldTransform;
 		var m = new Matrix(hm.a, hm.b, hm.c, hm.d, hm.tx, hm.ty);
 		return m;
 	}

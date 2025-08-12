@@ -4,7 +4,7 @@ import hx.shader.MultiTextureShader;
 import hx.display.DisplayObject;
 import hx.display.BlendMode;
 import hx.core.OpenFlBitmapData;
-import hx.gemo.Matrix;
+import hx.geom.Matrix;
 import hx.display.Graphics;
 import hx.core.Render;
 import openfl.display.BitmapData;
@@ -16,7 +16,7 @@ import openfl.Vector;
  */
 @:access(hx.display.Image)
 @:access(hx.display.Graphics)
-@:access(hx.gemo.Matrix)
+@:access(hx.geom.Matrix)
 class ImageBufferData {
 	/**
 	 * 只有1像素的位图

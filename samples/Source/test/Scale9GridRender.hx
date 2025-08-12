@@ -1,7 +1,7 @@
 package test;
 
 import hx.display.DisplayObjectContainer;
-import hx.gemo.Rectangle;
+import hx.geom.Rectangle;
 import hx.display.Image;
 import hx.assets.Assets;
 import hx.display.Scene;
