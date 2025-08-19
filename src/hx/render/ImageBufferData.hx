@@ -1,5 +1,6 @@
 package hx.render;
 
+import hx.geom.Matrix3D;
 import hx.shader.MultiTextureShader;
 import hx.display.DisplayObject;
 import hx.display.BlendMode;
@@ -382,6 +383,61 @@ class ImageBufferData {
 		var y3 = @:privateAccess tileTransform.__transformY(0, tileHeight);
 		var x4 = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
 		var y4 = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
+
+		// 3D变化支持
+		var __transformMatrix3D = @:privateAccess image.__transformMatrix3D;
+		if (__transformMatrix3D.transform3D != null) {
+			var matrix3D = new Matrix3D();
+			matrix3D.identity();
+			matrix3D.appendTranslation(-tileTransform.tx, -tileTransform.ty, 0);
+			if (__transformMatrix3D.center3DVector != null)
+				matrix3D.appendTranslation(-__transformMatrix3D.center3DVector.x, -__transformMatrix3D.center3DVector.y, -__transformMatrix3D.center3DVector.z);
+			matrix3D.append(__transformMatrix3D.transform3D);
+
+			// if (__transformMatrix3D.projectionMatrix3D != null) {
+			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, 0, 400);
+			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+			// }
+
+			// if (__transformMatrix3D.projectionMatrix3D != null) {
+			// matrix3D.appendTranslation(0, 0, 1000);
+			// matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+			// }
+
+			if (__transformMatrix3D.center3DVector != null)
+				matrix3D.appendTranslation(__transformMatrix3D.center3DVector.x, __transformMatrix3D.center3DVector.y, __transformMatrix3D.center3DVector.z);
+			matrix3D.appendTranslation(tileTransform.tx, tileTransform.ty, 0);
+
+			// if (__transformMatrix3D.projectionMatrix3D != null) {
+			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, image.stage.stageHeight / 2, 1000);
+			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+			// }
+
+			var array = [x, y, 0, x2, y2, 0, x3, y3, 0, x4, y4, 0];
+			// var array = [0, 0, tileWidth, 0, 0, tileWidth, tileWidth, tileHeight];
+			var projected = [];
+			var uvt = [];
+			Utils3D.projectVectors2D(matrix3D, array, projected, uvt);
+			// trace(projected);
+			x = projected[0];
+			y = projected[1];
+			x2 = projected[2];
+			y2 = projected[3];
+			x3 = projected[4];
+			y3 = projected[5];
+			x4 = projected[6];
+			y4 = projected[7];
+
+			// x = @:privateAccess tileTransform.__transformX(x, y);
+			// y = @:privateAccess tileTransform.__transformY(x, y);
+			// x2 = @:privateAccess tileTransform.__transformX(x2, y2);
+			// y2 = @:privateAccess tileTransform.__transformY(x2, y2);
+			// x3 = @:privateAccess tileTransform.__transformX(x3, y3);
+			// y3 = @:privateAccess tileTransform.__transformY(x3, y3);
+			// x4 = @:privateAccess tileTransform.__transformX(x4, y4);
+			// y4 = @:privateAccess tileTransform.__transformY(x4, y4);
+		}
+
 		vertices[dataPerVertex] = x;
 		vertices[dataPerVertex + 1] = y;
 		vertices[dataPerVertex + 2] = (x2);
