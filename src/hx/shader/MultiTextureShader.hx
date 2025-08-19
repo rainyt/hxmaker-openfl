@@ -39,6 +39,7 @@ class MultiTextureShader extends GraphicsShader {
 		
 		uniform mat4 openfl_Matrix;
 		uniform vec2 openfl_TextureSize;
+		uniform float time;
 
 		void main(void) {
 
@@ -76,6 +77,7 @@ class MultiTextureShader extends GraphicsShader {
 		varying float openfl_HasColorTransform_mutiv;
 		varying float openfl_TextureIdv;
 		varying float openfl_blendMode_addv;
+		uniform float time;
 
 		uniform sampler2D SAMPLER_INJECT;
 
@@ -148,6 +150,7 @@ class MultiTextureShader extends GraphicsShader {
 		attribute float openfl_blendMode_add;
 		uniform mat4 openfl_Matrix;
 		uniform vec2 openfl_TextureSize;
+		uniform float time;
 		uniform sampler2D uSampler0;
 		uniform sampler2D uSampler1;
 		uniform sampler2D uSampler2;
@@ -202,5 +205,10 @@ class MultiTextureShader extends GraphicsShader {
 
 		super(null);
 		this.__initGL();
+		this.time.value = [0];
+	}
+
+	public function update(time:Float):Void {
+		this.time.value[0] += time;
 	}
 }
