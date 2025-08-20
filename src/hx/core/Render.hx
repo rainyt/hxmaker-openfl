@@ -255,9 +255,11 @@ class Render implements IRender {
 			container.maskRect.transform(__retRect, container.__worldTransform);
 			__maskRect.setTo(__retRect.x, __retRect.y, __retRect.width, __retRect.height);
 			// shape.scrollRect = __maskRect;
-			__maskSprite.x = __retRect.x;
-			__maskSprite.y = __retRect.y;
-			__maskSprite.scrollRect = __maskRect;
+			if (__maskSprite != null) {
+				__maskSprite.x = __retRect.x;
+				__maskSprite.y = __retRect.y;
+				__maskSprite.scrollRect = __maskRect;
+			}
 			this.setMask(false);
 		}
 		container.__dirty = false;
