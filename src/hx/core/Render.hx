@@ -75,11 +75,11 @@ class Render implements IRender {
 			var openfl_blendMode_add:ShaderParameter<Float> = currentShader.data.openfl_blendMode_add;
 			var offests:Array<Float> = [];
 			var mapIds:Map<BitmapData, Int> = [];
-			for (index => data in data.bitmapDatas) {
-				mapIds.set(data, index);
+			for (index => data2 in data.bitmapDatas) {
+				mapIds.set(data2, index);
 				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
-				sampler.input = data;
-				sampler.filter = LINEAR;
+				sampler.input = data2;
+				sampler.filter = data.smoothing ? LINEAR : NEAREST;
 			}
 			openfl_ColorOffer.value = data.colorOffset;
 			openfl_ColorMultiplier.value = data.colorMultiplier;

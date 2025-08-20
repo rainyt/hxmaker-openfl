@@ -316,6 +316,8 @@ class ImageBufferData {
 			} else {
 				return false;
 			}
+		} else if (smoothing != image.smoothing) {
+			return false;
 		}
 		// 可以绘制，记录纹理ID
 		if (id == null) {
