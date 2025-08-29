@@ -151,6 +151,7 @@ class Engine implements IEngine {
 		ContextStats.statsCpuStart();
 		var now = Timer.stamp();
 		var dt = now - __lastTime;
+		hx.utils.Timer.run(dt);
 		__lastTime = now;
 		var __dirty = false;
 		for (stage in stages) {
