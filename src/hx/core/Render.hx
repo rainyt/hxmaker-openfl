@@ -216,6 +216,11 @@ class Render implements IRender {
 			endFillImageDataBuffer();
 			currentShader = object.shader;
 		}
+		// 如果存在遮罩时，需要结束掉之前的所有绘制
+		if (object.maskRect != null) {
+			endFillImageDataBuffer();
+			this.setMask(true);
+		}
 		if (object is Image) {
 			renderImage(cast object);
 		} else if (object is DisplayObjectContainer) {
@@ -227,32 +232,11 @@ class Render implements IRender {
 		} else if (object is CustomDisplayObject) {
 			renderCustomDisplayObject(cast object);
 		}
-		if (object.shader != null) {
-			endFillImageDataBuffer();
-			currentShader = renderShader;
-		}
-	}
-
-	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
-		// 如果存在遮罩时，需要结束掉之前的所有绘制
-		if (container.maskRect != null) {
-			endFillImageDataBuffer();
-			this.setMask(true);
-		}
-		for (object in container.children) {
-			if (!object.visible || object.alpha == 0) {
-				continue;
-			}
-			if (object.background != null) {
-				renderDisplayObject(object.background);
-			}
-			renderDisplayObject(object);
-		}
-		if (container.maskRect != null) {
+		if (object.maskRect != null) {
 			var shape = endFillImageDataBuffer();
 			// 遮罩
 			__retRect.setTo(0, 0, 0, 0);
-			container.maskRect.transform(__retRect, container.__worldTransform);
+			object.maskRect.transform(__retRect, object.__worldTransform);
 			__maskRect.setTo(__retRect.x, __retRect.y, __retRect.width, __retRect.height);
 			// shape.scrollRect = __maskRect;
 			if (__maskSprite != null) {
@@ -261,6 +245,22 @@ class Render implements IRender {
 				__maskSprite.scrollRect = __maskRect;
 			}
 			this.setMask(false);
+		}
+		if (object.shader != null) {
+			endFillImageDataBuffer();
+			currentShader = renderShader;
+		}
+	}
+
+	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
+		for (object in container.children) {
+			if (!object.visible || object.alpha == 0) {
+				continue;
+			}
+			if (object.background != null) {
+				renderDisplayObject(object.background);
+			}
+			renderDisplayObject(object);
 		}
 		container.__dirty = false;
 	}
