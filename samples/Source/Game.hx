@@ -1,3 +1,4 @@
+import test.MoreLabelRender;
 import test.ScrollRender;
 import test.ListViewRender;
 import test.BitmapLabelRender;
@@ -59,7 +60,8 @@ class Game extends Stage {
 		AllDisplayRender,
 		SpineRender,
 		ImageRender,
-		LabelRender
+		LabelRender,
+		MoreLabelRender
 	];
 
 	var title = new Label("Samples Name");

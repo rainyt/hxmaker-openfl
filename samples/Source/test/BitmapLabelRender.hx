@@ -12,7 +12,7 @@ class BitmapLabelRender extends Scene {
 		var assets = new Assets();
 		assets.loadAtlas("assets/NumberAtlas.png", "assets/NumberAtlas.xml");
 		assets.onComplete(a -> {
-			for (i in 0...100) {
+			for (i in 0...1000) {
 				var label = new hx.display.BitmapLabel();
 				label.atlas = assets.atlases.get("NumberAtlas");
 				this.addChild(label);
