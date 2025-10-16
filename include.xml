@@ -2,6 +2,8 @@
     <source path="engines/openfl" />
     <haxelib name="openfl"/>
     <haxelib name="hxmaker" />
+    <haxelib name="openfl-glsl"/>
+    <haxelib name="vector-math"/>
     <!-- Spine支持 -->
     <haxelib name="spine-haxe" unless="use_spine_hx" />
     <!-- HTML5 CPP 默认开始高清模式 -->
