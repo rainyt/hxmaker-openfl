@@ -12,6 +12,7 @@ using StringTools;
 @:noDebug
 #end
 // TODO: Currently this feature needs macro for optimization
+@:build(hx.macro.InstanceMacro.build())
 class MultiTextureShader extends GraphicsShader {
 	/**
 	 * 多纹理支持的纹理单元数量
@@ -168,14 +169,19 @@ class MultiTextureShader extends GraphicsShader {
 		uniform sampler2D uSampler14;
 		uniform sampler2D uSampler15;
 		uniform sampler2D uSampler16;")
-	public function new(customVertexSource:String = null, customFragmentSource:String = null) {
+	public function new(customVertexSource:String = null, customFragmentSource:String = null, customVertexBodySource:String = null,
+			customFragmentBodySource:String = null, glsl:GLSLSource = null) {
 		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
 		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
 		supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
 		supportedMultiTextureUnits = Std.int(Math.min(16, supportedMultiTextureUnits));
-		__glVertexSource = vertexSource;
-
-		__glFragmentSource = fragmentSource;
+		if (glsl != null) {
+			__glVertexSource = glsl.vertexSource;
+			__glFragmentSource = glsl.fragmentSource;
+		} else {
+			__glVertexSource = vertexSource;
+			__glFragmentSource = fragmentSource;
+		}
 		var uSamplerVariableBuffer:String = "";
 		for (i in 0...supportedMultiTextureUnits) {
 			uSamplerVariableBuffer += 'uniform sampler2D uSampler${i};\n';
@@ -201,6 +207,8 @@ class MultiTextureShader extends GraphicsShader {
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);", uSamplerBodyBuffer);
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, uv);", uSamplerBodyBuffer.replace("openfl_TextureCoordv", "uv"));
 		__glFragmentSource = __glFragmentSource.replace("::CUSTOM_FRAGMENT_SHADER::", customFragmentSource != null ? customFragmentSource : "");
+
+		trace(__glVertexSource, "\n\n\n\n", __glFragmentSource);
 
 		super(null);
 		this.__initGL();

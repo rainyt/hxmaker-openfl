@@ -1,0 +1,5 @@
+--main Main
+--interp
+--library openfl-glsl
+--library vector-math
+--class-path src
