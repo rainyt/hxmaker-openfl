@@ -23,7 +23,7 @@ class TextFieldRender {
 	 */
 	public static function getTextFieldContextBitmapData():TextFieldContextBitmapData {
 		if (__contextBitmapData == null)
-			__contextBitmapData = new TextFieldContextBitmapData(50);
+			__contextBitmapData = new TextFieldContextBitmapData(50, 2048, 2048, 5, 5);
 		return __contextBitmapData;
 	}
 

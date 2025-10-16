@@ -65,14 +65,15 @@ if(openfl_blendMode_addv > 0.5){
 }";
 
 	public static inline var FRAGMENT_FUNCTION = "
+varying float openfl_Alphav;
+
 vec4 readColor(vec2 uv) {
     float vTextureId = openfl_TextureIdv;
     vec4 color;
     color = texture2D(SAMPLER_INJECT, uv);
     return color;
 }
-    
-void main(void){";
+";
 
 	public var vertexSource:String;
 
@@ -83,7 +84,7 @@ void main(void){";
 		this.fragmentSource = fragmentSource;
 		this.vertexSource = this.vertexSource.replace("#pragma body", VERTEX_SOURCE);
 		this.fragmentSource = this.fragmentSource.replace("#pragma body", FRAGMENT_SOURCE);
-		this.fragmentSource = this.fragmentSource.replace("void main(void){", FRAGMENT_FUNCTION);
+		this.fragmentSource = this.fragmentSource.replace("varying float openfl_Alphav;", FRAGMENT_FUNCTION);
 		// 将所有uniform sampler2D uSampler定义删除，并更换为::CUSTOM_FRAGMENT_BODY_SHADER::
 		this.fragmentSource = this.fragmentSource.split("\n").map(s -> {
 			if (s.indexOf("uniform sampler2D") != -1) {

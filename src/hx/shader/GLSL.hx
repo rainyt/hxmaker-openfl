@@ -39,7 +39,51 @@ class GLSL {
 	@:uniform public var uSampler14:Sampler2D;
 	@:uniform public var uSampler15:Sampler2D;
 	@:uniform public var uSampler16:Sampler2D;
-	public var color:Vec4;
+
+	/**
+	 * 纹理UV
+	 */
+	public var gl_openfl_TextureCoord:Vec2;
+
+	/** 
+	 * 纹理UV
+	 */
+	public var gl_openfl_TextureCoordv:Vec2;
+
+	/**
+	 * 颜色偏移
+	 */
+	public var gl_openfl_ColorOffsetv:Vec4;
+
+	/**
+	 * 颜色相乘
+	 */
+	public var gl_openfl_ColorMultiplierv:Vec4;
+
+	/**
+	 * 是否存在颜色转换
+	 */
+	public var gl_openfl_HasColorTransform:Bool;
+
+	/**
+	 * 纹理尺寸
+	 */
+	public var gl_openfl_TextureSize:Vec2;
+
+	/**
+	 * 当前纹理透明度
+	 */
+	public var gl_openfl_Alphav:Float;
+
+	/**
+	 * 
+	 */
+	public var gl_openfl_Matrix:Mat4;
+
+	/**
+	 * 顶点参数
+	 */
+	public var gl_openfl_Position:Vec4;
 
 	/**
 	 * 最终值输出
@@ -56,7 +100,16 @@ class GLSL {
 	 */
 	public var gl_Position:Vec4;
 
+	/**
+	 * 当前着色器获得到的颜色
+	 */
+	public var color:Vec4;
+
 	public function fragment():Void {}
 
 	public function vertex():Void {}
+
+	public function readColor(uv:Vec2):Vec4 {
+		return null;
+	}
 }
