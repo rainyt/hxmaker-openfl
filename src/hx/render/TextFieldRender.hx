@@ -147,6 +147,7 @@ class Text implements ITextFieldDataProvider {
 					// var image = __images_pool.get();
 					var image = new Image();
 					image.data = fntFrame.data;
+					image.smoothing = label.smoothing;
 					images.push(image);
 					// 追加到渲染区域
 					var color = ColorUtils.toShaderColor(label.textFormat.color);
@@ -183,6 +184,7 @@ class Text implements ITextFieldDataProvider {
 			for (image in images) {
 				if (label.__transformDirty) {
 					var __worldTransform = image.__worldTransform;
+					image.smoothing = label.smoothing;
 					image.__worldAlpha = label.__worldAlpha * image.__alpha;
 					image.setTransformDirty(true);
 					// 世界矩阵

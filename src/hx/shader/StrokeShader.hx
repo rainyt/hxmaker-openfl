@@ -74,8 +74,6 @@ class StrokeShaderGLSL extends GLSL {
 	 */
 	@:fragmentglsl public function getAlpha(v2:Vec2, offestX:Float, offestY:Float):Float {
 		return readColor(v2 + vec2(offestX, offestY)).a;
-		// return readColor(v2).a;
-		// return offestX;
 	}
 
 	/**
