@@ -80,7 +80,6 @@ class Engine implements IEngine {
 	 * @param mainClasses 
 	 */
 	public function init(stageWidth:Int, stageHeight:Int):Void {
-		trace("[HXMAKER] init", stageWidth, stageHeight);
 		if (this.stage == null) {
 			this.stage = Lib.current.stage;
 			// 初始化渲染器
@@ -93,6 +92,7 @@ class Engine implements IEngine {
 		__lastTime = Timer.stamp();
 		__onStageSizeEvent(null);
 		__initStageEvent();
+		trace("[HXMAKER] init", stageWidth, stageHeight);
 	}
 
 	private function onAddedToStage(e:Event):Void {
@@ -135,6 +135,7 @@ class Engine implements IEngine {
 			stage.__stageHeight = this.stageHeight;
 			stage.dispatchEvent(new hx.events.Event(hx.events.Event.RESIZE));
 		}
+		trace("[HXMAKER] size changed", ____stageWidth, ____stageHeight, "scaleFactor", scaleFactor);
 	}
 
 	private var __lastTime:Float = 0;
