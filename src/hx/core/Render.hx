@@ -282,8 +282,8 @@ class Render implements IRender {
 	}
 
 	public function renderImage(image:Image):Void {
-		if (image.scale9Grid != null) {
-			renderGraphics(image.getScale9GridGraphic());
+		if (image.scale9Grid != null || image.__repeat) {
+			renderGraphics(image.getGraphic());
 		} else {
 			ImageRender.render(image, this);
 		}
