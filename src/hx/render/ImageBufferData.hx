@@ -168,7 +168,7 @@ class ImageBufferData {
 			switch command {
 				case BEGIN_FILL(color):
 					data.currentBitmapData = px1bitmapData;
-					data.smoothing = false;
+					data.smoothing = true;
 				case BEGIN_BITMAP_DATA(bitmapData, smoothing):
 					data.currentBitmapData = bitmapData;
 					data.smoothing = smoothing;
@@ -193,6 +193,8 @@ class ImageBufferData {
 							} else {
 								return false;
 							}
+						} else if (smoothing != data.smoothing) {
+							return false;
 						}
 						if (!applyBlendAddMode && graphic.blendMode == ADD) {
 							applyBlendAddMode = true;
