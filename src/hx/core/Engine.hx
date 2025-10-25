@@ -8,6 +8,7 @@ import openfl.Lib;
 import openfl.system.System;
 import hx.utils.ContextStats;
 import openfl.geom.Rectangle;
+import openfl.events.TouchEvent;
 import openfl.events.KeyboardEvent;
 import openfl.events.MouseEvent;
 import hx.utils.ScaleUtils;
@@ -195,6 +196,9 @@ class Engine implements IEngine {
 		this.stage.addEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
+		this.stage.addEventListener(TouchEvent.TOUCH_BEGIN, __onTouchEvent);
+		this.stage.addEventListener(TouchEvent.TOUCH_END, __onTouchEvent);
+		this.stage.addEventListener(TouchEvent.TOUCH_MOVE, __onTouchEvent);
 		this.stage.addEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
 		this.stage.addEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
 	}
@@ -278,6 +282,37 @@ class Engine implements IEngine {
 							}
 						}
 					}
+			}
+		}
+	}
+
+	private function __onTouchEvent(e:TouchEvent):Void {
+		if (e.target == stage || e.target is hx.display.MakerDisplay) {
+			touchX = e.stageX / scaleFactor;
+			touchY = e.stageY / scaleFactor;
+			var openflRenderer:hx.core.Render = cast this.renderer;
+			var engineEvent:hx.events.TouchEvent = new hx.events.TouchEvent(e.type);
+			var mouseX = openflRenderer.stage.mouseX;
+			var mouseY = openflRenderer.stage.mouseY;
+			// 如果是MakerDisplay对象，则使用相对MakerDisplay对象的坐标
+			if (e.target is hx.display.MakerDisplay) {
+				var makerDisplay:hx.display.MakerDisplay = cast e.target;
+				mouseX = makerDisplay.mouseX;
+				mouseY = makerDisplay.mouseY;
+			}
+			engineEvent.touchPointID = e.touchPointID;
+			engineEvent.touchX = mouseX;
+			engineEvent.touchY = mouseY;
+			engineEvent.stageX = mouseX;
+			engineEvent.stageY = mouseY;
+			var i = stages.length;
+
+			var needHitTest = true;
+			while (i-- > 0) {
+				var stage = stages[i];
+				if (stage.handleMouseEvent(engineEvent, needHitTest)) {
+					needHitTest = false;
+				}
 			}
 		}
 	}
