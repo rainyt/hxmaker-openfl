@@ -36,8 +36,9 @@ class TextFieldRender {
 		var textField:Text = cast label.root;
 		if (label.data != null) {
 			var context = getTextFieldContextBitmapData();
-			if (textField.text != label.data) {
+			if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
 				textField.text = label.data;
+				@:privateAccess label.__textFormatDirty = false;
 				if (label.charFilterEnabled && Label.onGlobalCharFilter != null)
 					context.drawText(Label.onGlobalCharFilter(textField.text));
 				else
