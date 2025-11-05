@@ -63,7 +63,10 @@ class TextFieldContextBitmapData {
 	private var req = ~/[\ud04e-\ue50e]+/;
 	#end
 
+	public var fontSize:Int = 36;
+
 	public function new(size:Int = 36, textureWidth:Int = 2048, textureHeight:Int = 2048, offestX:Int = 1, offestY:Int = 1) {
+		this.fontSize = size;
 		this.__textureWidth = textureWidth;
 		this.__textureHeight = textureHeight;
 		this.__offestX = offestX;

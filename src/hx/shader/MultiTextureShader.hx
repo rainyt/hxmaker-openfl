@@ -208,7 +208,7 @@ class MultiTextureShader extends GraphicsShader {
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, uv);", uSamplerBodyBuffer.replace("openfl_TextureCoordv", "uv"));
 		__glFragmentSource = __glFragmentSource.replace("::CUSTOM_FRAGMENT_SHADER::", customFragmentSource != null ? customFragmentSource : "");
 
-		trace(__glVertexSource, "\n\n\n\n", __glFragmentSource);
+		// trace(__glVertexSource, "\n\n\n\n", __glFragmentSource);
 
 		super(null);
 		this.__initGL();

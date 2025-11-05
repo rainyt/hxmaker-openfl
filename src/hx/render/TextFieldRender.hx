@@ -129,7 +129,7 @@ class Text implements ITextFieldDataProvider {
 	}
 
 	public function drawText(context:TextFieldContextBitmapData, render:Render, isReset:Bool = false):Void {
-		var scale = label.textFormat.size / 60;
+		var scale = label.textFormat.size / context.fontSize;
 		if (isReset) {
 			this.release();
 			var allText = this.text;
