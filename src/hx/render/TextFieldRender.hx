@@ -129,7 +129,6 @@ class Text implements ITextFieldDataProvider {
 	}
 
 	public function drawText(context:TextFieldContextBitmapData, render:Render, isReset:Bool = false):Void {
-		var scale = label.textFormat.size / context.fontSize;
 		if (isReset) {
 			this.release();
 			var allText = this.text;
@@ -142,8 +141,10 @@ class Text implements ITextFieldDataProvider {
 			textWidth = 0;
 			textHeight = 0;
 			charBounds = [];
-			for (char in chars) {
+			for (index => char in chars) {
 				var fntFrame = context.getAtlas().getCharFntFrame(char);
+				var textFormat = label.getCharTextFormatAt(index);
+				var scale = textFormat.size / context.fontSize;
 				if (fntFrame != null) {
 					// var image = __images_pool.get();
 					var image = new Image();
@@ -151,7 +152,7 @@ class Text implements ITextFieldDataProvider {
 					image.smoothing = label.smoothing;
 					images.push(image);
 					// 追加到渲染区域
-					var color = ColorUtils.toShaderColor(label.textFormat.color);
+					var color = ColorUtils.toShaderColor(textFormat.color);
 					image.colorTransform = new ColorTransform(color.r, color.g, color.b, 1);
 					image.x = offestX;
 					image.y = offestY;
@@ -182,8 +183,10 @@ class Text implements ITextFieldDataProvider {
 			label.__updateTransform(label.parent);
 		}
 		if (render != null) {
-			for (image in images) {
+			for (index => image in images) {
 				if (label.__transformDirty) {
+					var textFormat = label.getCharTextFormatAt(index);
+					var scale = textFormat.size / context.fontSize;
 					var __worldTransform = image.__worldTransform;
 					image.smoothing = label.smoothing;
 					image.__worldAlpha = label.__worldAlpha * image.__alpha;
