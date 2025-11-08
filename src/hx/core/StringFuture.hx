@@ -18,7 +18,7 @@ class StringFuture extends Future<String, String> {
 		} else {
 			url += "?v=" + version;
 		}
-		var loader = new URLLoader(new URLRequest(url));
+		var loader = new URLLoader(new URLRequest(hx.assets.Assets.getDefaultNativePath(url)));
 		loader.addEventListener(Event.COMPLETE, (e) -> {
 			this.completeValue(loader.data);
 		});

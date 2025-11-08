@@ -20,6 +20,6 @@ class BytesFuture extends Future<Bytes, String> {
 		urlLoader.addEventListener(IOErrorEvent.IO_ERROR, (e) -> {
 			this.errorValue(new FutureErrorEvent(FutureErrorEvent.LOAD_ERROR, false, false));
 		});
-		urlLoader.load(new URLRequest(getLoadData()));
+		urlLoader.load(new URLRequest(hx.assets.Assets.getDefaultNativePath(getLoadData())));
 	}
 }

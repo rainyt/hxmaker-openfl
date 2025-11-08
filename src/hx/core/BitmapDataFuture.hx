@@ -13,20 +13,20 @@ class BitmapDataFuture extends Future<BitmapData, String> {
 	override function post() {
 		super.post();
 		#if zygameui
-		zygame.utils.AssetsUtils.loadBitmapData(path, false).onComplete(function(data:openfl.display.BitmapData):Void {
+		zygame.utils.AssetsUtils.loadBitmapData(hx.assets.Assets.getDefaultNativePath(path), false).onComplete(function(data:openfl.display.BitmapData):Void {
 			this.completeValue(BitmapData.formData(new OpenFlBitmapData(data)));
 		}).onError(err->{
 			errorValue(FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.getLoadData()));
 		});
 		#elseif cpp
-		Assets.loadBitmapData(this.getLoadData(), false).onComplete((data) -> {
+		Assets.loadBitmapData(hx.assets.Assets.getDefaultNativePath(this.getLoadData()), false).onComplete((data) -> {
 			this.completeValue(BitmapData.formData(new OpenFlBitmapData(data)));
 		}).onError(err -> {
 			errorValue(FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.getLoadData()));
 		});
 		#else
 		var img:Image = new Image();
-		@:privateAccess img.__fromFile(this.getLoadData(), function(loadedImage:Image):Void {
+		@:privateAccess img.__fromFile(hx.assets.Assets.getDefaultNativePath(this.getLoadData()), function(loadedImage:Image):Void {
 			var bitmapData:openfl.display.BitmapData = openfl.display.BitmapData.fromImage(loadedImage);
 			if (bitmapData == null) {
 				errorValue(FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.getLoadData()));
