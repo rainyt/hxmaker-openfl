@@ -1,5 +1,6 @@
 package hx.render;
 
+import hx.utils.ContextStats;
 import hx.geom.Matrix3D;
 import hx.shader.MultiTextureShader;
 import hx.display.DisplayObject;
@@ -293,6 +294,7 @@ class ImageBufferData {
 			data.index++;
 		}
 		graphic.__graphicsDrawData.index = 0;
+		ContextStats.statsGraphicRenderCount();
 		return true;
 	}
 

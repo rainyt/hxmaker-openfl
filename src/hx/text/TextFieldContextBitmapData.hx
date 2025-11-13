@@ -179,7 +179,7 @@ class TextFieldContextBitmapData {
 			untyped __textField.__graphics.__context.clearRect(0, 0, __textField.__graphics.__canvas.width, __textField.__graphics.__canvas.height);
 		#end
 		__renderTestBitmapData.draw(__textField);
-		bitmapData.draw(__textField, m);
+		bitmapData.draw(__textField, m, null, null, null, true);
 		#if !cpp
 		emoj = "";
 		#end
