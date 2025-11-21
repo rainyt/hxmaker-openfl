@@ -210,6 +210,9 @@ class Render implements IRender {
 	}
 
 	public function renderDisplayObject(object:DisplayObject):Void {
+		if (object.parent != null && object.parent.__transformDirty) {
+			object.setTransformDirty();
+		}
 		// 自定义着色器支持
 		var renderShader = currentShader;
 		if (object.shader != null && object.shader != currentShader) {
