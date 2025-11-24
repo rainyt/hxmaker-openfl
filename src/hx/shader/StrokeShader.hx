@@ -82,8 +82,8 @@ class StrokeShaderGLSL extends GLSL {
 	 * @return Bool
 	 */
 	@:fragmentglsl public function circleCheck(v2:Vec2, len:Float):Float {
-		var setpX:Float = 1 / 2048. * len;
-		var setpY:Float = 1 / 2048. * len;
+		var setpX:Float = 1. / (2048. * 2.) * len;
+		var setpY:Float = 1. / (2048. * 2.) * len;
 		var checkTimes = 36.;
 		var setp:Float = 6.28 / checkTimes;
 		var allAlpha:Float = 0.;
@@ -92,7 +92,7 @@ class StrokeShaderGLSL extends GLSL {
 			var alpha:Float = getAlpha(v2, setpX * sin(r), setpY * cos(r));
 			allAlpha += alpha;
 		}
-		return clamp(allAlpha / (checkTimes * 0.5) * 2, 0., 1.);
+		return clamp(allAlpha / (checkTimes * 0.5) * 4., 0., 1.);
 	}
 
 	override function fragment() {
@@ -101,8 +101,8 @@ class StrokeShaderGLSL extends GLSL {
 		if (availableColor) {
 			color = mix(startcolor, endcolor, gl_openfl_TextureCoordv.y) * color.a;
 		}
-		for (i in 0...6) {
-			if (float(i) > (storksize))
+		for (i in 0...12) {
+			if (float(i) > (storksize * 2.))
 				break;
 			var alpha:Float = circleCheck(gl_openfl_TextureCoordv, float(i));
 			if (alpha > 0.) {
