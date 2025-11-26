@@ -5,13 +5,12 @@ import hx.display.EventDispatcher;
 import openfl.events.Event;
 import openfl.media.SoundChannel;
 import hx.assets.ISoundChannel;
-import openfl.media.Sound;
 import hx.assets.ISound;
 
 class OpenFLSound implements ISound {
-	public var sound:Sound;
+	public var sound:BaseSound;
 
-	public function new(sound:Sound) {
+	public function new(sound:BaseSound) {
 		this.sound = sound;
 	}
 
@@ -23,11 +22,11 @@ class OpenFLSound implements ISound {
 }
 
 class OpenFLSoundChannel extends EventDispatcher implements ISoundChannel {
-	public var channel:SoundChannel;
+	public var channel:BaseSoundChannel;
 
 	public var isLoop:Bool = false;
 
-	public function new(sound:Sound, isLoop:Bool) {
+	public function new(sound:BaseSound, isLoop:Bool) {
 		this.channel = sound.play();
 		this.isLoop = isLoop;
 		if (this.channel != null) {

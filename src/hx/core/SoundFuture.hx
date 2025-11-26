@@ -16,7 +16,7 @@ class SoundFuture extends Future<Sound, String> {
 		path = StringTools.replace(path, ".mp3", ".ogg");
 		#end
 		var url = new URLRequest(hx.assets.Assets.getDefaultNativePath(path));
-		var sound = new openfl.media.Sound();
+		var sound = new BaseSound();
 		sound.addEventListener(Event.COMPLETE, (e) -> {
 			var data = new Sound();
 			data.root = new OpenFLSound(sound);
