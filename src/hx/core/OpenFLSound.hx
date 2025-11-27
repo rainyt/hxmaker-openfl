@@ -31,7 +31,8 @@ class OpenFLSoundChannel extends EventDispatcher implements ISoundChannel {
 		this.isLoop = isLoop;
 		if (this.channel != null) {
 			this.channel.addEventListener(Event.SOUND_COMPLETE, function(e:Event) {
-				if (this.isLoop && this.channel == null) {
+				// && this.channel == null
+				if (this.isLoop) {
 					this.channel = sound.play();
 				}
 				this.dispatchEvent(new SoundEvent(SoundEvent.SOUND_COMPLETE));
