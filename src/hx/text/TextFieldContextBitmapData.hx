@@ -245,9 +245,6 @@ class TextFieldContextBitmapData {
 		 * 对当前显示对象进行重绘
 		 */
 	public function redraw():Void {
-		#if text_debug
-		ZLog.error("TextFieldContextBitmapData redraw");
-		#end
 		this.clear();
 		// 这里需要遍历并且重绘支持
 		for (stage in Hxmaker.engine.stages) {
@@ -255,7 +252,11 @@ class TextFieldContextBitmapData {
 				if (display is Label) {
 					var label:Label = cast display;
 					label.setTextFormatDirty();
-					__cacheText(label.data);
+					if (label.data != null) {
+						var texts = label.data.split("");
+						texts = texts.filter((s) -> s != " " || s != "\n" || s != "\r");
+						__cacheText(texts.join(" "));
+					}
 				}
 				return true;
 			});
