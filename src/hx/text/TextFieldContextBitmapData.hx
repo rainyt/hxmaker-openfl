@@ -1,5 +1,7 @@
 package hx.text;
 
+import hx.display.Label;
+import hx.core.Hxmaker;
 import hx.text.MaxRectsBinPack.FreeRectangleChoiceHeuristic;
 import lime.text.Font;
 import openfl.geom.Matrix;
@@ -148,6 +150,8 @@ class TextFieldContextBitmapData {
 		 */
 	private function __cacheText(text:String):Void {
 		// __textField = new TextField();
+		if (text == null)
+			return;
 		__textField.wordWrap = true;
 		__textField.text = text;
 		__textField.width = 2048;
@@ -201,6 +205,8 @@ class TextFieldContextBitmapData {
 			#end
 
 			var rect = __textField.getCharBoundaries(i);
+			if (rect == null)
+				continue;
 			rect.x += pakRect.x;
 			rect.y += pakRect.y;
 			rect.x -= __offestX;
@@ -243,16 +249,17 @@ class TextFieldContextBitmapData {
 		ZLog.error("TextFieldContextBitmapData redraw");
 		#end
 		this.clear();
-		// TODO 这里需要遍历并且重绘支持
-		// DisplayTools.map(Start.current.stage, (display) -> {
-		// 	if (display is ZLabel) {
-		// 		var label:ZLabel = cast display;
-		// 		var oldText = label.dataProvider;
-		// 		label.dataProvider = "";
-		// 		label.dataProvider = oldText;
-		// 	}
-		// 	return true;
-		// });
+		// 这里需要遍历并且重绘支持
+		for (stage in Hxmaker.engine.stages) {
+			hx.utils.DisplayTools.map(stage, (display) -> {
+				if (display is Label) {
+					var label:Label = cast display;
+					label.setTextFormatDirty();
+					__cacheText(label.data);
+				}
+				return true;
+			});
+		}
 	}
 
 	/**
