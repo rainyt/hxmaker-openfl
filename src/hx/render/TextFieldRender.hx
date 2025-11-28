@@ -15,16 +15,37 @@ import hx.display.Label;
  * 文本渲染器，需要支持纹理渲染
  */
 class TextFieldRender {
-	private static var __contextBitmapData:TextFieldContextBitmapData;
+	/**
+	 * 文本渲染纹理缓存
+	 */
+	private static var __contextBitmapDataCache:Map<Int, TextFieldContextBitmapData> = [];
 
 	/**
 	 * 获得文本渲染纹理
 	 * @return TextFieldContextBitmapData
 	 */
-	public static function getTextFieldContextBitmapData():TextFieldContextBitmapData {
-		if (__contextBitmapData == null)
-			__contextBitmapData = new TextFieldContextBitmapData(50, 2048, 2048, 5, 5);
-		return __contextBitmapData;
+	public static function getTextFieldContextBitmapData(cacheId:Int):TextFieldContextBitmapData {
+		if (!__contextBitmapDataCache.exists(cacheId))
+			__contextBitmapDataCache[cacheId] = new TextFieldContextBitmapData(50, 2048, 2048, 5, 5);
+		return __contextBitmapDataCache[cacheId];
+	}
+
+	/**
+	 * 释放文本渲染纹理
+	 * @param cacheId 缓存id
+	 */
+	public static function disposeTextFieldContextBitmapData(cacheId:Int = 0):Void {
+		__contextBitmapDataCache[cacheId].bitmapData.dispose();
+		__contextBitmapDataCache[cacheId] = null;
+	}
+
+	/**
+	 * 设置文本渲染纹理
+	 * @param cacheId 缓存id
+	 * @param context 文本渲染纹理
+	 */
+	public static function setTextFieldContextBitmapData(cacheId:Int = 0, context:TextFieldContextBitmapData):Void {
+		__contextBitmapDataCache[cacheId] = context;
 	}
 
 	public inline static function render(label:Label, render:Render):Void {
@@ -35,7 +56,7 @@ class TextFieldRender {
 		}
 		var textField:Text = cast label.root;
 		if (label.data != null) {
-			var context = getTextFieldContextBitmapData();
+			var context = getTextFieldContextBitmapData(label.textCacheId);
 			if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
 				textField.text = label.data;
 				@:privateAccess label.__textFormatDirty = false;
@@ -44,10 +65,10 @@ class TextFieldRender {
 				else
 					context.drawText(textField.text);
 				// 进行渲染，使用多个image组成
-				textField.drawText(__contextBitmapData, render, true);
+				textField.drawText(context, render, true);
 			} else {
 				// 没有变化，则使用已有的数据进行渲染
-				textField.drawText(__contextBitmapData, render);
+				textField.drawText(context, render);
 			}
 		}
 	}
@@ -101,14 +122,14 @@ class Text implements ITextFieldDataProvider {
 
 	public function getTextWidth():Float {
 		if (this.textWidth == null) {
-			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
+			this.drawText(TextFieldRender.getTextFieldContextBitmapData(label.textCacheId), null, true);
 		}
 		return this.textWidth;
 	}
 
 	public function getTextHeight():Float {
 		if (this.textWidth == null) {
-			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
+			this.drawText(TextFieldRender.getTextFieldContextBitmapData(label.textCacheId), null, true);
 		}
 		return this.textHeight;
 	}

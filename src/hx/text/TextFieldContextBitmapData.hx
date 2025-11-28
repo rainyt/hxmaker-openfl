@@ -252,11 +252,7 @@ class TextFieldContextBitmapData {
 				if (display is Label) {
 					var label:Label = cast display;
 					label.setTextFormatDirty();
-					if (label.data != null) {
-						var texts = label.data.split("");
-						texts = texts.filter((s) -> s != " " || s != "\n" || s != "\r");
-						__cacheText(texts.join(" "));
-					}
+					drawText(label.data);
 				}
 				return true;
 			});
