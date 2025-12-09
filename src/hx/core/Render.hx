@@ -91,7 +91,6 @@ class Render implements IRender {
 				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
 				sampler.input = data2;
 				sampler.filter = data.smoothing ? LINEAR : NEAREST;
-				// sampler.filter = NEAREST;
 			}
 			openfl_ColorOffer.value = data.colorOffset;
 			openfl_ColorMultiplier.value = data.colorMultiplier;
@@ -124,10 +123,6 @@ class Render implements IRender {
 					shape.blendMode = INVERT;
 			}
 
-			// if (!data.smoothing) {
-			// shape.graphics.clear();
-			// }
-			// currentShader = null;
 			if (currentShader == defalutUnSmoothingShader) {
 				currentShader = defalutShader;
 			}
