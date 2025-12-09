@@ -41,6 +41,11 @@ class Render implements IRender {
 	public static var defalutShader:Shader;
 
 	/**
+	 * 默认的无平滑着色器支持
+	 */
+	public static var defalutUnSmoothingShader:Shader;
+
+	/**
 	 * 当前渲染的着色器
 	 */
 	public static var currentShader:Shader;
@@ -65,8 +70,14 @@ class Render implements IRender {
 			data.endFill();
 			var shape:Sprite = __pool.get();
 			shape.graphics.clear();
-			if (currentShader == null)
+			if (currentShader == null) {
 				currentShader = defalutShader;
+			}
+			if (currentShader == defalutShader) {
+				if (!data.smoothing) {
+					currentShader = defalutUnSmoothingShader;
+				}
+			}
 			var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
 			var openfl_Alpha:ShaderParameter<Float> = currentShader.data.openfl_Alpha_multi;
 			var openfl_ColorMultiplier:ShaderParameter<Float> = currentShader.data.openfl_ColorMultiplier_muti;
@@ -80,6 +91,7 @@ class Render implements IRender {
 				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
 				sampler.input = data2;
 				sampler.filter = data.smoothing ? LINEAR : NEAREST;
+				// sampler.filter = NEAREST;
 			}
 			openfl_ColorOffer.value = data.colorOffset;
 			openfl_ColorMultiplier.value = data.colorMultiplier;
@@ -111,7 +123,14 @@ class Render implements IRender {
 				case INVERT:
 					shape.blendMode = INVERT;
 			}
+
+			// if (!data.smoothing) {
+			// shape.graphics.clear();
+			// }
 			// currentShader = null;
+			if (currentShader == defalutUnSmoothingShader) {
+				currentShader = defalutShader;
+			}
 			return shape;
 		}
 		return null;
@@ -166,6 +185,9 @@ class Render implements IRender {
 		// 使用多纹理支持
 		if (defalutShader == null) {
 			defalutShader = new MultiTextureShader();
+		}
+		if (defalutUnSmoothingShader == null) {
+			defalutUnSmoothingShader = new MultiTextureShader();
 		}
 	}
 
