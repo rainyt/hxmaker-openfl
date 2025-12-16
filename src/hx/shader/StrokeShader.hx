@@ -95,6 +95,7 @@ class StrokeShaderGLSL extends GLSL {
 		return clamp(allAlpha / (checkTimes * 0.5) * 4., 0., 1.);
 	}
 
+	@:precision("highp float")
 	override function fragment() {
 		super.fragment();
 		// 渐变色支持
@@ -115,6 +116,7 @@ class StrokeShaderGLSL extends GLSL {
 		gl_FragColor *= gl_openfl_Alphav;
 	}
 
+	@:precision("highp float")
 	override public function vertex():Void {
 		super.vertex();
 	}
