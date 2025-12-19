@@ -59,10 +59,15 @@ class OpenFlBitmapData implements IBitmapData {
 
 	public function draw(source:DisplayObject, matrix:Matrix):Void {
 		getBitmapDataRender().clear();
-		getBitmapDataRender().renderDisplayObject(source);
 		if (__root.readable) {
 			__root.disposeImage();
 		}
+		if (source.stage != null) {
+			@:privateAccess source.stage.__updateTransform(null);
+		} else {
+			@:privateAccess source.__updateTransform(null);
+		}
+		getBitmapDataRender().renderDisplayObject(source);
 		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty));
 	}
 
