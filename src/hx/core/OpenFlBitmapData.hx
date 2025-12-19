@@ -65,4 +65,11 @@ class OpenFlBitmapData implements IBitmapData {
 		}
 		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty));
 	}
+
+	/**
+	 * 清除当前位图数据
+	 */
+	public function clear():Void {
+		__root.fillRect(__root.rect, 0);
+	}
 }
