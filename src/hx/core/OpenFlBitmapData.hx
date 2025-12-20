@@ -68,6 +68,7 @@ class OpenFlBitmapData implements IBitmapData {
 			@:privateAccess source.__updateTransform(null);
 		}
 		getBitmapDataRender().renderDisplayObject(source);
+		getBitmapDataRender().endFill();
 		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty));
 	}
 
@@ -76,5 +77,12 @@ class OpenFlBitmapData implements IBitmapData {
 	 */
 	public function clear():Void {
 		__root.fillRect(__root.rect, 0);
+	}
+
+	/**
+	 * 释放位图数据
+	 */
+	public function dispose():Void {
+		__root.dispose();
 	}
 }

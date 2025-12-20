@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.utils.KeyboardTools;
 import hx.display.MakerDisplay;
 import hx.geom.Matrix;
 import hx.display.DisplayObjectContainer;
@@ -231,6 +232,11 @@ class Engine implements IEngine {
 		engineEvent.keyCode = e.keyCode;
 		for (stage in stages) {
 			stage.handleKeyboardEvent(engineEvent);
+		}
+		if (engineEvent.type == KeyboardEvent.KEY_DOWN) {
+			@:privateAccess KeyboardTools.onKeyDown(engineEvent.keyCode);
+		} else {
+			@:privateAccess KeyboardTools.onKeyUp(engineEvent.keyCode);
 		}
 	}
 
