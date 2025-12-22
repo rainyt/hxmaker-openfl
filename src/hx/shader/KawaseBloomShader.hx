@@ -44,8 +44,9 @@ class KawaseBloomShaderGLSL extends GLSL {
 
 			times += 8.;
 		}
-		this.gl_FragColor = color2 / times * 2.;
-		// this.gl_FragColor = vec4(1, uv.x, uv.y, 1);
+		color2 /= times * 0.5;
+		this.gl_FragColor = color2;
+		// this.gl_FragColor = vec4(1., 1., 0., 1.) * (color2.r + color2.g + color2.b) / 3.;
 	}
 
 	override public function vertex():Void {
