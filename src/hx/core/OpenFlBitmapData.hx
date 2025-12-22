@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.display.BlendMode;
 import hx.geom.Matrix;
 import hx.display.DisplayObject;
 import openfl.display.BitmapData;
@@ -58,7 +59,7 @@ class OpenFlBitmapData implements IBitmapData {
 		return __root != null ? __root.height : 0;
 	}
 
-	public function draw(source:DisplayObject, matrix:Matrix):Void {
+	public function draw(source:DisplayObject, matrix:Matrix, ?blendMode:BlendMode):Void {
 		getBitmapDataRender().clear();
 		if (__root.readable) {
 			__root.disposeImage();
@@ -70,7 +71,25 @@ class OpenFlBitmapData implements IBitmapData {
 		}
 		getBitmapDataRender().renderDisplayObject(source);
 		getBitmapDataRender().endFill();
-		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty));
+		var openflBlendMode:openfl.display.BlendMode = switch blendMode {
+			default:
+				null;
+			case ADD:
+				openfl.display.BlendMode.ADD;
+			case MULTIPLY:
+				openfl.display.BlendMode.MULTIPLY;
+			case NORMAL:
+				openfl.display.BlendMode.NORMAL;
+			case SCREEN:
+				openfl.display.BlendMode.SCREEN;
+			case DIFFERENCE:
+				openfl.display.BlendMode.DIFFERENCE;
+			case SUBTRACT:
+				openfl.display.BlendMode.SUBTRACT;
+			case INVERT:
+				openfl.display.BlendMode.INVERT;
+		}
+		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty), null, openflBlendMode);
 	}
 
 	/**
