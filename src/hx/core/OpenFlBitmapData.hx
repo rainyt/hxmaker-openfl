@@ -35,6 +35,7 @@ class OpenFlBitmapData implements IBitmapData {
 	public static function getBitmapDataRender():Render {
 		if (__bitmapDataRender == null) {
 			__bitmapDataRender = new Render();
+			__bitmapDataRender.enableRenderFilter = false;
 		}
 		return __bitmapDataRender;
 	}

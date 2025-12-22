@@ -226,9 +226,27 @@ class Render implements IRender {
 		return data;
 	}
 
+	/**
+	 * 是否启用渲染滤镜
+	 */
+	public var enableRenderFilter:Bool = true;
+
 	public function renderDisplayObject(object:DisplayObject):Void {
 		if (object.parent != null && object.parent.__transformDirty) {
 			object.setTransformDirty();
+		}
+		// 过滤器渲染支持
+		if (enableRenderFilter && object.filters != null && object.filters.length > 0) {
+			endFillImageDataBuffer();
+			var lastRender:DisplayObject = null;
+			for (filter in object.filters) {
+				filter.update(lastRender == null ? object : null, 0.1);
+				if (filter.render != null) {
+					lastRender = filter.render;
+					renderDisplayObject(filter.render);
+				}
+			}
+			return;
 		}
 		// 自定义着色器支持
 		var renderShader = currentShader;
