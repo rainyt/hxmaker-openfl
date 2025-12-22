@@ -240,7 +240,7 @@ class Render implements IRender {
 			endFillImageDataBuffer();
 			var lastRender:DisplayObject = null;
 			for (filter in object.filters) {
-				filter.update(lastRender == null ? object : null, 0.1);
+				filter.update(lastRender == null ? object : lastRender, 0.1);
 				if (filter.render != null) {
 					lastRender = filter.render;
 					renderDisplayObject(filter.render);
