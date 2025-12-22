@@ -112,4 +112,8 @@ class GLSL {
 	public function readColor(uv:Vec2):Vec4 {
 		return null;
 	}
+
+	public function float(value:Int):Float {
+		return value;
+	}
 }

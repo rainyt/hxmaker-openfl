@@ -24,7 +24,7 @@ class BloomFilter extends StageBitmapRenderFilter {
 		// 泛光图
 		__bloomImage = new Image();
 		__bloomImage.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
-		__bloomImage.shader = new hx.shader.KawaseBloomShader(12);
+		__bloomImage.shader = new hx.shader.KawaseBloomShader(24);
 	}
 
 	override function update(display:DisplayObject, dt:Float) {
