@@ -58,16 +58,18 @@ class OpenFlBitmapData implements IBitmapData {
 		return __root != null ? __root.height : 0;
 	}
 
-	public function draw(source:DisplayObject, matrix:Matrix, ?blendMode:BlendMode):Void {
+	public function draw(source:DisplayObject, matrix:Matrix, ?blendMode:BlendMode, updateTransform:Bool = true):Void {
 		var render = getBitmapDataRender();
 		render.clear();
 		if (__root.readable) {
 			__root.disposeImage();
 		}
-		if (source.stage != null && @:privateAccess source.stage.__transformDirty) {
-			@:privateAccess source.stage.__updateTransform(null);
-		} else if (@:privateAccess source.__transformDirty) {
-			@:privateAccess source.__updateTransform(null);
+		if (updateTransform) {
+			if (source.stage != null && @:privateAccess source.stage.__transformDirty) {
+				@:privateAccess source.stage.__updateTransform(null);
+			} else if (@:privateAccess source.__transformDirty) {
+				@:privateAccess source.__updateTransform(null);
+			}
 		}
 		render.enableRenderFilterDisplayObject = source;
 		render.renderDisplayObject(source);
