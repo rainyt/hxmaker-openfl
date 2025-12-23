@@ -17,9 +17,14 @@ class StrokeShader extends MultiTextureShader {
 		updateMixColor(scolor, ecolor);
 	}
 
+	public function updateSize(width:Float, height:Float):Void {
+		var param:ShaderParameter<Float> = this.data.textureSize;
+		param.value = [width, height];
+	}
+
 	public function updateParam(size:Float, color:UInt):Void {
 		var param:ShaderParameter<Float> = this.data.storksize;
-		param.value = [size > 0 ? size + 1 : size];
+		param.value = [size];
 		var scolor = ColorUtils.toShaderColor(color);
 		var param:ShaderParameter<Float> = this.data.storkcolor;
 		param.value = [scolor.r, scolor.g, scolor.b, 1];
@@ -44,6 +49,11 @@ class StrokeShaderGLSL extends GLSL {
 	 * 描边的大小
 	 */
 	@:uniform public var storksize:Float;
+
+	/**
+	 * 纹理的大小
+	 */
+	@:uniform public var textureSize:Vec2;
 
 	/**
 	 * 描边的颜色
@@ -82,8 +92,8 @@ class StrokeShaderGLSL extends GLSL {
 	 * @return Bool
 	 */
 	@:fragmentglsl public function circleCheck(v2:Vec2, len:Float):Float {
-		var setpX:Float = 1. / (2048. * 2.) * len;
-		var setpY:Float = 1. / (2048. * 2.) * len;
+		var setpX:Float = 1. / (textureSize.x) * len;
+		var setpY:Float = 1. / (textureSize.y) * len;
 		var checkTimes = 36.;
 		var setp:Float = 6.28 / checkTimes;
 		var allAlpha:Float = 0.;
@@ -103,14 +113,14 @@ class StrokeShaderGLSL extends GLSL {
 			color = mix(startcolor, endcolor, gl_openfl_TextureCoordv.y) * color.a;
 		}
 		for (i in 0...12) {
-			if (float(i) > (storksize * 2.))
+			if (float(i) > (storksize))
 				break;
 			var alpha:Float = circleCheck(gl_openfl_TextureCoordv, float(i));
 			if (alpha > 0.) {
 				gl_FragColor = storkcolor * alpha;
-				if (color.a > 0.) {
-					gl_FragColor = vec4(color.rgb, 1);
-				}
+				// if (color.a > 0.) {
+				// gl_FragColor = vec4(color.rgb, 1);
+				// }
 			}
 		}
 		gl_FragColor *= gl_openfl_Alphav;

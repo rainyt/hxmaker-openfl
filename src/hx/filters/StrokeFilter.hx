@@ -1,5 +1,6 @@
 package hx.filters;
 
+import hx.shader.StrokeShader;
 import hx.geom.Matrix;
 import hx.display.Box;
 import hx.core.OpenFlBitmapData;
@@ -40,32 +41,27 @@ class StrokeFilter extends RenderFilter {
 			return;
 		}
 		image.data = OpenFlBitmapData.fromSize(Std.int(width + strokeSize * 4), Std.int(height + strokeSize * 4), true, 0x0);
-		ready.data = OpenFlBitmapData.fromSize(Std.int(width), Std.int(height), true, 0x0);
+		ready.data = OpenFlBitmapData.fromSize(Std.int(width + strokeSize * 4), Std.int(height + strokeSize * 4), true, 0x0);
 		var m = new Matrix();
+		m.translate(strokeSize, strokeSize);
 		var clone = display.__worldTransform.clone();
 		display.__worldTransform.identity();
 		var oldAlpha = display.__worldAlpha;
 		display.__worldAlpha = 1.0;
-		ready.data.draw(display, null, null, false);
+		ready.data.draw(display, m, null, false);
 		display.__worldTransform.copyFrom(clone);
 		display.__worldAlpha = oldAlpha;
-		var box = new Box();
-		for (px in 0...strokeSize) {
-			var array = [-1, 0, 1, 0, 0, 1, 0, -1, -1, -1, 1, 1, -1, 1, 1, -1];
-			for (i in 0...Std.int(array.length / 2)) {
-				var img = new Image();
-				img.data = ready.data;
-				img.x = strokeSize + array[i * 2] * px;
-				img.y = strokeSize + array[i * 2 + 1] * px;
-				img.setColorTransform(0x0, 1);
-				box.addChild(img);
-			}
-		}
 
 		image.data.clear();
-		image.data.draw(box);
-		ready.x = strokeSize;
-		ready.y = strokeSize;
+
+		// 先渲染黑色描边
+		ready.x = ready.y = 0;
+		var sShader = new StrokeShader(strokeSize, 0x0);
+		sShader.updateSize(image.data.width, image.data.height);
+		ready.shader = sShader;
+		image.data.draw(ready);
+
+		sShader.updateParam(1, 0xffffff);
 		image.data.draw(ready);
 		this.render = image;
 
