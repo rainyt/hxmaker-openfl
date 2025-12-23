@@ -17,7 +17,7 @@ class StrokeFilter extends RenderFilter {
 
 	private var ready = new Image();
 
-	public function new(strokeSize:Int = 1, strokeColor:UInt = 0x0, fontColor:UInt = 0xffffff) {
+	public function new(strokeSize:Int = 3, strokeColor:UInt = 0x0, fontColor:UInt = 0xffffff, bold:Int = 1) {
 		this.strokeSize = strokeSize;
 		this.strokeColor = strokeColor;
 		this.fontColor = fontColor;
@@ -31,9 +31,14 @@ class StrokeFilter extends RenderFilter {
 	}
 
 	/**
+	 * 文本加粗
+	 */
+	public var bold:Int = 1;
+
+	/**
 	 * 描边宽度
 	 */
-	public var strokeSize:Int = 1;
+	public var strokeSize:Int = 3;
 
 	/**
 	 * 描边颜色
@@ -81,8 +86,8 @@ class StrokeFilter extends RenderFilter {
 		ready.shader = shader;
 		image.data.draw(ready);
 
-		shader.updateParam(1, fontColor);
-		ready.shader = null;
+		shader.updateParam(bold, fontColor);
+		ready.shader = shader;
 		image.data.draw(ready);
 		this.render = image;
 
