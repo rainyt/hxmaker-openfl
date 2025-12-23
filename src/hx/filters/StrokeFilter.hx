@@ -16,15 +16,27 @@ class StrokeFilter extends RenderFilter {
 
 	private var ready = new Image();
 
-	public function new(strokeSize:Int = 1) {
+	public function new(strokeSize:Int = 1, strokeColor:UInt = 0x0, fontColor:UInt = 0xffffff) {
 		this.strokeSize = strokeSize;
+		this.strokeColor = strokeColor;
+		this.fontColor = fontColor;
 		super();
 	}
 
 	/**
 	 * 描边宽度
 	 */
-	private var strokeSize:Int = 1;
+	public var strokeSize:Int = 1;
+
+	/**
+	 * 描边颜色
+	 */
+	public var strokeColor:UInt = 0x0;
+
+	/**
+	 * 字体颜色
+	 */
+	public var fontColor:UInt = 0xffffff;
 
 	private var __textureWidth:Float = 0;
 	private var __textureHeight:Float = 0;
@@ -56,12 +68,12 @@ class StrokeFilter extends RenderFilter {
 
 		// 先渲染黑色描边
 		ready.x = ready.y = 0;
-		var sShader = new StrokeShader(strokeSize, 0x0);
+		var sShader = new StrokeShader(strokeSize, strokeColor);
 		sShader.updateSize(image.data.width, image.data.height);
 		ready.shader = sShader;
 		image.data.draw(ready);
 
-		sShader.updateParam(1, 0xffffff);
+		sShader.updateParam(1, fontColor);
 		image.data.draw(ready);
 		this.render = image;
 
