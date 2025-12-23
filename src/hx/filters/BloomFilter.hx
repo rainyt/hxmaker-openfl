@@ -36,8 +36,6 @@ class BloomFilter extends StageBitmapRenderFilter {
 		this.bitmapData.clear();
 		this.bitmapData.draw(display);
 		// 将泛光区域叠加上去
-		// __thresholdImage.x = 100;
-		// __thresholdImage.y = 100;
 		__bloomImage.data.clear();
 		__bloomImage.data.draw(__thresholdImage);
 		this.bitmapData.draw(__bloomImage);
