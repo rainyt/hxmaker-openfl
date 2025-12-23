@@ -2,7 +2,6 @@ package hx.filters;
 
 import hx.shader.StrokeShader;
 import hx.geom.Matrix;
-import hx.display.Box;
 import hx.core.OpenFlBitmapData;
 import hx.display.DisplayObject;
 import hx.display.Image;
@@ -12,6 +11,8 @@ import hx.display.Image;
  */
 @:access(hx.display.DisplayObject)
 class StrokeFilter extends RenderFilter {
+	private static var shader:StrokeShader;
+
 	public var image:Image = new Image();
 
 	private var ready = new Image();
@@ -21,6 +22,12 @@ class StrokeFilter extends RenderFilter {
 		this.strokeColor = strokeColor;
 		this.fontColor = fontColor;
 		super();
+	}
+
+	override function init() {
+		super.init();
+		if (shader == null)
+			shader = new StrokeShader(1, 0, 0, 0);
 	}
 
 	/**
@@ -68,12 +75,13 @@ class StrokeFilter extends RenderFilter {
 
 		// 先渲染黑色描边
 		ready.x = ready.y = 0;
-		var sShader = new StrokeShader(strokeSize, strokeColor);
-		sShader.updateSize(image.data.width, image.data.height);
-		ready.shader = sShader;
+		shader.updateSize(image.data.width, image.data.height);
+		shader.updateParam(strokeSize, strokeColor);
+		ready.shader = shader;
 		image.data.draw(ready);
 
-		sShader.updateParam(1, fontColor);
+		// shader.updateParam(1, fontColor);
+		ready.shader = null;
 		image.data.draw(ready);
 		this.render = image;
 
