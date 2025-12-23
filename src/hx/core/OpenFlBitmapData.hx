@@ -36,7 +36,6 @@ class OpenFlBitmapData implements IBitmapData {
 	public static function getBitmapDataRender():Render {
 		if (__bitmapDataRender == null) {
 			__bitmapDataRender = new Render();
-			__bitmapDataRender.enableRenderFilter = false;
 		}
 		return __bitmapDataRender;
 	}
@@ -60,7 +59,8 @@ class OpenFlBitmapData implements IBitmapData {
 	}
 
 	public function draw(source:DisplayObject, matrix:Matrix, ?blendMode:BlendMode):Void {
-		getBitmapDataRender().clear();
+		var render = getBitmapDataRender();
+		render.clear();
 		if (__root.readable) {
 			__root.disposeImage();
 		}
@@ -69,8 +69,10 @@ class OpenFlBitmapData implements IBitmapData {
 		} else if (@:privateAccess source.__transformDirty) {
 			@:privateAccess source.__updateTransform(null);
 		}
-		getBitmapDataRender().renderDisplayObject(source);
-		getBitmapDataRender().endFill();
+		render.enableRenderFilterDisplayObject = source;
+		render.renderDisplayObject(source);
+		render.endFill();
+		render.enableRenderFilterDisplayObject = null;
 		var openflBlendMode:openfl.display.BlendMode = switch blendMode {
 			default:
 				null;

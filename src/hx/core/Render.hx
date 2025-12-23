@@ -233,14 +233,14 @@ class Render implements IRender {
 	/**
 	 * 是否启用渲染滤镜
 	 */
-	public var enableRenderFilter:Bool = true;
+	public var enableRenderFilterDisplayObject:DisplayObject = null;
 
 	public function renderDisplayObject(object:DisplayObject):Void {
 		if (object.parent != null && object.parent.__transformDirty) {
 			object.setTransformDirty();
 		}
 		// 过滤器渲染支持
-		if (enableRenderFilter && object.filters != null && object.filters.length > 0) {
+		if (enableRenderFilterDisplayObject != object && object.filters != null && object.filters.length > 0) {
 			endFillImageDataBuffer();
 			var lastRender:DisplayObject = null;
 			for (filter in object.filters) {

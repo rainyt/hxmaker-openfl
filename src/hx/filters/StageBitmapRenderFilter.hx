@@ -16,6 +16,7 @@ class StageBitmapRenderFilter extends RenderFilter {
 
 	override function init() {
 		super.init();
+		isStageRenderFilter = true;
 		bitmapData = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
 		var image = new Image();
 		image.data = bitmapData;
