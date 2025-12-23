@@ -77,10 +77,11 @@ class StrokeFilter extends RenderFilter {
 		ready.x = ready.y = 0;
 		shader.updateSize(image.data.width, image.data.height);
 		shader.updateParam(strokeSize, strokeColor);
+		shader.updateIntensity(6);
 		ready.shader = shader;
 		image.data.draw(ready);
 
-		// shader.updateParam(1, fontColor);
+		shader.updateParam(1, fontColor);
 		ready.shader = null;
 		image.data.draw(ready);
 		this.render = image;
