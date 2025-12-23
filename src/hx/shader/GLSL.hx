@@ -116,4 +116,8 @@ class GLSL {
 	public function float(value:Int):Float {
 		return value;
 	}
+
+	public function int(value:Float):Int {
+		return Std.int(value);
+	}
 }
