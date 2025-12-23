@@ -64,7 +64,6 @@ class StrokeShaderGLSL extends GLSL {
 				var color4:Vec4 = readColor(gl_openfl_TextureCoordv + vec2(setpX * sin(r), setpY * cos(r)));
 				if (color4.r + color4.g + color4.b > 0.0) {
 					color3 += color4;
-					checkTimes += 1;
 				} else {
 					color3 += vec4(1.0, 0.0, 0.0, 0.);
 				}
