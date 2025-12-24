@@ -14,6 +14,7 @@ import glsl.GLSL.texture2D;
 	0xDD、0xCC＜0xF8和0x33＞0x00＝33）。
 	- 变暗滤镜在Hxmaker中得到支持
  */
+@:build(hx.macro.InstanceMacro.build())
 class DarkenShader extends MultiTextureShader {
 	public function new() {
 		super(new GLSLSource(DarkenShaderGLSL.vertexSource, DarkenShaderGLSL.fragmentSource));

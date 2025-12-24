@@ -8,6 +8,6 @@ import hx.shader.DifferenceShader;
 class DifferenceFilter extends BlendModeFilter {
 	override function init() {
 		super.init();
-		this.render.shader = new DifferenceShader();
+		this.render.shader = DifferenceShader.getInstance();
 	}
 }

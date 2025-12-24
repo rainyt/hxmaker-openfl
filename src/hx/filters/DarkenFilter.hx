@@ -8,6 +8,6 @@ import hx.shader.DarkenShader;
 class DarkenFilter extends BlendModeFilter {
 	override function init() {
 		super.init();
-		this.render.shader = new DarkenShader();
+		this.render.shader = DarkenShader.getInstance();
 	}
 }

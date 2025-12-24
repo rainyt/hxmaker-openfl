@@ -6,6 +6,7 @@ import VectorMath;
 /**
  * 翻转颜色混合滤镜，对应`BlendMode.INVERT`
  */
+@:build(hx.macro.InstanceMacro.build())
 class InvertBlendShader extends MultiTextureShader {
 	public function new() {
 		super(new GLSLSource(InvertBlendShaderGLSL.vertexSource, InvertBlendShaderGLSL.fragmentSource));

@@ -6,6 +6,7 @@ import glsl.GLSL.texture2D;
 /**
  * 差值混合
  */
+@:build(hx.macro.InstanceMacro.build())
 class DifferenceShader extends MultiTextureShader {
 	public function new() {
 		super(new GLSLSource(DifferenceShaderGLSL.vertexSource, DifferenceShaderGLSL.fragmentSource));

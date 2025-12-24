@@ -6,6 +6,7 @@ import glsl.GLSL.texture2D;
 /**
  * 变亮滤镜
  */
+@:build(hx.macro.InstanceMacro.build())
 class LightenShader extends MultiTextureShader {
 	public function new() {
 		super(new GLSLSource(LightenShaderGLSL.vertexSource, LightenShaderGLSL.fragmentSource));

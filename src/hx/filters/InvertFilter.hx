@@ -9,6 +9,6 @@ import hx.display.DisplayObject;
 class InvertFilter extends BlendModeFilter {
 	override function init() {
 		super.init();
-		this.render.shader = new InvertBlendShader();
+		this.render.shader = InvertBlendShader.getInstance();
 	}
 }

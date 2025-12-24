@@ -8,6 +8,7 @@ import glsl.GLSL.texture2D;
 /**
  * 相减滤镜
  */
+@:build(hx.macro.InstanceMacro.build())
 class SubtractShader extends MultiTextureShader {
 	public function new() {
 		super(new GLSLSource(SubtractShaderGLSL.vertexSource, SubtractShaderGLSL.fragmentSource));

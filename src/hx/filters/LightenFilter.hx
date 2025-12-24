@@ -8,6 +8,6 @@ import hx.shader.LightenShader;
 class LightenFilter extends BlendModeFilter {
 	override function init() {
 		super.init();
-		this.render.shader = new LightenShader();
+		this.render.shader = LightenShader.getInstance();
 	}
 }

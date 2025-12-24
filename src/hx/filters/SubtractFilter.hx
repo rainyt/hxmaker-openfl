@@ -8,6 +8,6 @@ import hx.shader.SubtractShader;
 class SubtractFilter extends BlendModeFilter {
 	override function init() {
 		super.init();
-		this.render.shader = new SubtractShader();
+		this.render.shader = SubtractShader.getInstance();
 	}
 }

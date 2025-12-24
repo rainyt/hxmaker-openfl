@@ -3,6 +3,10 @@ package hx.shader;
 import VectorMath.vec4;
 import glsl.GLSL.texture2D;
 
+/**
+ * 乘法混合滤镜
+ */
+@:build(hx.macro.InstanceMacro.build())
 class MultiplyShader extends MultiTextureShader {
 	public function new() {
 		super(new GLSLSource(MultiplyShaderGLSL.vertexSource, MultiplyShaderGLSL.fragmentSource));
