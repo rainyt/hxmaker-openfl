@@ -16,7 +16,7 @@ class DifferenceShaderGLSL extends GLSL {
 	override function fragment() {
 		super.fragment();
 		var diffColor:Vec4 = texture2D(uSampler1, gl_openfl_TextureCoordv);
-		gl_FragColor = vec4(abs(color.r - diffColor.r), abs(color.g - diffColor.g), abs(color.b - diffColor.b), color.a);
+		gl_FragColor = vec4(abs(diffColor.r - color.r), abs(diffColor.g - color.g), abs(diffColor.b - color.b), color.a);
 	}
 
 	override function vertex() {
