@@ -240,17 +240,32 @@ class Render implements IRender {
 			object.setTransformDirty();
 		}
 		// 过滤器渲染支持
-		if (enableRenderFilterDisplayObject != object && object.filters != null && object.filters.length > 0) {
-			endFillImageDataBuffer();
-			var lastRender:DisplayObject = null;
-			for (filter in object.filters) {
-				filter.update(lastRender == null ? object : lastRender, 0.1);
-				if (filter.render != null) {
-					lastRender = filter.render;
-					renderDisplayObject(filter.render);
+		if (enableRenderFilterDisplayObject != object) {
+			// 这是BlendMode的增强渲染处理
+			var isRender = false;
+			if (object.__blendFilter != null) {
+				endFillImageDataBuffer();
+				object.__blendFilter.update(object, 0.1);
+				if (object.__blendFilter.render != null) {
+					renderDisplayObject(object.__blendFilter.render);
 				}
+				isRender = true;
 			}
-			return;
+			if (object.filters != null && object.filters.length > 0) {
+				endFillImageDataBuffer();
+				var lastRender:DisplayObject = null;
+				for (filter in object.filters) {
+					filter.update(lastRender == null ? object : lastRender, 0.1);
+					if (filter.render != null) {
+						lastRender = filter.render;
+						renderDisplayObject(filter.render);
+					}
+				}
+				isRender = true;
+			}
+			if (isRender) {
+				return;
+			}
 		}
 		// 自定义着色器支持
 		var renderShader = currentShader;
@@ -369,5 +384,17 @@ class Render implements IRender {
 	public function endFill():Void {
 		this.renderImageBuffData(this.imageBufferData[this.drawImageBuffDataIndex]);
 		this.imageBufferData = this.imageBufferData.splice(0, this.drawImageBuffDataIndex + 1);
+	}
+
+	/**
+	 * 将当前已渲染好的画面渲染到BitmapData
+	 * @return 
+	 */
+	public function renderToBitmapData(bitmapData:hx.display.BitmapData):Void {
+		var root:BitmapData = cast(bitmapData.data, OpenFlBitmapData).getTexture();
+		if (root.readable) {
+			root.disposeImage();
+		}
+		root.draw(this.stage);
 	}
 }
