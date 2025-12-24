@@ -127,6 +127,8 @@ class Render implements IRender {
 					shape.blendMode = INVERT;
 				case DARKEN:
 					shape.blendMode = DARKEN;
+				case LIGHTEN:
+					shape.blendMode = LIGHTEN;
 			}
 
 			if (currentShader == defalutUnSmoothingShader) {
