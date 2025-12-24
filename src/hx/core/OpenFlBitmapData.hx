@@ -60,6 +60,7 @@ class OpenFlBitmapData implements IBitmapData {
 
 	public function draw(source:DisplayObject, matrix:Matrix, ?blendMode:BlendMode, updateTransform:Bool = true):Void {
 		var render = getBitmapDataRender();
+		render.enableRenderFilterDisplayObject = source;
 		render.clear();
 		if (__root.readable) {
 			__root.disposeImage();
@@ -71,7 +72,6 @@ class OpenFlBitmapData implements IBitmapData {
 				@:privateAccess source.__updateTransform(null);
 			}
 		}
-		render.enableRenderFilterDisplayObject = source;
 		render.renderDisplayObject(source);
 		render.endFill();
 		render.enableRenderFilterDisplayObject = null;
