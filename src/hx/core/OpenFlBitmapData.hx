@@ -1,5 +1,6 @@
 package hx.core;
 
+import openfl.geom.Rectangle;
 import hx.display.BlendMode;
 import hx.geom.Matrix;
 import hx.display.DisplayObject;
@@ -99,8 +100,8 @@ class OpenFlBitmapData implements IBitmapData {
 	/**
 	 * 清除当前位图数据
 	 */
-	public function clear():Void {
-		__root.fillRect(__root.rect, 0);
+	public function clear(?rect:hx.geom.Rectangle):Void {
+		__root.fillRect(rect != null ? new Rectangle(rect.x, rect.y, rect.width, rect.height) : __root.rect, 0);
 	}
 
 	/**

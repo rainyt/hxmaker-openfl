@@ -131,6 +131,10 @@ class Render implements IRender {
 					shape.blendMode = LIGHTEN;
 				case LAYER:
 					shape.blendMode = LAYER;
+				case ALPHA:
+					shape.blendMode = ALPHA;
+				case ERASE:
+					shape.blendMode = ERASE;
 			}
 
 			if (currentShader == defalutUnSmoothingShader) {
