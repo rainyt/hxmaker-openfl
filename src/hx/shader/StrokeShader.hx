@@ -88,7 +88,7 @@ class StrokeShaderGLSL extends GLSL {
 			checkTimes += 8.;
 		}
 
-		gl_FragColor = (color3.a / checkTimes * intensity) * storkcolor;
+		gl_FragColor = min(1., (color3.a / checkTimes * intensity)) * storkcolor;
 		gl_FragColor *= gl_openfl_Alphav;
 	}
 

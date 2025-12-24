@@ -21,6 +21,7 @@ class StrokeFilter extends RenderFilter {
 		this.strokeSize = strokeSize;
 		this.strokeColor = strokeColor;
 		this.fontColor = fontColor;
+		this.bold = bold;
 		super();
 	}
 
@@ -88,6 +89,7 @@ class StrokeFilter extends RenderFilter {
 
 		shader.updateParam(bold, fontColor);
 		ready.shader = shader;
+		// ready.shader = null;
 		image.data.draw(ready);
 		this.render = image;
 
