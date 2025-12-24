@@ -7,8 +7,9 @@ import VectorMath.vec4;
 /**
  * 模糊着色器
  */
+@:build(hx.macro.InstanceMacro.build())
 class BlurShader extends MultiTextureShader {
-	public function new(blurX:Float, blurY:Float) {
+	public function new(blurX:Float = 10, blurY:Float = 10) {
 		super(new GLSLSource(BlurShaderGLSL.vertexSource, BlurShaderGLSL.fragmentSource));
 		this.updateBlur(blurX, blurY);
 	}

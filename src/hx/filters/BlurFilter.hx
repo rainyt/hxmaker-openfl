@@ -47,7 +47,7 @@ class BlurFilter extends StageBitmapRenderFilter {
 	override function init() {
 		super.init();
 		blurImage.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
-		blurImage.shader = new BlurShader(blurX, blurY);
+		blurImage.shader = BlurShader.getInstance();
 	}
 
 	override function update(display:DisplayObject, dt:Float) {
