@@ -225,8 +225,6 @@ class Render implements IRender {
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);
 		__stage.removeChildren();
-		if (this.enableRenderFilterDisplayObject == null)
-			ContextStats.statsFps();
 	}
 
 	/**

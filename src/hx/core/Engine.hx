@@ -166,6 +166,7 @@ class Engine implements IEngine {
 			}
 		}
 		ContextStats.reset();
+		ContextStats.statsFps();
 		if (__dirty) {
 			renderer.clear();
 			for (stage in stages) {
