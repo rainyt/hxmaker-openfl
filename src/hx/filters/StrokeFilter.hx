@@ -10,7 +10,7 @@ import hx.display.Image;
  * 描边滤镜
  */
 @:access(hx.display.DisplayObject)
-class StrokeFilter extends RenderFilter {
+class StrokeFilter extends DisplayObjectFilter {
 	private static var shader:StrokeShader;
 
 	public var image:Image = new Image();

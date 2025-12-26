@@ -28,6 +28,11 @@ class BlurFilter extends StageBitmapRenderFilter {
 	 */
 	public var blurY(default, set):Float = 10;
 
+	/**
+	 * 是否强制刷新
+	 */
+	public var forceDirty:Bool = false;
+
 	private function set_blurX(value:Float):Float {
 		this.invalidate();
 		return blurX = value;
@@ -52,7 +57,7 @@ class BlurFilter extends StageBitmapRenderFilter {
 
 	override function update(display:DisplayObject, dt:Float) {
 		super.update(display, dt);
-		if (!__dirty)
+		if (!__dirty && !forceDirty)
 			return;
 		__dirty = false;
 		this.blurImage.data.clear();

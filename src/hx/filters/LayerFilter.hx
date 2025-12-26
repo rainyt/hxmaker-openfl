@@ -40,7 +40,7 @@ class LayerFilter extends BlendModeFilter {
 			var children = cast(display, DisplayObjectContainer).children;
 			for (i in 0...children.length) {
 				var child = children[i];
-				if (child.blendMode != BlendMode.ALPHA && child.blendMode != BlendMode.ERASE) {
+				if (child.blendMode != BlendMode.ALPHA && child.blendMode != BlendMode.ERASE && child.visible) {
 					__render.renderDisplayObject(child);
 				}
 			}
