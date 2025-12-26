@@ -53,6 +53,8 @@ class StrokeFilter extends RenderFilter {
 
 	private var __textureWidth:Float = 0;
 	private var __textureHeight:Float = 0;
+	private var __offsetX:Float = 0;
+	private var __offsetY:Float = 0;
 
 	override function update(display:DisplayObject, dt:Float) {
 		super.update(display, dt);
@@ -60,15 +62,18 @@ class StrokeFilter extends RenderFilter {
 			return;
 		}
 		__dirty = false;
-		var width = display.width;
-		var height = display.height;
-		if (width <= 0 || height <= 0) {
+		// var width = display.width;
+		// var height = display.height;
+		var rect = display.__getLocalBounds(display.__getRect());
+		if (rect.width <= 0 || rect.height <= 0) {
 			return;
 		}
-		image.data = OpenFlBitmapData.fromSize(Std.int(width + strokeSize * 4), Std.int(height + strokeSize * 4), true, 0x0);
-		ready.data = OpenFlBitmapData.fromSize(Std.int(width + strokeSize * 4), Std.int(height + strokeSize * 4), true, 0x0);
+		__offsetX = rect.x;
+		__offsetY = rect.y;
+		image.data = OpenFlBitmapData.fromSize(Std.int(rect.width + strokeSize * 4), Std.int(rect.height + strokeSize * 4), true, 0x0);
+		ready.data = OpenFlBitmapData.fromSize(Std.int(rect.width + strokeSize * 4), Std.int(rect.height + strokeSize * 4), true, 0x0);
 		var m = new Matrix();
-		m.translate(strokeSize, strokeSize);
+		m.translate(strokeSize - rect.x, strokeSize - rect.y);
 		var clone = display.__worldTransform.clone();
 		display.__worldTransform.identity();
 		var oldAlpha = display.__worldAlpha;
@@ -100,7 +105,7 @@ class StrokeFilter extends RenderFilter {
 		if (render != null) {
 			this.render.__worldAlpha = display.__worldAlpha;
 			this.render.__worldTransform.copyFrom(display.__worldTransform);
-			this.render.__worldTransform.translate(-strokeSize, -strokeSize);
+			this.render.__worldTransform.translate(-strokeSize + __offsetX, -strokeSize + __offsetY);
 		}
 	}
 }
