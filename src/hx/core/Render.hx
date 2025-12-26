@@ -257,7 +257,6 @@ class Render implements IRender {
 			// 这是BlendMode的增强渲染处理
 			var isRender = false;
 			if (object.__blendFilter != null) {
-				endFillImageDataBuffer();
 				object.__blendFilter.update(object, 0.1);
 				if (object.__blendFilter.render != null) {
 					renderDisplayObject(object.__blendFilter.render);
@@ -265,7 +264,6 @@ class Render implements IRender {
 				isRender = true;
 			}
 			if (object.filters != null && object.filters.length > 0) {
-				endFillImageDataBuffer();
 				var lastRender:DisplayObject = null;
 				for (filter in object.filters) {
 					filter.update(lastRender == null ? object : lastRender, 0.1);
@@ -404,6 +402,7 @@ class Render implements IRender {
 	 * @return 
 	 */
 	public function renderToBitmapData(bitmapData:hx.display.BitmapData):Void {
+		this.endFillImageDataBuffer();
 		var root:BitmapData = cast(bitmapData.data, OpenFlBitmapData).getTexture();
 		if (root.readable) {
 			root.disposeImage();
