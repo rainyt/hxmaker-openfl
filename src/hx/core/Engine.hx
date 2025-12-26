@@ -309,10 +309,10 @@ class Engine implements IEngine {
 				mouseY = makerDisplay.mouseY;
 			}
 			engineEvent.touchPointID = e.touchPointID;
-			engineEvent.touchX = mouseX;
-			engineEvent.touchY = mouseY;
-			engineEvent.stageX = mouseX;
-			engineEvent.stageY = mouseY;
+			engineEvent.touchX = touchX;
+			engineEvent.touchY = touchY;
+			engineEvent.stageX = touchX;
+			engineEvent.stageY = touchY;
 			var i = stages.length;
 
 			var needHitTest = true;
