@@ -64,7 +64,8 @@ class StrokeFilter extends RenderFilter {
 		__dirty = false;
 		// var width = display.width;
 		// var height = display.height;
-		var rect = display.__getLocalBounds(display.__getRect());
+		// var rect = display.__getLocalBounds(display.__getRect());
+		var rect = display.getBounds(null);
 		if (rect.width <= 0 || rect.height <= 0) {
 			return;
 		}
