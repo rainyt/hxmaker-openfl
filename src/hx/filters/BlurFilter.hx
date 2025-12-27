@@ -78,6 +78,7 @@ class BlurFilter extends StageBitmapRenderFilter {
 			this.blurImage.data.draw(this.render);
 			this.bitmapData.draw(blurImage);
 		}
+		trace("渲染", this.blurImage.data.width, this.blurImage.data.height);
 	}
 
 	/**
@@ -86,5 +87,10 @@ class BlurFilter extends StageBitmapRenderFilter {
 	public function tweenTo(blurX:Int, blurY:Int, duration:Float):BlurFilter {
 		Actuate.tween(this, duration, {blurX: blurX, blurY: blurY}).ease(Linear.easeNone);
 		return this;
+	}
+
+	override function updateStageSize() {
+		super.updateStageSize();
+		blurImage.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
 	}
 }

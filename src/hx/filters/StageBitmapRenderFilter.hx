@@ -27,4 +27,9 @@ class StageBitmapRenderFilter extends RenderFilter {
 		super.dispose();
 		bitmapData.dispose();
 	}
+
+	override function updateStageSize() {
+		super.updateStageSize();
+		bitmapData.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0).data;
+	}
 }

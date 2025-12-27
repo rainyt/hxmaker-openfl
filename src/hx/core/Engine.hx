@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.utils.DisplayTools;
 import hx.utils.KeyboardTools;
 import hx.display.MakerDisplay;
 import hx.geom.Matrix;
@@ -136,6 +137,15 @@ class Engine implements IEngine {
 			stage.__stageWidth = this.stageWidth;
 			stage.__stageHeight = this.stageHeight;
 			stage.dispatchEvent(new hx.events.Event(hx.events.Event.RESIZE));
+			DisplayTools.map(stage, (display) -> {
+				if (display.filters != null)
+					for (filter in display.filters) {
+						filter.updateStageSize();
+					}
+				if (@:privateAccess display.__blendFilter != null)
+					@:privateAccess display.__blendFilter.updateStageSize();
+				return true;
+			});
 		}
 		trace("[HXMAKER] size changed", ____stageWidth, ____stageHeight, "scaleFactor", scaleFactor);
 	}
