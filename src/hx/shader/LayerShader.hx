@@ -8,6 +8,10 @@ import openfl.display.ShaderParameter;
  */
 @:build(hx.macro.InstanceMacro.build())
 class LayerShader extends MultiTextureShader {
+	@:glFragmentHeader("
+	uniform bool applyAlphav;
+	uniform bool applyErasev;
+	")
 	public function new() {
 		super(new GLSLSource(LayerShaderGLSL.vertexSource, LayerShaderGLSL.fragmentSource));
 	}

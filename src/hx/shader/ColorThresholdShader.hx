@@ -9,6 +9,9 @@ import openfl.display.ShaderParameter;
  * 颜色阈值着色器，会提取指定阈值范围内的颜色进行显示，其他颜色将被忽略。
  */
 class ColorThresholdShader extends MultiTextureShader {
+	@:glFragmentHeader("
+	uniform float threshold;
+	")
 	public function new(threshold:Float) {
 		super(new GLSLSource(ColorThresholdShaderGLSL.vertexSource, ColorThresholdShaderGLSL.fragmentSource));
 		updateThreshold(threshold);

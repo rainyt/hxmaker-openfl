@@ -9,6 +9,13 @@ import VectorMath.vec4;
  */
 @:build(hx.macro.InstanceMacro.build())
 class BlurShader extends MultiTextureShader {
+	@:glFragmentHeader("
+	uniform vec2 blurRadius;
+	varying vec2 vBlurCoords[7];
+	")
+	@:glVertexHeader("
+	varying vec2 vBlurCoords[7];
+	")
 	public function new(blurX:Float = 10, blurY:Float = 10) {
 		super(new GLSLSource(BlurShaderGLSL.vertexSource, BlurShaderGLSL.fragmentSource));
 		this.updateBlur(blurX, blurY);

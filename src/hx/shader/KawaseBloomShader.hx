@@ -8,6 +8,9 @@ import VectorMath.vec4;
  * Kawase 模糊 shader
  */
 class KawaseBloomShader extends MultiTextureShader {
+	@:glFragmentHeader("
+	uniform int iterations;
+	")
 	public function new(iterations:Int) {
 		super(new GLSLSource(KawaseBloomShaderGLSL.vertexSource, KawaseBloomShaderGLSL.fragmentSource));
 		this.updateIterations(iterations);

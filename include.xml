@@ -1,9 +1,9 @@
 <project>
     <source path="engines/openfl" />
-    <haxelib name="openfl"/>
+    <haxelib name="openfl" />
     <haxelib name="hxmaker" />
-    <haxelib name="openfl-glsl"/>
-    <haxelib name="vector-math"/>
+    <haxelib name="openfl-glsl" />
+    <haxelib name="vector-math" />
     <!-- Spine支持 -->
     <haxelib name="spine-haxe" unless="use_spine_hx" />
     <!-- HTML5 CPP 默认开始高清模式 -->
@@ -11,6 +11,33 @@
     <!-- 调试模式 -->
     <haxeflag name="--debug" if="debug" />
     <!-- 鸿蒙HAP目标（HTML5包装版本） -->
-	<target name="hap-html5" handler="harmony-os-html5-hap" />
-	<haxelib name="harmony-os-html5-hap" if="hap-html5"/>
+    <target name="hap-html5" handler="harmony-os-html5-hap" />
+    <haxelib name="harmony-os-html5-hap" if="hap-html5" />
+    <!-- IOS以及Android进行64位支持 -->
+    <architecture name="arm64" exclude="armv7" if="ios" />
+    <!-- 现在安卓只要默认的64位架构，除非定义`armv7` -->
+    <section if="android">
+        <architecture name="arm64" />
+        <architecture exclude="armv7" unless="armv7" />
+    </section>
+    <haxeflag name='--macro keep("openfl.display.DisplayObject")' />
+	<haxeflag name='--macro keep("openfl.display.DisplayObjectContainer")' />
+	<haxeflag name='--macro keep("openfl.display.Sprite")' />
+	<haxeflag name='--macro keep("openfl.geom.Point")' />
+	<haxeflag name='--macro keep("game.core.display.WipeImage")' />
+	<haxeflag name='--macro keep("openfl.ui.Multitouch")' />
+	<haxeflag name='--macro keep("spine.AnimationStateData")' />
+	<haxeflag name='--macro keep("spine.Key")' />
+	<haxeflag name='--macro keep("spine.Skin")' />
+	<haxeflag name='--macro keep("spine.support.extensions.SpineExtensions")' />
+	<haxeflag name='--macro keep("spine.support.extensions.StringExtensions")' />
+	<haxeflag name='--macro keep("tweenxcore.Tools")' />
+	<haxeflag name='--macro keep("tweenxcore.Tools.Easing")' />
+	<haxeflag name='--macro keep("tweenxcore.Tools.FloatTools")' />
+	<haxeflag name='--macro keep("tweenxcore.Tools.PointTools")' />
+	<haxeflag name='--macro keep("tweenxcore.Tools.MatrixTools")' />
+	<haxeflag name='--macro keep("tweenxcore.Easing")' />
+	<haxeflag name='--macro keep("tweenxcore.FloatTools")' />
+	<haxeflag name='--macro keep("tweenxcore.PointTools")' />
+	<haxeflag name='--macro keep("tweenxcore.MatrixTools")' />
 </project>

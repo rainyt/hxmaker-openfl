@@ -10,6 +10,12 @@ import glsl.GLSL;
  * 描边着色器
  */
 class StrokeShader extends MultiTextureShader {
+	@:glFragmentHeader("
+	uniform float storksize;
+	uniform vec2 textureSize;
+	uniform vec4 storkcolor;
+	uniform float intensity;
+	")
 	public function new(size:Float = 1.5, color:UInt = 0x0, scolor:UInt = 0, ecolor:UInt = 0) {
 		super(new GLSLSource(StrokeShaderGLSL.vertexSource, StrokeShaderGLSL.fragmentSource));
 		// 初始化渐变色
