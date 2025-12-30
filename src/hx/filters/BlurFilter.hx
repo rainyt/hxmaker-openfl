@@ -78,7 +78,6 @@ class BlurFilter extends StageBitmapRenderFilter {
 			this.blurImage.data.draw(this.render);
 			this.bitmapData.draw(blurImage);
 		}
-		trace("渲染", this.blurImage.data.width, this.blurImage.data.height);
 	}
 
 	/**
