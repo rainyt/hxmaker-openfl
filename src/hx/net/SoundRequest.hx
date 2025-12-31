@@ -14,7 +14,7 @@ class SoundRequest extends BaseRequest<Sound> {
 	override function request() {
 		super.request();
 		var path = this.url;
-		#if cpp
+		#if (cpp && !hxmaker_sound)
 		path = StringTools.replace(path, ".mp3", ".ogg");
 		#end
 		var url = new URLRequest(hx.assets.Assets.getDefaultNativePath(path));
