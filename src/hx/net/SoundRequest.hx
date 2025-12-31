@@ -11,6 +11,8 @@ import hx.assets.Sound;
 import hx.assets.Future;
 
 class SoundRequest extends BaseRequest<Sound> {
+	public var isMusic:Bool = false;
+
 	override function request() {
 		super.request();
 		var path = this.url;
@@ -19,6 +21,9 @@ class SoundRequest extends BaseRequest<Sound> {
 		#end
 		var url = new URLRequest(hx.assets.Assets.getDefaultNativePath(path));
 		var sound = new BaseSound();
+		#if hxmaker_sound
+		@:privateAccess sound.__isMusic = isMusic;
+		#end
 		sound.addEventListener(Event.COMPLETE, (e) -> {
 			var data = new Sound();
 			data.root = new OpenFLSound(sound);

@@ -40,8 +40,9 @@ class RequestQueue {
 	/**
 	 * 加载声音
 	 */
-	public static function loadSound(url:String, cb:Sound->FutureErrorEvent->Void):Void {
+	public static function loadSound(url:String, cb:Sound->FutureErrorEvent->Void, isMusic:Bool = false):Void {
 		var request = new SoundRequest(url, cb);
+		request.isMusic = isMusic;
 		__requestQueue.push(request);
 		// 如果请求数量已经超过最大数量，直接等待
 		if (CURRENT_REQUEST_COUNT >= MAX_REQUEST_COUNT) {

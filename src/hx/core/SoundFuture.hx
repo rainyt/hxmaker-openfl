@@ -9,6 +9,8 @@ import hx.assets.Future;
  * 声音加载
  */
 class SoundFuture extends Future<Sound, String> {
+	public var isMusic:Bool = false;
+
 	override function post() {
 		super.post();
 		RequestQueue.loadSound(this.getLoadData(), (data:Sound, error:FutureErrorEvent) -> {
@@ -19,6 +21,6 @@ class SoundFuture extends Future<Sound, String> {
 				this.completeValue(data);
 				RequestQueue.loadComplete();
 			}
-		});
+		}, isMusic);
 	}
 }
