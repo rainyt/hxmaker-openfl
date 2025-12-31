@@ -1,5 +1,6 @@
 package hx.core;
 
+import openfl.media.SoundTransform;
 import hx.events.SoundEvent;
 import hx.display.EventDispatcher;
 import openfl.events.Event;
@@ -44,6 +45,12 @@ class OpenFLSoundChannel extends EventDispatcher implements ISoundChannel {
 		if (channel != null) {
 			channel.stop();
 			channel = null;
+		}
+	}
+
+	public function setVolume(volume:Float, pan:Float = 0.0):Void {
+		if (channel != null) {
+			channel.soundTransform = new SoundTransform(volume, pan);
 		}
 	}
 }
