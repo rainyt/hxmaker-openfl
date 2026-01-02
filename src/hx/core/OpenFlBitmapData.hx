@@ -75,26 +75,9 @@ class OpenFlBitmapData implements IBitmapData {
 		}
 		render.renderDisplayObject(source);
 		render.endFill();
+		// render.endFillImageDataBuffer();
 		render.enableRenderFilterDisplayObject = null;
-		var openflBlendMode:openfl.display.BlendMode = switch blendMode {
-			default:
-				null;
-			case ADD:
-				openfl.display.BlendMode.ADD;
-			case MULTIPLY:
-				openfl.display.BlendMode.MULTIPLY;
-			case NORMAL:
-				openfl.display.BlendMode.NORMAL;
-			case SCREEN:
-				openfl.display.BlendMode.SCREEN;
-			case DIFFERENCE:
-				openfl.display.BlendMode.DIFFERENCE;
-			case SUBTRACT:
-				openfl.display.BlendMode.SUBTRACT;
-			case INVERT:
-				openfl.display.BlendMode.INVERT;
-		}
-		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty), null, openflBlendMode);
+		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty), null);
 	}
 
 	/**

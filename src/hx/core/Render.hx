@@ -113,32 +113,11 @@ class Render implements IRender {
 			switch data.blendMode {
 				case ADD:
 					// shape.blendMode = ADD;
-				case MULTIPLY:
-					shape.blendMode = MULTIPLY;
 				case NORMAL:
 					shape.blendMode = NORMAL;
 				case SCREEN:
 					shape.blendMode = SCREEN;
-				case DIFFERENCE:
-					shape.blendMode = DIFFERENCE;
-				case SUBTRACT:
-					shape.blendMode = SUBTRACT;
-				case INVERT:
-					shape.blendMode = INVERT;
-				case DARKEN:
-					shape.blendMode = DARKEN;
-				case LIGHTEN:
-					shape.blendMode = LIGHTEN;
-				case LAYER:
-					shape.blendMode = LAYER;
-				case ALPHA:
-					shape.blendMode = ALPHA;
-				case ERASE:
-					shape.blendMode = ERASE;
-				case HARDLIGHT:
-					shape.blendMode = HARDLIGHT;
-				case OVERLAY:
-					shape.blendMode = OVERLAY;
+				default:
 			}
 
 			if (currentShader == defalutUnSmoothingShader) {
@@ -257,6 +236,7 @@ class Render implements IRender {
 			// 这是BlendMode的增强渲染处理
 			var isRender = false;
 			if (object.__blendFilter != null) {
+				// this.endFillImageDataBuffer();
 				object.__blendFilter.update(object, 0.1);
 				if (object.__blendFilter.render != null) {
 					renderDisplayObject(object.__blendFilter.render);
@@ -264,6 +244,7 @@ class Render implements IRender {
 				isRender = true;
 			}
 			if (object.filters != null && object.filters.length > 0) {
+				// this.endFillImageDataBuffer();
 				var lastRender:DisplayObject = null;
 				for (filter in object.filters) {
 					filter.update(lastRender == null ? object : lastRender, 0.1);
