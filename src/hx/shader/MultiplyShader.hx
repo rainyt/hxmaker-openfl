@@ -18,7 +18,7 @@ class MultiplyShaderGLSL extends GLSL {
 		super.fragment();
 		var mulColor:Vec4 = texture2D(uSampler1, gl_openfl_TextureCoordv);
 		if (mulColor.a > 0)
-			gl_FragColor = vec4(mulColor.r * color.r, mulColor.g * color.g, mulColor.b * color.b, color.a);
+			gl_FragColor = vec4(mulColor.r * color.r, mulColor.g * color.g, mulColor.b * color.b, mulColor.a * color.a);
 	}
 
 	override function vertex() {
