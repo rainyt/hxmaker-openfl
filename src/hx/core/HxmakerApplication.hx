@@ -8,8 +8,8 @@ class HxmakerApplication extends Sprite {
 		super();
 	}
 
-	public function init(mainClasses:Class<Stage>, hdwidth:Int = 1920, hdheight:Int = 1080):Void {
-		var engine = Hxmaker.init(Engine, hdwidth, hdheight);
+	public function init(mainClasses:Class<Stage>, hdwidth:Int = 1920, hdheight:Int = 1080, cacheAsBitmap:Bool = false):Void {
+		var engine = Hxmaker.init(Engine, hdwidth, hdheight, cacheAsBitmap);
 		engine.initOpenFLRoot(this);
 		Hxmaker.engine.addToStage(Type.createInstance(mainClasses, []));
 	}

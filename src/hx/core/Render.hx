@@ -1,5 +1,6 @@
 package hx.core;
 
+import openfl.display.Bitmap;
 import hx.shader.MultiTextureShader;
 import openfl.geom.Rectangle;
 import openfl.display.Shape;
@@ -61,6 +62,41 @@ class Render implements IRender {
 	public var drawImageBuffDataIndex:Int = 0;
 
 	/**
+	 * 是否将渲染结果缓存为位图
+	 */
+	public var cacheAsBitmap(get, set):Bool;
+
+	private var __cacheAsBitmap:Bool = false;
+
+	private function get_cacheAsBitmap():Bool {
+		return __cacheAsBitmap;
+	}
+
+	private function set_cacheAsBitmap(value:Bool):Bool {
+		__cacheAsBitmap = value;
+		if (value) {
+			__cacheBitmap = new Bitmap(new BitmapData(1, 1, true, 0x0));
+			__cacheBitmap.bitmapData.disposeImage();
+		} else {
+			if (__cacheBitmap != null) {
+				__cacheBitmap.bitmapData.dispose();
+				__cacheBitmap = null;
+			}
+		}
+		return __cacheAsBitmap;
+	}
+
+	private var __cacheBitmap:Bitmap;
+
+	public function onStageSizeChange():Void {
+		if (cacheAsBitmap && __cacheBitmap != null) {
+			__cacheBitmap.bitmapData.dispose();
+			__cacheBitmap.bitmapData = new BitmapData(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
+			__cacheBitmap.bitmapData.disposeImage();
+		}
+	}
+
+	/**
 	 * 绘制图片缓存数据
 	 * @param data 
 	 */
@@ -105,7 +141,6 @@ class Render implements IRender {
 			shape.graphics.beginShaderFill(currentShader);
 			shape.graphics.drawTriangles(data.vertices, data.indices, data.uvtData);
 			shape.graphics.endFill();
-			stage.addChild(shape);
 			drawImageBuffDataIndex++;
 			createImageBufferData(drawImageBuffDataIndex);
 			ContextStats.statsVertexCount(data.indices.length);
@@ -120,6 +155,11 @@ class Render implements IRender {
 				default:
 			}
 
+			if (cacheAsBitmap) {
+				__cacheBitmap.bitmapData.draw(shape);
+			} else {
+				stage.addChild(shape);
+			}
 			if (currentShader == defalutUnSmoothingShader) {
 				currentShader = defalutShader;
 			}
@@ -221,6 +261,9 @@ class Render implements IRender {
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);
 		__stage.removeChildren();
+		if (cacheAsBitmap) {
+			__stage.addChild(__cacheBitmap);
+		}
 	}
 
 	/**

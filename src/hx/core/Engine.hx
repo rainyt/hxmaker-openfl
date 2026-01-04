@@ -147,6 +147,7 @@ class Engine implements IEngine {
 				return true;
 			});
 		}
+		render.onStageSizeChange();
 		trace("[HXMAKER] size changed", ____stageWidth, ____stageHeight, "scaleFactor", scaleFactor);
 	}
 
