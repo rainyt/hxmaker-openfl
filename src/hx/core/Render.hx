@@ -57,6 +57,15 @@ class Render implements IRender {
 	public var imageBufferData:Array<ImageBufferData> = [];
 
 	/**
+	 * 是否为核心渲染器
+	 */
+	public var isCoreRender(get, never):Bool;
+
+	private function get_isCoreRender():Bool {
+		return Hxmaker.engine.renderer == this;
+	}
+
+	/**
 	 * 当前图片的缓存数据索引
 	 */
 	public var drawImageBuffDataIndex:Int = 0;
@@ -298,6 +307,8 @@ class Render implements IRender {
 			if (object.__blendFilter != null) {
 				// this.endFillImageDataBuffer();
 				object.__blendFilter.update(object, 0.1);
+				// 统计混合模式滤镜绘制次数
+				ContextStats.statsBlendModeFilterDrawCall();
 				if (object.__blendFilter.render != null) {
 					renderDisplayObject(object.__blendFilter.render);
 				}
@@ -308,6 +319,8 @@ class Render implements IRender {
 				var lastRender:DisplayObject = null;
 				for (filter in object.filters) {
 					filter.update(lastRender == null ? object : lastRender, 0.1);
+					// 统计混合模式滤镜绘制次数
+					ContextStats.statsBlendModeFilterDrawCall();
 					if (filter.render != null) {
 						lastRender = filter.render;
 						renderDisplayObject(filter.render);

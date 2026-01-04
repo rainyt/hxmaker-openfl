@@ -84,6 +84,9 @@ class OpenFlBitmapData implements IBitmapData {
 	 * 清除当前位图数据
 	 */
 	public function clear(?rect:hx.geom.Rectangle):Void {
+		if (__root.readable) {
+			__root.disposeImage();
+		}
 		__root.fillRect(rect != null ? new Rectangle(rect.x, rect.y, rect.width, rect.height) : __root.rect, 0);
 	}
 
