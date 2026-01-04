@@ -109,7 +109,7 @@ class Render implements IRender {
 			drawImageBuffDataIndex++;
 			createImageBufferData(drawImageBuffDataIndex);
 			ContextStats.statsVertexCount(data.indices.length);
-			ContextStats.statsDrawCall();
+			this.statsDrawCall();
 			switch data.blendMode {
 				case ADD:
 					// shape.blendMode = ADD;
@@ -126,6 +126,22 @@ class Render implements IRender {
 			return shape;
 		}
 		return null;
+	}
+
+	private var __drawCallCount:Int = 0;
+
+	private function statsDrawCall(counts:Int = 1) {
+		ContextStats.statsDrawCall(counts);
+		__drawCallCount += counts;
+	}
+
+	/**
+	 * 获得当前渲染的绘制调用次数
+	 */
+	public var drawCall(get, never):Int;
+
+	private function get_drawCall():Int {
+		return __drawCallCount;
 	}
 
 	/**
@@ -201,6 +217,7 @@ class Render implements IRender {
 					__pool.release(cast display);
 			}
 		}
+		__drawCallCount = 0;
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);
 		__stage.removeChildren();
@@ -389,5 +406,6 @@ class Render implements IRender {
 			root.disposeImage();
 		}
 		root.draw(this.stage);
+		ContextStats.statsDrawCall(this.drawCall);
 	}
 }
