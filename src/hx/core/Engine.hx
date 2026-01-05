@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.filters.StageBitmapData;
 import hx.utils.DisplayTools;
 import hx.utils.KeyboardTools;
 import hx.display.MakerDisplay;
@@ -152,6 +153,7 @@ class Engine implements IEngine {
 				return true;
 			});
 		}
+		StageBitmapData.disposeAll();
 		render.onStageSizeChange();
 		trace("[HXMAKER] size changed", ____stageWidth, ____stageHeight, "scaleFactor", scaleFactor);
 	}

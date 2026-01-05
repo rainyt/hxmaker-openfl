@@ -43,7 +43,6 @@ class StageBitmapData extends BitmapData {
 		}
 		__pool = [];
 		__poolIndex = 0;
-		cacheSize(__cacheSize);
 	}
 
 	public function new() {
