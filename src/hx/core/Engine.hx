@@ -127,6 +127,11 @@ class Engine implements IEngine {
 		return ____stageHeight;
 	}
 
+	/**
+	 * 时间间隔
+	 */
+	public var dt:Float = 0;
+
 	private function __onStageSizeEvent(e:Event):Void {
 		scaleFactor = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight);
 		____stageWidth = Std.int(this.stage.stageWidth / scaleFactor);
@@ -164,7 +169,7 @@ class Engine implements IEngine {
 			return;
 		ContextStats.statsCpuStart();
 		var now = Timer.stamp();
-		var dt = now - __lastTime;
+		dt = now - __lastTime;
 		hx.utils.Timer.run(dt);
 		__lastTime = now;
 		var __dirty = false;

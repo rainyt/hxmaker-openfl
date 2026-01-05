@@ -306,7 +306,7 @@ class Render implements IRender {
 			var isRender = false;
 			if (object.__blendFilter != null) {
 				// this.endFillImageDataBuffer();
-				object.__blendFilter.update(object, 0.1);
+				object.__blendFilter.update(object, Hxmaker.engine.dt);
 				// 统计混合模式滤镜绘制次数
 				ContextStats.statsBlendModeFilterDrawCall();
 				if (object.__blendFilter.render != null) {
@@ -318,7 +318,7 @@ class Render implements IRender {
 				// this.endFillImageDataBuffer();
 				var lastRender:DisplayObject = null;
 				for (filter in object.filters) {
-					filter.update(lastRender == null ? object : lastRender, 0.1);
+					filter.update(lastRender == null ? object : lastRender, Hxmaker.engine.dt);
 					// 统计混合模式滤镜绘制次数
 					ContextStats.statsBlendModeFilterDrawCall();
 					if (filter.render != null) {
