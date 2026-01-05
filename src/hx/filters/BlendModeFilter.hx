@@ -15,7 +15,7 @@ class BlendModeFilter extends StageBitmapRenderFilter {
 
 	override function init() {
 		super.init();
-		displayImage.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
+		displayImage.data = new StageBitmapData();
 	}
 
 	override function update(display:DisplayObject, dt:Float) {

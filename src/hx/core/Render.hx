@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.filters.StageBitmapData;
 import openfl.display.Bitmap;
 import hx.shader.MultiTextureShader;
 import openfl.geom.Rectangle;
@@ -272,6 +273,9 @@ class Render implements IRender {
 		__stage.removeChildren();
 		if (cacheAsBitmap) {
 			__stage.addChild(__cacheBitmap);
+		}
+		if (isCoreRender) {
+			StageBitmapData.resetPool();
 		}
 	}
 
