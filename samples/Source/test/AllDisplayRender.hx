@@ -48,9 +48,8 @@ class AllDisplayRender extends Scene {
 		this.addChild(box);
 		box.addChild(spine);
 		spine.scaleX = spine.scaleY = 0.15;
-		spine.animationState.setAnimationByName(0, "idle", true);
+		spine.play("idle", true);
 		// 让spine居中
-		trace("spine", spine.getBounds());
 		box.layoutData = AnchorLayoutData.center();
 
 		// 文本

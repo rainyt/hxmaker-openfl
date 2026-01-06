@@ -77,7 +77,7 @@ class SpineDuckRender extends Scene {
 			bunny.speedY = (Math.random() * 5) - 2.5;
 			bunny.scaleX = bunny.scaleY = 0.5;
 			bunnys.push(bunny);
-			bunny.animationState.setAnimationByName(0, "run", true);
+			bunny.play("run", 0, true);
 		}
 		label.data = "数量：" + bunnys.length;
 	}

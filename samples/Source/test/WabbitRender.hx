@@ -60,7 +60,7 @@ class WabbitRender extends Scene {
 	}
 
 	private function onMouseDown(e:MouseEvent):Void {
-		createBunny(100);
+		createBunny(10000);
 	}
 
 	private function createBunny(counts = 500):Void {

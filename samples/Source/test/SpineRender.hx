@@ -36,7 +36,7 @@ class SpineRender extends Scene {
 			for (animation in spine.skeleton.data.animations) {
 				trace(animation.name);
 			}
-			spine.animationState.setAnimationByName(0, "shake", true);
+			spine.play("shake", 0, true);
 			spine.colorTransform = new ColorTransform(1, 0, 0, 1);
 		}
 	}
