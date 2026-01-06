@@ -153,7 +153,7 @@ class Engine implements IEngine {
 				return true;
 			});
 		}
-		StageBitmapData.disposeAll();
+		StageBitmapData.disposeAll(true);
 		render.onStageSizeChange();
 		trace("[HXMAKER] size changed", ____stageWidth, ____stageHeight, "scaleFactor", scaleFactor);
 	}
@@ -199,6 +199,7 @@ class Engine implements IEngine {
 			__time = 0;
 			ContextStats.statsMemory(System.totalMemory);
 		}
+		StageBitmapData.update(dt);
 	}
 
 	private function __initStageEvent():Void {
