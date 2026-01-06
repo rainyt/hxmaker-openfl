@@ -166,8 +166,12 @@ class Render implements IRender {
 			}
 
 			if (cacheAsBitmap) {
-				__cacheBitmap.bitmapData.draw(shape);
-				__pool.release(cast shape);
+				if (__maskSprite != null) {
+					__maskSprite.addChild(shape);
+				} else {
+					__cacheBitmap.bitmapData.draw(shape);
+					__pool.release(cast shape);
+				}
 			} else {
 				stage.addChild(shape);
 			}
@@ -202,6 +206,8 @@ class Render implements IRender {
 
 	@:noCompletion private var __maskSprite:EngineSprite;
 
+	@:noCompletion private var __cacheSprite:Sprite = new Sprite();
+
 	/**
 	 * 设置遮罩行为
 	 * @param isMask 
@@ -210,8 +216,21 @@ class Render implements IRender {
 		if (isMask) {
 			__maskSprite = new EngineSprite();
 			__maskSprite.isPool = false;
-			this.__stage.addChild(__maskSprite);
+			if (!cacheAsBitmap)
+				this.__stage.addChild(__maskSprite);
 		} else {
+			if (cacheAsBitmap && __maskSprite != null) {
+				this.__cacheSprite.addChild(__maskSprite);
+				__cacheBitmap.bitmapData.draw(__cacheSprite);
+				this.__cacheSprite.removeChild(__maskSprite);
+				for (i in 0...__maskSprite.numChildren) {
+					var child:openfl.display.DisplayObject = __maskSprite.getChildAt(i);
+					if (child is EngineSprite) {
+						__pool.release(cast child);
+					}
+				}
+				__maskSprite.removeChildren();
+			}
 			__maskSprite = null;
 		}
 	}
@@ -372,6 +391,11 @@ class Render implements IRender {
 				__maskSprite.x = __retRect.x;
 				__maskSprite.y = __retRect.y;
 				__maskSprite.scrollRect = __maskRect;
+				// var sprite = new Sprite();
+				// sprite.graphics.beginFill(0xff0000);
+				// sprite.graphics.drawRect(400, 0, 300, 300);
+				// __maskSprite.mask = sprite;
+				// __maskSprite.addChild(sprite);
 			}
 			this.setMask(false);
 		}
