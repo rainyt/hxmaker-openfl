@@ -167,6 +167,7 @@ class Render implements IRender {
 
 			if (cacheAsBitmap) {
 				__cacheBitmap.bitmapData.draw(shape);
+				__pool.release(cast shape);
 			} else {
 				stage.addChild(shape);
 			}
@@ -263,8 +264,9 @@ class Render implements IRender {
 						}
 					}
 					sprite.removeChildren();
-				} else if (sprite.isPool)
+				} else if (sprite.isPool) {
 					__pool.release(cast display);
+				}
 			}
 		}
 		__drawCallCount = 0;
@@ -273,6 +275,7 @@ class Render implements IRender {
 		__stage.removeChildren();
 		if (cacheAsBitmap) {
 			__stage.addChild(__cacheBitmap);
+			__cacheBitmap.bitmapData.fillRect(__cacheBitmap.bitmapData.rect, 0x0);
 		}
 		if (isCoreRender) {
 			StageBitmapData.resetPool();

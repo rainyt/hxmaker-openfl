@@ -5,6 +5,8 @@ import openfl.Lib;
 import hx.core.OpenFlBitmapData;
 import hx.display.IBitmapData;
 import hx.display.BitmapData;
+import hx.display.Quad;
+import hx.geom.Matrix;
 
 /**
  * 舞台位图数据，它们之间会进行共享，以便提高性能
@@ -20,9 +22,13 @@ class StageBitmapData extends BitmapData {
 	 */
 	public static function cacheSize(size:Int):Void {
 		__cacheSize = size;
+		// 缓存好了之后，进行一次简易的绘制进行激活
+		var quad = new Quad(10, 10, 0xff0000);
 		for (i in 0...size) {
 			if (__pool[i] == null) {
 				__pool[i] = OpenFlBitmapData.fromSize(Std.int(hx.core.Hxmaker.engine.stageWidth), Std.int(hx.core.Hxmaker.engine.stageHeight), true, 0x0).data;
+				__pool[i].clear();
+				__pool[i].draw(quad, new Matrix());
 			}
 		}
 	}
@@ -62,7 +68,7 @@ class StageBitmapData extends BitmapData {
 	 * 释放所有位图数据
 	 */
 	public static function disposeAll(force:Bool = false):Void {
-		if (__pool.length == 0)
+		if (__pool.length == 0 || __cacheSize >= __pool.length)
 			return;
 		for (index => bitmapData in __pool) {
 			if (bitmapData != null) {
@@ -70,8 +76,7 @@ class StageBitmapData extends BitmapData {
 					bitmapData.dispose();
 			}
 		}
-		__pool = [];
-		__poolIndex = 0;
+		__pool = __pool.slice(0, __cacheSize);
 	}
 
 	public function new() {
