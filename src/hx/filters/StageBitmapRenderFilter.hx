@@ -14,10 +14,20 @@ class StageBitmapRenderFilter extends RenderFilter {
 	 */
 	public var bitmapData:BitmapData;
 
+	public var keep:Bool = false;
+
+	public function new(keep:Bool = false) {
+		this.keep = keep;
+		super();
+	}
+
 	override function init() {
 		super.init();
 		isStageRenderFilter = true;
-		bitmapData = new StageBitmapData();
+		if (keep)
+			bitmapData = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
+		else
+			bitmapData = new StageBitmapData();
 		var image = new Image();
 		image.data = bitmapData;
 		this.render = image;
@@ -30,6 +40,7 @@ class StageBitmapRenderFilter extends RenderFilter {
 
 	override function updateStageSize() {
 		super.updateStageSize();
-		// bitmapData.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0).data;
+		if (keep)
+			bitmapData.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0).data;
 	}
 }

@@ -46,7 +46,7 @@ class BlurFilter extends StageBitmapRenderFilter {
 	public function new(blurX:Float = 10, blurY:Float = 10) {
 		this.blurX = blurX;
 		this.blurY = blurY;
-		super();
+		super(true);
 	}
 
 	override function init() {
@@ -64,8 +64,6 @@ class BlurFilter extends StageBitmapRenderFilter {
 		this.blurImage.data.draw(display);
 		this.bitmapData.clear();
 		this.bitmapData.draw(display);
-		var quad = new Quad(50, 50, 0xff0000);
-		quad.y = 300;
 		var stepX = blurX / Std.int(blurX);
 		var stepY = blurY / Std.int(blurY);
 		for (i in 0...Std.int(blurX)) {
