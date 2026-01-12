@@ -50,7 +50,7 @@ class Render implements IRender {
 	/**
 	 * 当前渲染的着色器
 	 */
-	public static var currentShader:Shader;
+	public var currentShader:Shader;
 
 	/**
 	 * 图片的缓存数据
