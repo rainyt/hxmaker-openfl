@@ -78,6 +78,23 @@ class Render implements IRender {
 
 	private var __cacheAsBitmap:Bool = false;
 
+	/**
+	 * 是否开启高分辨率支持
+	 */
+	public var highDpi(get, set):Bool;
+
+	private var __highDpi:Bool = true;
+
+	private function get_highDpi():Bool {
+		return __highDpi;
+	}
+
+	private function set_highDpi(value:Bool):Bool {
+		this.__highDpi = value;
+		this.cacheAsBitmap = cacheAsBitmap;
+		return value;
+	}
+
 	private function get_cacheAsBitmap():Bool {
 		return __cacheAsBitmap;
 	}
@@ -85,8 +102,24 @@ class Render implements IRender {
 	private function set_cacheAsBitmap(value:Bool):Bool {
 		__cacheAsBitmap = value;
 		if (value) {
-			__cacheBitmap = new Bitmap(new BitmapData(1, 1, true, 0x0));
-			__cacheBitmap.bitmapData.disposeImage();
+			if (__cacheBitmap == null) {
+				__cacheBitmap = new Bitmap();
+			}
+			if (highDpi) {
+				__cacheBitmap.scaleX = 0.5;
+				__cacheBitmap.scaleY = 0.5;
+			} else {
+				__cacheBitmap.scaleX = 1;
+				__cacheBitmap.scaleY = 1;
+			}
+			var sizeWidth = highDpi ? Std.int(Hxmaker.engine.stageWidth) * 2 : Std.int(Hxmaker.engine.stageWidth);
+			var sizeHeight = highDpi ? Std.int(Hxmaker.engine.stageHeight) * 2 : Std.int(Hxmaker.engine.stageHeight);
+			if (__cacheBitmap.bitmapData == null
+				|| __cacheBitmap.bitmapData.width != sizeWidth
+				|| __cacheBitmap.bitmapData.height != sizeHeight) {
+				__cacheBitmap.bitmapData = new BitmapData(sizeWidth, sizeHeight, true, 0x0);
+				__cacheBitmap.bitmapData.disposeImage();
+			}
 		} else {
 			if (__cacheBitmap != null) {
 				__cacheBitmap.bitmapData.dispose();
@@ -169,7 +202,10 @@ class Render implements IRender {
 				if (__maskSprite != null) {
 					__maskSprite.addChild(shape);
 				} else {
-					__cacheBitmap.bitmapData.draw(shape);
+					__drawMatrix.identity();
+					if (highDpi)
+						__drawMatrix.scale(2, 2);
+					__cacheBitmap.bitmapData.draw(shape, __drawMatrix, null, null, null, true);
 					__pool.release(cast shape);
 				}
 			} else {
@@ -182,6 +218,8 @@ class Render implements IRender {
 		}
 		return null;
 	}
+
+	private var __drawMatrix:Matrix = new Matrix();
 
 	private var __drawCallCount:Int = 0;
 
@@ -221,7 +259,10 @@ class Render implements IRender {
 		} else {
 			if (cacheAsBitmap && __maskSprite != null) {
 				this.__cacheSprite.addChild(__maskSprite);
-				__cacheBitmap.bitmapData.draw(__cacheSprite);
+				__drawMatrix.identity();
+				if (highDpi)
+					__drawMatrix.scale(2, 2);
+				__cacheBitmap.bitmapData.draw(__cacheSprite, __drawMatrix, true);
 				this.__cacheSprite.removeChild(__maskSprite);
 				for (i in 0...__maskSprite.numChildren) {
 					var child:openfl.display.DisplayObject = __maskSprite.getChildAt(i);
