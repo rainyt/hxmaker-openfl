@@ -79,7 +79,7 @@ class Render implements IRender {
 	private var __cacheAsBitmap:Bool = false;
 
 	/**
-	 * 是否开启高分辨率支持
+	 * 是否开启高分辨率支持，该属性仅在`cacheAsBitmap`为`true`时生效，默认值为`true`。
 	 */
 	public var highDpi(get, set):Bool;
 
