@@ -1,5 +1,6 @@
 package test;
 
+import hx.events.MouseEvent;
 import hx.particle.FourAttribute;
 import hx.particle.TweenAttribute;
 import hx.particle.RandomTwoAttribute;
@@ -14,20 +15,39 @@ class ParticleRender extends Scene {
 		super.onStageInit();
 		var assets = new Assets();
 		assets.loadBitmapData("assets/texture.png");
+		assets.loadBitmapData("assets/particle/yudi_da.png");
+		assets.loadJson("assets/particle/yudi_da.json");
+        assets.loadBitmapData("assets/particle/yudi_xiao.png");
+		assets.loadJson("assets/particle/yudi_xiao.json");
+        assets.loadBitmapData("assets/particle/yuhua.png");
+		assets.loadJson("assets/particle/yuhua.json");
 		assets.onComplete((a) -> {
+			// 下雨
+			var p = new Particle(assets.getObject("yudi_da"), assets.getBitmapData("yudi_da"));
+			this.addChild(p);
+			p.x = this.stage.stageWidth / 2;
+			p.start();
+
+			var p2 = new Particle(assets.getObject("yudi_xiao"), assets.getBitmapData("yudi_xiao"));
+			this.addChild(p2);
+			p2.x = this.stage.stageWidth / 2;
+			p2.start();
+
 			// 创建一个粒子
-			var p = new Particle(null, assets.getBitmapData("texture"));
+			var p = new Particle(assets.getBitmapData("texture"));
 			// 设置粒子数量
-			p.counts = 15000;
+			p.counts = 100;
+			// 设置发射点为动态
+			p.dynamicEmitPoint = true;
 			// 设置整个粒子的持续时间
-			p.duration = 10;
+			p.duration = -1;
 			this.addChild(p);
 			// 设置粒子的初始位置
 			p.x = this.stage.stageWidth / 2;
 			p.y = this.stage.stageHeight / 2;
 			// 设置粒子的生成范围
-			p.widthRange = 1000;
-			p.heightRange = 100;
+			p.widthRange = 30;
+			p.heightRange = 30;
 			// 设置粒子的旋转角度
 			p.rotaionAttribute.start = new OneAttribute(0);
 			p.rotaionAttribute.end = new RandomTwoAttribute(180, 360);
@@ -54,8 +74,12 @@ class ParticleRender extends Scene {
 			p.colorAttribute.tween.pushAttribute(20, new FourAttribute(1, 1, 1, 1));
 			p.colorAttribute.tween.pushAttribute(80, new FourAttribute(1, 1, 1, 1));
 			p.colorAttribute.tween.pushAttribute(20, new FourAttribute(1, 1, 1, 0));
-            // 启动粒子系统
+			// 启动粒子系统
 			p.start();
+			this.addEventListener(MouseEvent.MOUSE_MOVE, (e:MouseEvent) -> {
+				p.x = e.stageX;
+				p.y = e.stageY;
+			});
 		});
 		assets.start();
 	}
