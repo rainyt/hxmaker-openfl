@@ -7,6 +7,7 @@
         {
             "type": "chrome",
             "request": "launch",
+            "preLaunchTask": "lime: build html5 -debug",
             "name": "针对 localhost 启动 Chrome",
             "url": "http://localhost:3678",
             "webRoot": "${workspaceFolder}"

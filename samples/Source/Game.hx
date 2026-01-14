@@ -1,3 +1,4 @@
+import test.ParticleRender;
 import test.MoreLabelRender;
 import test.ScrollRender;
 import test.ListViewRender;
@@ -43,6 +44,7 @@ class Game extends Stage {
 	 * 测试用例列表
 	 */
 	public static var tests:Array<Class<hx.display.Scene>> = [
+		ParticleRender,
 		ScrollRender,
 		ListViewRender,
 		BitmapLabelRender,
