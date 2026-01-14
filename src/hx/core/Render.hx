@@ -117,6 +117,8 @@ class Render implements IRender {
 			if (__cacheBitmap.bitmapData == null
 				|| __cacheBitmap.bitmapData.width != sizeWidth
 				|| __cacheBitmap.bitmapData.height != sizeHeight) {
+				if (__cacheBitmap.bitmapData != null)
+					__cacheBitmap.bitmapData.dispose();
 				__cacheBitmap.bitmapData = new BitmapData(sizeWidth, sizeHeight, true, 0x0);
 				__cacheBitmap.bitmapData.disposeImage();
 			}
@@ -133,9 +135,7 @@ class Render implements IRender {
 
 	public function onStageSizeChange():Void {
 		if (cacheAsBitmap && __cacheBitmap != null) {
-			__cacheBitmap.bitmapData.dispose();
-			__cacheBitmap.bitmapData = new BitmapData(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
-			__cacheBitmap.bitmapData.disposeImage();
+			this.cacheAsBitmap = true;
 		}
 	}
 
