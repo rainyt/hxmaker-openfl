@@ -1,0 +1,67 @@
+<Box x="200" y="300">
+    <Particle src="assets/bg_white.png" scale="0.1" visible="true">
+        <particle-config counts="100" widthRange="50" heightRange="50" lifeVariance="0.5" time="2">
+            <particle-velocity>
+                <particle-random-two-attribute max="200" min="-200"/>
+                <particle-one-attribute value="50"/>
+            </particle-velocity>
+            <particle-tangential>
+                <particle-one-attribute value="50"/>
+                <particle-one-attribute value="50"/>
+            </particle-tangential>
+            <particle-group-scale-x>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="2"/>
+            </particle-group-scale-x>
+            <particle-group-scale-y>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="1"/>
+            </particle-group-scale-y>
+            <particle-emit-rotation>
+                <particle-random-two-attribute max="200" min="-200"/>
+            </particle-emit-rotation>
+            <particle-group-color>
+                <particle-four-attribute x="1" y="0" z="0" w="0.5"/>
+                <particle-four-attribute x="1" y="0.3" z="0.3" w="0.5" weight="10"/>
+                <particle-four-attribute x="1" y="0.3" z="0.3" w="0"/>
+            </particle-group-color>
+            <particle-group-rotation>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="360"/>
+            </particle-group-rotation>
+        </particle-config>
+    </Particle>
+    <Particle id="dynamicSprite" src="assets/bg_white.png" scale="0.1">
+        <particle-config dynamicEmitPoint="true" counts="30" widthRange="300" heightRange="300" life="0.5">
+            <particle-velocity>
+                <particle-random-two-attribute max="500" min="-500"/>
+                <particle-random-two-attribute max="500" min="-500"/>
+
+            </particle-velocity>
+            <particle-tangential>
+                <particle-one-attribute value="350"/>
+                <particle-one-attribute value="350"/>
+            </particle-tangential>
+            <particle-group-scale-x>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="1"/>
+            </particle-group-scale-x>
+            <particle-group-scale-y>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="1"/>
+            </particle-group-scale-y>
+            <particle-emit-rotation>
+                <particle-random-two-attribute max="200" min="-200"/>
+            </particle-emit-rotation>
+            <particle-group-color>
+                <particle-four-attribute x="1" y="0" z="0" w="1"/>
+                <particle-four-attribute x="0" y="0" z="1" w="0.1" weight="10"/>
+                <particle-four-attribute x="1" y="0.3" z="0.3" w="0"/>
+            </particle-group-color>
+            <particle-group-rotation>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="360"/>
+            </particle-group-rotation>
+        </particle-config>
+    </Particle>
+</Box>

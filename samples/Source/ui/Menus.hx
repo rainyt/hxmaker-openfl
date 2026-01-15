@@ -61,7 +61,7 @@ class MenuButton extends DisplayObjectContainer {
 		this.addChild(quad);
 		var className = Type.getClassName(__c);
 		var label = new Label(className);
-		label.textFormat = new TextFormat(null, 26, 0xff0000);
+		label.textFormat = new TextFormat(null, 20, 0xff0000);
 		label.height = this.height;
 		label.x = 10;
 		label.verticalAlign = MIDDLE;
