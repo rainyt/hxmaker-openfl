@@ -1,3 +1,53 @@
 <Scene>
-    <xml:ParticleSprite id="particle"/>
+    <xml:ParticleSprite2 id="particle" />
+    <VBox gap="100" centerX="0" y="200">
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+    </VBox>
+    <VBox gap="100" centerX="-200" y="200">
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+    </VBox>
+    <VBox gap="100" centerX="200" y="200">
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+    </VBox>
+    <VBox gap="100" centerX="400" y="200">
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+    </VBox>
+    <VBox gap="100" centerX="-400" y="200">
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+        <xml:ParticleSprite />
+    </VBox>
 </Scene>

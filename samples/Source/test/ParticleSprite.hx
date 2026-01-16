@@ -5,7 +5,7 @@ import hx.display.Box;
 /**
  * 粒子精灵
  */
-@:build(hx.macro.UIBuilder.build("assets/views/ParticleSprite.xml"))
+@:build(hx.macro.UIBuilder.build("assets/views/ParticleSprite2.xml"))
 class ParticleSprite extends Box {
 	override function onInit() {
 		super.onInit();

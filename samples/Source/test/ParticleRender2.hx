@@ -23,24 +23,21 @@ class ParticleRender2 extends UILoadScene {
 		super.onLoaded();
 		this.particle.x = this.stage.stageWidth / 2;
 		this.particle.y = this.stage.stageHeight / 2;
-		this.addChild(this.particle.dynamicSprite);
+		// 动态坐标
+		this.particle.dynamicSprite.dynamicEmitPoint = true;
+		this.particle.dynamicSprite.localToGlobalEmitPoint = true;
 		this.addEventListener(MouseEvent.MOUSE_MOVE, (e:MouseEvent) -> {
 			this.__targetX = e.stageX;
 			this.__targetY = e.stageY;
 		});
-		this.particle.dynamicSprite.x = this.particle.x;
-		this.particle.dynamicSprite.y = this.particle.y;
 		this.updateEnabled = true;
 	}
 
 	override function onUpdate(dt:Float) {
+		if (particle != null) {
+			this.particle.x += (this.__targetX - this.particle.x) * 0.1;
+			this.particle.y += (this.__targetY - this.particle.y) * 0.1;
+		}
 		super.onUpdate(dt);
-		if (particle == null)
-			return;
-		this.particle.x += (this.__targetX - this.particle.x) * 0.1;
-		this.particle.y += (this.__targetY - this.particle.y) * 0.1;
-		this.particle.dynamicSprite.x = this.particle.x;
-		this.particle.dynamicSprite.y = this.particle.y;
-		this.particle.dynamicSprite.onUpdate(0.0016);
 	}
 }
