@@ -1,0 +1,94 @@
+<Scene>
+    <Quad width="100%" height="100%"/>
+    <Image src="assets/scene.png" centerX="0" centerY="0" scale="0.5"/>
+    <Box width="1" height="1" centerX="-80" centerY="0">
+    <Image id="circle" src="assets/bg_white.png" scaleX="0.25" scaleY="0.5" centerX="0" centerY="0" alpha="0.8" blendMode="add"/>
+    <Particle id="boom" visible="true" src="assets/bg_white.png" centerX="0" centerY="0" alpha="0.3" scale="0.3">
+        <particle-config dynamicEmitPoint="false" auto="true" emitMode="1" createMode="1" minRadiusRange="0" maxRadiusRange="250" radiusScaleX="0.3" counts="10" life="0.8" duration="-1" widthRange="1" heightRange="1"  >
+            <particle-velocity>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="0"/>
+            </particle-velocity>
+            <!-- <particle-emit-rotation> -->
+                <!-- <particle-random-two-attribute min="0" max="360"/> -->
+            <!-- </particle-emit-rotation> -->
+            <particle-group-scale-x>
+                <particle-one-attribute value="0.1"/>
+                <particle-one-attribute value="0.3"/>
+            </particle-group-scale-x>
+            <particle-group-scale-y>
+                <particle-one-attribute value="0.1"/>
+                <particle-one-attribute value="1"/>
+            </particle-group-scale-y>
+            <particle-tangential>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="0"/>
+            </particle-tangential>
+            <particle-group-color>
+                <particle-four-attribute x="1" y="1" z="0.5" w="0"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="1" weight="20"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="1" weight="50"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="0" weight="30"/>
+            </particle-group-color>
+        </particle-config>
+    </Particle>
+    <Particle id="boom" visible="true" src="assets/bg_white.png" centerX="0" centerY="0" alpha="1" scale="0.3">
+        <particle-config dynamicEmitPoint="false" auto="true" emitMode="0" createMode="1" minRadiusRange="0" maxRadiusRange="250" radiusScaleY="0.3" counts="10" life="0.8" duration="-1" widthRange="1" heightRange="1"  >
+            <particle-velocity>
+                <particle-one-attribute value="300"/>
+                <particle-one-attribute value="0"/>
+            </particle-velocity>
+            <!-- <particle-emit-rotation> -->
+                <!-- <particle-random-two-attribute min="0" max="360"/> -->
+            <!-- </particle-emit-rotation> -->
+            <particle-group-scale-x>
+                <particle-one-attribute value="0.1"/>
+                <particle-one-attribute value="0.0"/>
+            </particle-group-scale-x>
+            <particle-group-scale-y>
+                <particle-one-attribute value="0.1"/>
+                <particle-one-attribute value="0."/>
+            </particle-group-scale-y>
+            <particle-acceleration>
+                <particle-one-attribute value="0"/>
+                <particle-one-attribute value="300"/>
+            </particle-acceleration>
+            <particle-group-color>
+                <particle-four-attribute x="1" y="1" z="0.5" w="0"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="1" weight="20"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="1" weight="50"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="0" weight="30"/>
+            </particle-group-color>
+        </particle-config>
+    </Particle>
+    <Particle id="boom" blendMode="add" visible="true" src="assets/jian.png" centerX="40" centerY="0" alpha="1" scale="0.3">
+        <particle-config dynamicEmitPoint="false" useEmitRotation="true" auto="true" emitMode="0" createMode="0" minRadiusRange="250" maxRadiusRange="250" radiusScaleY="0.35" counts="50" life="0.8" duration="-1" widthRange="200" heightRange="80"  >
+            <particle-velocity>
+                <particle-random-two-attribute min="1500" max="2000"/>
+                <particle-one-attribute value="0"/>
+            </particle-velocity>
+            <particle-emit-rotation>
+                <particle-random-two-attribute min="-20" max="-25"/>
+            </particle-emit-rotation>
+            <particle-group-scale-x>
+                <particle-one-attribute value="0.1"/>
+                <particle-one-attribute value="0.1"/>
+            </particle-group-scale-x>
+            <particle-group-scale-y>
+                <particle-one-attribute value="-0.1"/>
+                <particle-one-attribute value="-0.1"/>
+            </particle-group-scale-y>
+            <particle-tangential>
+                <particle-one-attribute value="300"/>
+                <particle-one-attribute value="0"/>
+            </particle-tangential>
+            <particle-group-color>
+                <particle-four-attribute x="1" y="1" z="0.5" w="0."/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="1" weight="20"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="1" weight="50"/>
+                <particle-four-attribute x="1" y="1" z="0.5" w="0" weight="30"/>
+            </particle-group-color>
+        </particle-config>
+    </Particle>
+    </Box>
+</Scene>
