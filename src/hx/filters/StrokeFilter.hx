@@ -17,7 +17,7 @@ class StrokeFilter extends DisplayObjectFilter {
 
 	private var ready = new Image();
 
-	public function new(strokeSize:Int = 3, strokeColor:UInt = 0x0, fontColor:UInt = 0xffffff, bold:Int = 1) {
+	public function new(strokeSize:Int = 3, strokeColor:UInt = 0x0, fontColor:UInt = 0xffffff, bold:Int = 0) {
 		this.strokeSize = strokeSize;
 		this.strokeColor = strokeColor;
 		this.fontColor = fontColor;
