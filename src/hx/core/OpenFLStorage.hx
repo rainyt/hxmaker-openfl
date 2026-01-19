@@ -43,4 +43,13 @@ class OpenFLStorage implements hx.utils.IStorage {
 		}
 		return value;
 	}
+
+	/**
+	 * 删除键
+	 * @param key 键
+	 */
+	public function removeKey(key:String):Void {
+		Reflect.deleteField(__shareObject.data, key);
+		__shareObject.flush();
+	}
 }
