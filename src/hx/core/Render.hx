@@ -427,16 +427,10 @@ class Render implements IRender {
 			__retRect.setTo(0, 0, 0, 0);
 			object.maskRect.transform(__retRect, object.__worldTransform);
 			__maskRect.setTo(__retRect.x, __retRect.y, __retRect.width, __retRect.height);
-			// shape.scrollRect = __maskRect;
 			if (__maskSprite != null) {
 				__maskSprite.x = __retRect.x;
 				__maskSprite.y = __retRect.y;
 				__maskSprite.scrollRect = __maskRect;
-				// var sprite = new Sprite();
-				// sprite.graphics.beginFill(0xff0000);
-				// sprite.graphics.drawRect(400, 0, 300, 300);
-				// __maskSprite.mask = sprite;
-				// __maskSprite.addChild(sprite);
 			}
 			this.setMask(false);
 		}
