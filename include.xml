@@ -41,4 +41,6 @@
     <haxeflag name='--macro keep("tweenxcore.FloatTools")' />
     <haxeflag name='--macro keep("tweenxcore.PointTools")' />
     <haxeflag name='--macro keep("tweenxcore.MatrixTools")' />
+    <!-- 平台定义 -->
+    <include path="platform.xml" />
 </project>

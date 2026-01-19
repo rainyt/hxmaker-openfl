@@ -1,0 +1,5 @@
+<project>
+    <section if="game4399">
+        <haxelib name="4399h5-sdk" />
+    </section>
+</project>
