@@ -296,7 +296,7 @@ class Engine implements IEngine {
 					__lastMouseY = openflRenderer.stage.mouseY;
 				case MouseEvent.MOUSE_UP:
 					// 判断距离
-					if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 10) {
+					if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 80) {
 						var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(hx.events.MouseEvent.CLICK);
 						engineEvent.stageX = mouseX;
 						engineEvent.stageY = mouseY;

@@ -35,15 +35,16 @@ class DisplayObjectFilter extends RenderFilter {
 	/**
 	 * 将显示对象绘制到指定的BitmapData中，该方法会忽略所有变换矩阵和透明度
 	 */
-	public function drawToBitmapData(bitmapData:BitmapData, display:DisplayObject) {
+	public function drawToBitmapData(bitmapData:BitmapData, display:DisplayObject, matrix:Matrix = null) {
 		var rect = display.getBounds();
 		var m = new Matrix();
-		var clone = display.__worldTransform.clone();
-		display.__worldTransform.identity();
 		var oldAlpha = display.__worldAlpha;
 		display.__worldAlpha = 1.0;
+		m.translate(-display.__worldTransform.tx, -display.__worldTransform.ty);
+		if (matrix != null) {
+			m.concat(matrix);
+		}
 		bitmapData.draw(display, m, null, false);
-		display.__worldTransform.copyFrom(clone);
 		display.__worldAlpha = oldAlpha;
 	}
 }
