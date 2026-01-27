@@ -46,6 +46,7 @@ class BlurShaderGLSL extends GLSL {
 		gl_FragColor = sum;
 	}
 
+	@:precision("highp float")
 	override public function vertex():Void {
 		super.vertex();
 		var r:Vec2 = blurRadius / openfl_TextureSize;
