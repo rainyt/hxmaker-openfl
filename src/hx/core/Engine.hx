@@ -1,5 +1,6 @@
 package hx.core;
 
+import openfl.geom.Point;
 import hx.filters.StageBitmapData;
 import hx.utils.DisplayTools;
 import hx.utils.KeyboardTools;
@@ -29,6 +30,13 @@ class Engine implements IEngine {
 	@:noCompletion private var __stageWidth:Float = 0;
 
 	@:noCompletion private var __stageHeight:Float = 0;
+
+	/**
+	 * 是否锁定横屏
+	 */
+	@:noCompletion private var __lockLandscape:Bool = false;
+
+	@:noCompletion private var __needRotate:Bool = false;
 
 	public var touchX:Float = 0;
 
@@ -79,20 +87,26 @@ class Engine implements IEngine {
 		root.graphics.endFill();
 	}
 
+	private var __stageSprite:Sprite = new Sprite();
+
 	/**
-	 * 初始化引擎入口类
-	 * @param mainClasses 
+	 * 初始化引擎
+	 * @param stageWidth 舞台宽度自适应，0表示不自适应
+	 * @param stageHeight 舞台高度自适应，0表示不自适应
+	 * @param lockLandscape 是否锁定横屏
 	 */
-	public function init(stageWidth:Int, stageHeight:Int):Void {
+	public function init(stageWidth:Int, stageHeight:Int, lockLandscape:Bool = false):Void {
 		if (this.stage == null) {
 			this.stage = Lib.current.stage;
 			// 初始化渲染器
 			this.renderer = new hx.core.Render();
-			this.stage.addChild(cast(this.renderer, Render).stage);
+			this.stage.addChild(__stageSprite);
+			__stageSprite.addChild(cast(this.renderer, Render).stage);
 		}
 		// 舞台尺寸计算
 		__stageWidth = stageWidth;
 		__stageHeight = stageHeight;
+		__lockLandscape = lockLandscape;
 		__lastTime = Timer.stamp();
 		__onStageSizeEvent(null);
 		__initStageEvent();
@@ -134,9 +148,21 @@ class Engine implements IEngine {
 	public var dt:Float = 0;
 
 	private function __onStageSizeEvent(e:Event):Void {
-		scaleFactor = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight);
+		scaleFactor = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight, __lockLandscape);
 		____stageWidth = Std.int(this.stage.stageWidth / scaleFactor);
 		____stageHeight = Std.int(this.stage.stageHeight / scaleFactor);
+
+		__needRotate = false;
+
+		if (__lockLandscape) {
+			if (____stageWidth < ____stageHeight) {
+				var temp:Float = ____stageWidth;
+				____stageWidth = ____stageHeight;
+				____stageHeight = temp;
+				__needRotate = true;
+			}
+		}
+
 		var render = cast(renderer, Render);
 		render.stage.scaleX = render.stage.scaleY = scaleFactor;
 		for (stage in stages) {
@@ -152,6 +178,13 @@ class Engine implements IEngine {
 					@:privateAccess display.__blendFilter.updateStageSize();
 				return true;
 			});
+		}
+		if (__needRotate) {
+			__stageSprite.rotation = 90;
+			__stageSprite.x = stage.stageWidth;
+		} else {
+			__stageSprite.rotation = 0;
+			__stageSprite.x = 0;
 		}
 		StageBitmapData.disposeAll(true);
 		render.onStageSizeChange();
@@ -315,8 +348,15 @@ class Engine implements IEngine {
 
 	private function __onTouchEvent(e:TouchEvent):Void {
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
-			touchX = e.stageX / scaleFactor;
-			touchY = e.stageY / scaleFactor;
+			if (__needRotate) {
+				var pos = __stageSprite.globalToLocal(new Point(e.stageX, e.stageY));
+				touchX = pos.x / scaleFactor;
+				touchY = pos.y / scaleFactor;
+				trace(pos, e.stageX, e.stageY);
+			} else {
+				touchX = e.stageX / scaleFactor;
+				touchY = e.stageY / scaleFactor;
+			}
 			var openflRenderer:hx.core.Render = cast this.renderer;
 			var engineEvent:hx.events.TouchEvent = new hx.events.TouchEvent(e.type);
 			var mouseX = openflRenderer.stage.mouseX;
