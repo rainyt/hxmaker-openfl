@@ -210,7 +210,7 @@ class Engine implements IEngine {
 		var __dirty = false;
 		for (stage in stages) {
 			if (!stage.customRender) {
-				stage.onUpdate(dt);
+				stage.advance(dt);
 				if (stage.__dirty) {
 					__dirty = true;
 				}
