@@ -1,5 +1,9 @@
 package hx.core;
 
+import haxe.CallStack;
+import haxe.Exception;
+import hx.events.UncaughtErrorEvent;
+import hx.display.EventDispatcher;
 import openfl.geom.Point;
 import hx.filters.StageBitmapData;
 import hx.utils.DisplayTools;
@@ -26,7 +30,7 @@ import openfl.display.Sprite;
  */
 @:access(hx.display.DisplayObjectContainer)
 @:access(hx.display.Stage)
-class Engine implements IEngine {
+class Engine extends EventDispatcher implements IEngine {
 	@:noCompletion private var __stageWidth:Float = 0;
 
 	@:noCompletion private var __stageHeight:Float = 0;
@@ -114,11 +118,43 @@ class Engine implements IEngine {
 	}
 
 	private function onAddedToStage(e:Event):Void {
+		#if uncaught_error_event
+		try {
+			onAddedToStageImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		onAddedToStageImpl(e);
+		#end
+	}
+
+	/**
+	 * 舞台添加事件实现
+	 * @param e 事件对象
+	 */
+	private function onAddedToStageImpl(e:Event):Void {
 		__onStageSizeEvent(null);
 		__initStageEvent();
 	}
 
 	private function onRemovedFromStage(e:Event):Void {
+		#if uncaught_error_event
+		try {
+			onRemovedFromStageImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		onRemovedFromStageImpl(e);
+		#end
+	}
+
+	/**
+	 * 舞台移除事件实现
+	 * @param e 事件对象
+	 */
+	private function onRemovedFromStageImpl(e:Event):Void {
 		__removeStageEvent();
 	}
 
@@ -148,6 +184,22 @@ class Engine implements IEngine {
 	public var dt:Float = 0;
 
 	private function __onStageSizeEvent(e:Event):Void {
+		#if uncaught_error_event
+		try {
+			__onStageSizeEventImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		__onStageSizeEventImpl(e);
+		#end
+	}
+
+	/**
+	 * 舞台尺寸变化事件实现
+	 * @param e 事件对象
+	 */
+	private function __onStageSizeEventImpl(e:Event):Void {
 		scaleFactor = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight, __lockLandscape);
 		____stageWidth = Std.int(this.stage.stageWidth / scaleFactor);
 		____stageHeight = Std.int(this.stage.stageHeight / scaleFactor);
@@ -199,7 +251,67 @@ class Engine implements IEngine {
 
 	private var __time = 1.;
 
+	private function __onActivate(e:Event):Void {
+		#if uncaught_error_event
+		try {
+			__onActivateImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		__onActivateImpl(e);
+		#end
+	}
+
+	/**
+	 * 舞台激活事件实现
+	 * @param e 事件对象
+	 */
+	private function __onActivateImpl(e:Event):Void {
+		for (stage in stages) {
+			stage.onActivate();
+		}
+	}
+
+	private function __onDeactivate(e:Event):Void {
+		#if uncaught_error_event
+		try {
+			__onDeactivateImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		__onDeactivateImpl(e);
+		#end
+	}
+
+	/**
+	 * 舞台失活事件实现
+	 * @param e 事件对象
+	 */
+	private function __onDeactivateImpl(e:Event):Void {
+		for (stage in stages) {
+			stage.onDeactivate();
+		}
+	}
+
 	private function __onRenderEnterFrame(e:Event):Void {
+		#if uncaught_error_event
+		try {
+			__onRenderEnterFrameImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		__onRenderEnterFrameImpl(e);
+		#end
+	}
+
+	/**
+	 * 渲染事件帧更新实现
+	 * @param e 事件对象
+	 */
+	private function __onRenderEnterFrameImpl(e:Event):Void {
 		if (render == null)
 			return;
 		ContextStats.statsCpuStart();
@@ -257,18 +369,6 @@ class Engine implements IEngine {
 		this.stage.addEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
 	}
 
-	private function __onActivate(e:Event):Void {
-		for (stage in stages) {
-			stage.onActivate();
-		}
-	}
-
-	private function __onDeactivate(e:Event):Void {
-		for (stage in stages) {
-			stage.onDeactivate();
-		}
-	}
-
 	private function __removeStageEvent():Void {
 		this.stage.removeEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
 		this.stage.removeEventListener(Event.RESIZE, __onStageSizeEvent);
@@ -281,6 +381,22 @@ class Engine implements IEngine {
 	}
 
 	private function __onKeyboardEvent(e:KeyboardEvent):Void {
+		#if uncaught_error_event
+		try {
+			__onKeyboardEventImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		__onKeyboardEventImpl(e);
+		#end
+	}
+
+	/**
+	 * 键盘事件实现
+	 * @param e 事件对象
+	 */
+	private function __onKeyboardEventImpl(e:KeyboardEvent):Void {
 		var engineEvent:hx.events.KeyboardEvent = new hx.events.KeyboardEvent(e.type, false, true);
 		engineEvent.keyCode = e.keyCode;
 		for (stage in stages) {
@@ -294,6 +410,22 @@ class Engine implements IEngine {
 	}
 
 	private function __onMouseEvent(e:MouseEvent):Void {
+		#if uncaught_error_event
+		try {
+			__onMouseEventImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		__onMouseEventImpl(e);
+		#end
+	}
+
+	/**
+	 * 鼠标事件实现
+	 * @param e 事件对象
+	 */
+	private function __onMouseEventImpl(e:MouseEvent):Void {
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
 			touchX = e.stageX / scaleFactor;
 			touchY = e.stageY / scaleFactor;
@@ -347,6 +479,22 @@ class Engine implements IEngine {
 	}
 
 	private function __onTouchEvent(e:TouchEvent):Void {
+		#if uncaught_error_event
+		try {
+			__onTouchEventImpl(e);
+		} catch (e:Dynamic) {
+			handleError(e);
+		}
+		#else
+		__onTouchEventImpl(e);
+		#end
+	}
+
+	/**
+	 * 触摸事件实现
+	 * @param e 事件对象
+	 */
+	private function __onTouchEventImpl(e:TouchEvent):Void {
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
 			if (__needRotate) {
 				var pos = __stageSprite.globalToLocal(new Point(e.stageX, e.stageY));
@@ -418,5 +566,30 @@ class Engine implements IEngine {
 		__frameRate = value;
 		Lib.current.stage.frameRate = value;
 		return value;
+	}
+
+	/**
+	 * 引擎错误处理
+	 * @param e 
+	 */
+	private function handleError(e:Dynamic):Void {
+		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
+		if (e is Exception) {
+			var error:Exception = cast e;
+			var event:UncaughtErrorEvent = new UncaughtErrorEvent(UncaughtErrorEvent.UNCAUGHT_ERROR, error, error.message, stack, false, false);
+			this.dispatchEvent(event);
+			if (event.isDefaultPrevented) {
+				return;
+			}
+			throw e;
+		} else {
+			var event:UncaughtErrorEvent = new UncaughtErrorEvent(UncaughtErrorEvent.UNCAUGHT_ERROR, e, Std.isOfType(e, String) ? e : null, stack, false,
+				false);
+			this.dispatchEvent(event);
+			if (event.isDefaultPrevented) {
+				return;
+			}
+			throw e;
+		}
 	}
 }
