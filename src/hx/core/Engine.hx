@@ -402,4 +402,21 @@ class Engine implements IEngine {
 		renderer.renderDisplayObject(display);
 		display.__dirty = false;
 	}
+
+	/**
+	 * 引擎帧率，默认为机器动态帧率，一般不会低于60FPS，可自定义帧率
+	 */
+	public var frameRate(get, set):Int;
+
+	private var __frameRate:Int = 60;
+
+	private function get_frameRate():Int {
+		return __frameRate;
+	}
+
+	private function set_frameRate(value:Int):Int {
+		__frameRate = value;
+		Lib.current.stage.frameRate = value;
+		return value;
+	}
 }
