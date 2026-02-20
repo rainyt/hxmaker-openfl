@@ -303,11 +303,11 @@ class ImageBufferData {
 	 * @param image 
 	 */
 	public function draw(image:Image, render:Render):Bool {
-		if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
-			return false;
-		}
 		var texture = image.data.data.getTexture();
 		var id = mapIds.get(texture);
+		if (id == null && bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
+			return false;
+		}
 		// 如果平滑值不同，则产生新的绘制
 		if (index == 0) {
 			smoothing = image.smoothing;

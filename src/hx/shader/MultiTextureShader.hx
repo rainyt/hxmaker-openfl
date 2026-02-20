@@ -17,7 +17,18 @@ class MultiTextureShader extends GraphicsShader {
 	/**
 	 * 多纹理支持的纹理单元数量
 	 */
-	public static var supportedMultiTextureUnits:Int = 1;
+	public static var supportedMultiTextureUnits(get, never):Int;
+
+	private static var __supportedMultiTextureUnits:Int = 1;
+
+	private static function get_supportedMultiTextureUnits():Int {
+		return multiTextureEnabled ? __supportedMultiTextureUnits : 1;
+	}
+
+	/**
+	 * 是否启用多纹理渲染，默认为`true`，设置为`false`后可关闭
+	 */
+	public static var multiTextureEnabled:Bool = true;
 
 	@:noCompletion private static var __pool:ObjectPool<MultiTextureShader>;
 
@@ -173,8 +184,8 @@ class MultiTextureShader extends GraphicsShader {
 			customFragmentBodySource:String = null, glsl:GLSLSource = null) {
 		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
 		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
-		supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
-		supportedMultiTextureUnits = Std.int(Math.min(16, supportedMultiTextureUnits));
+		__supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
+		__supportedMultiTextureUnits = Std.int(Math.min(16, __supportedMultiTextureUnits));
 		if (glsl != null) {
 			__glVertexSource = glsl.vertexSource;
 			__glFragmentSource = glsl.fragmentSource;
@@ -183,18 +194,18 @@ class MultiTextureShader extends GraphicsShader {
 			__glFragmentSource = fragmentSource;
 		}
 		var uSamplerVariableBuffer:String = "";
-		for (i in 0...supportedMultiTextureUnits) {
+		for (i in 0...__supportedMultiTextureUnits) {
 			uSamplerVariableBuffer += 'uniform sampler2D uSampler${i};\n';
 		}
 		__glFragmentSource = __glFragmentSource.replace("uniform sampler2D SAMPLER_INJECT;", uSamplerVariableBuffer);
 
 		var uSamplerBodyBuffer:String = "";
-		for (i in 0...supportedMultiTextureUnits) {
+		for (i in 0...__supportedMultiTextureUnits) {
 			if (i == 0) {
 				uSamplerBodyBuffer += 'if (vTextureId < ${i}.5) {
                     color = texture2D(uSampler${i}, openfl_TextureCoordv);
                 }';
-			} else if (i == supportedMultiTextureUnits - 1) {
+			} else if (i == __supportedMultiTextureUnits - 1) {
 				uSamplerBodyBuffer += 'else {
                     color = texture2D(uSampler${i}, openfl_TextureCoordv);
                 }';

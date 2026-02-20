@@ -80,6 +80,13 @@ class GraphicRender extends Scene {
 
 		this.addChild(line);
 
+		var circle = new Graphics();
+		circle.beginFill(0xff0000);
+		circle.drawCircle(0, 0, 200);
+		circle.x = stage.stageWidth / 2;
+		circle.y = stage.stageHeight / 2;
+		this.addChild(circle);
+
 		this.addEventListener(Event.UPDATE, (e) -> {
 			image.rotation++;
 		});

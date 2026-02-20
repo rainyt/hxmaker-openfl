@@ -38,6 +38,23 @@ using Reflect;
 @:access(openfl.geom.Matrix)
 class Render implements IRender {
 	/**
+	 * 启动多纹理渲染，默认为`true`，但如果后端平台不支持时，那么这个属性会为`false`，同时即使设置成`true`也不会起作用。
+	 */
+	public var multiTextureEnabled(get, set):Bool;
+
+	private var __multiTextureEnabled:Bool = true;
+
+	private function get_multiTextureEnabled():Bool {
+		return __multiTextureEnabled;
+	}
+
+	private function set_multiTextureEnabled(value:Bool):Bool {
+		__multiTextureEnabled = value;
+		MultiTextureShader.multiTextureEnabled = value;
+		return value;
+	}
+
+	/**
 	 * 默认的着色器支持
 	 */
 	public static var defalutShader:Shader;
