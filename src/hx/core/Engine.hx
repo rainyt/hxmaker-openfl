@@ -592,4 +592,13 @@ class Engine extends EventDispatcher implements IEngine {
 			throw e;
 		}
 	}
+
+	/**
+	 * 设备像素比
+	 */
+	public var devicePixelRatio(get, never):Float;
+
+	private function get_devicePixelRatio():Float {
+		return Lib.application.window.scale;
+	}
 }
