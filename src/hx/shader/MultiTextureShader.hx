@@ -32,7 +32,10 @@ class MultiTextureShader extends GraphicsShader {
 
 	@:noCompletion private static var __pool:ObjectPool<MultiTextureShader>;
 
-	public static var vertexSource:String = "attribute float openfl_Alpha_multi;
+	public static var vertexSource:String = "
+		precision highp float;
+
+		attribute float openfl_Alpha_multi;
 		attribute vec4 openfl_ColorMultiplier_muti;
 		attribute vec4 openfl_ColorOffset_muti;
 		attribute vec4 openfl_Position;
@@ -82,7 +85,10 @@ class MultiTextureShader extends GraphicsShader {
 
 		}";
 	#else
-	public static var fragmentSource:String = "varying float openfl_Alphav;
+	public static var fragmentSource:String = "
+		precision highp float; 
+		
+		varying float openfl_Alphav;
 		varying vec4 openfl_ColorMultiplierv;
 		varying vec4 openfl_ColorOffsetv;
 		varying vec2 openfl_TextureCoordv;
