@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.utils.SoundManager;
 import openfl.media.SoundTransform;
 import hx.events.SoundEvent;
 import hx.display.EventDispatcher;
@@ -25,20 +26,26 @@ class OpenFLSound implements ISound {
 class OpenFLSoundChannel extends EventDispatcher implements ISoundChannel {
 	public var channel:BaseSoundChannel;
 
+	private var __sound:BaseSound;
+
 	public var isLoop:Bool = false;
 
 	public function new(sound:BaseSound, isLoop:Bool) {
-		this.channel = sound.play();
+		this.__sound = sound;
+		this.channel = __sound.play();
 		this.isLoop = isLoop;
 		if (this.channel != null) {
-			this.channel.addEventListener(Event.SOUND_COMPLETE, function(e:Event) {
-				// && this.channel == null
-				if (this.isLoop) {
-					this.channel = sound.play();
-				}
-				this.dispatchEvent(new SoundEvent(SoundEvent.SOUND_COMPLETE));
-			});
+			this.channel.addEventListener(Event.SOUND_COMPLETE, __onComplete);
 		}
+	}
+
+	private function __onComplete(e:Event):Void {
+		if (this.isLoop) {
+			this.channel = __sound.play();
+			this.channel.addEventListener(Event.SOUND_COMPLETE, __onComplete);
+			SoundManager.getInstance().updateVolume();
+		}
+		this.dispatchEvent(new SoundEvent(SoundEvent.SOUND_COMPLETE));
 	}
 
 	public function stop():Void {
