@@ -1,5 +1,8 @@
 package hx.net;
 
+#if hx_astcenc
+import openfl.display.ASTCBitmapData;
+#end
 import hx.ui.UIManager;
 import hx.core.OpenFlBitmapData;
 import lime.graphics.Image;
@@ -7,6 +10,8 @@ import hx.events.FutureErrorEvent;
 import openfl.utils.Assets;
 import hx.display.BitmapData;
 import hx.assets.Future;
+
+using StringTools;
 
 class BitmapDataRequest extends BaseRequest<BitmapData> {
 	override function request() {
@@ -26,7 +31,36 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 			});
 			return;
 		}
+		#if hx_astcenc
+		__loadAstc();
+		#else
+		__loadPng();
+		#end
+	}
 
+	private function __loadAstc():Void {
+		#if (wechat_zygame_dom && hx_astcenc)
+		// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
+		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url.replace(".png", ".astc")]);
+		hx.utils.System.existFile(localFile).onComplete(function(exist) {
+			if (exist) {
+				ASTCBitmapData.loadFromFile(localFile).onComplete((data) -> {
+					this.callback(BitmapData.formData(new OpenFlBitmapData(data)), null);
+					RequestQueue.loadComplete();
+				}).onError((err) -> {
+					this.callback(null, err);
+					RequestQueue.loadComplete();
+				});
+			} else {
+				__load();
+			}
+		});
+		#else
+		__loadPng();
+		#end
+	}
+
+	private function __loadPng():Void {
 		#if wechat_zygame_dom
 		// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
 		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url]);
