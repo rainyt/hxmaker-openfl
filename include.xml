@@ -17,7 +17,7 @@
     <architecture name="arm64" exclude="armv7" if="ios" />
     <!-- 现在安卓只要默认的64位架构，除非定义`armv7` -->
     <section if="android">
-        <haxelib name="hxmaker-sound" />
+        <!-- <haxelib name="hxmaker-sound" /> -->
         <architecture name="arm64" />
         <architecture exclude="armv7" unless="armv7" />
     </section>
