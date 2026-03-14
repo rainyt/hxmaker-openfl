@@ -25,6 +25,9 @@ class StringRequest extends BaseRequest<String> {
 		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url]);
 		hx.utils.System.existFile(localFile).onComplete(function(exist) {
 			if (exist) {
+				#if assets_debug
+				trace("[Assets] Loading string data from local file: " + localFile);
+				#end
 				__load(localFile);
 			} else {
 				__load();

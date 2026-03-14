@@ -44,6 +44,9 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url.replace(".png", ".astc")]);
 		hx.utils.System.existFile(localFile).onComplete(function(exist) {
 			if (exist) {
+				#if assets_debug
+				trace("[Assets] Loading bitmap data from local file: " + localFile);
+				#end
 				ASTCBitmapData.loadFromFile(localFile).onComplete((data) -> {
 					this.callback(BitmapData.formData(new OpenFlBitmapData(data)), null);
 					RequestQueue.loadComplete();
@@ -66,6 +69,9 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url]);
 		hx.utils.System.existFile(localFile).onComplete(function(exist) {
 			if (exist) {
+				#if assets_debug
+				trace("[Assets] Loading bitmap data from local file: " + localFile);
+				#end
 				__load(localFile);
 			} else {
 				__load();

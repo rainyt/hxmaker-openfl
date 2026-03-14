@@ -21,6 +21,9 @@ class SoundRequest extends BaseRequest<Sound> {
 		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url]);
 		hx.utils.System.existFile(localFile).onComplete(function(exist) {
 			if (exist) {
+				#if assets_debug
+				trace("[Assets] Loading sound data from local file: " + localFile);
+				#end
 				__load(localFile);
 			} else {
 				__load();
