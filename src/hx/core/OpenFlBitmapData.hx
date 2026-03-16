@@ -75,10 +75,12 @@ class OpenFlBitmapData implements IBitmapData {
 		}
 		render.renderDisplayObject(source);
 		render.endFill();
-		// render.endFillImageDataBuffer();
 		render.enableRenderFilterDisplayObject = null;
 		__root.draw(getBitmapDataRender().stage, new openfl.geom.Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty), null);
 		getBitmapDataRender().clear();
+		for (data in getBitmapDataRender().imageBufferData) {
+			data.drawDisplayList = [];
+		}
 	}
 
 	/**
