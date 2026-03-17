@@ -54,7 +54,7 @@ class StringRequest extends BaseRequest<String> {
 			RequestQueue.loadComplete();
 		});
 		loader.addEventListener(IOErrorEvent.IO_ERROR, (e) -> {
-			callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + url));
+			callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + url, url));
 			RequestQueue.loadComplete();
 		});
 	}

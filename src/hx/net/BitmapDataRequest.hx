@@ -1,5 +1,6 @@
 package hx.net;
 
+import hx.utils.System;
 #if hx_astcenc
 import openfl.display.ASTCBitmapData;
 #end
@@ -40,24 +41,31 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 
 	private function __loadAstc():Void {
 		#if (wechat_zygame_dom && hx_astcenc)
-		// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
-		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url.replace(".png", ".astc")]);
-		hx.utils.System.existFile(localFile).onComplete(function(exist) {
-			if (exist) {
-				#if assets_debug
-				trace("[Assets] Loading bitmap data from local file: " + localFile);
-				#end
-				ASTCBitmapData.loadFromFile(localFile).onComplete((data) -> {
-					this.callback(BitmapData.formData(new OpenFlBitmapData(data)), null);
-					RequestQueue.loadComplete();
-				}).onError((err) -> {
-					this.callback(null, err);
-					RequestQueue.loadComplete();
-				});
-			} else {
-				__load();
-			}
-		});
+		var platform = System.getPlatform();
+		if (platform == "ios") {
+			// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
+			var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url.replace(".png", ".astc")]);
+			hx.utils.System.existFile(localFile).onComplete(function(exist) {
+				if (exist) {
+					#if assets_debug
+					trace("[Assets] Loading bitmap data from local file: " + localFile);
+					#end
+					ASTCBitmapData.loadFromFile(localFile).onComplete((data) -> {
+						this.callback(BitmapData.formData(new OpenFlBitmapData(data)), null);
+						RequestQueue.loadComplete();
+					}).onError((err) -> {
+						err.path = localFile;
+						trace("Error loading bitmap data from local file: " + localFile);
+						this.callback(null, err);
+						RequestQueue.loadComplete();
+					});
+				} else {
+					__loadPng();
+				}
+			});
+		} else {
+			__loadPng();
+		}
 		#else
 		__loadPng();
 		#end
@@ -106,7 +114,7 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 		@:privateAccess img.__fromFile(path ?? hx.assets.Assets.getDefaultNativePath(this.url), function(loadedImage:Image):Void {
 			var bitmapData:openfl.display.BitmapData = openfl.display.BitmapData.fromImage(loadedImage);
 			if (bitmapData == null) {
-				this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url));
+				this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url, url));
 				RequestQueue.loadComplete();
 			} else {
 				this.callback(BitmapData.formData(new OpenFlBitmapData(bitmapData)), null);
@@ -114,7 +122,7 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 			}
 		}, function():Void {
 			// 加载失败，应该移除所有回调，并且重新载入
-			this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url));
+			this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url, url));
 			RequestQueue.loadComplete();
 		});
 		#end

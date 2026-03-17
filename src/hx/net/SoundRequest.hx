@@ -51,7 +51,7 @@ class SoundRequest extends BaseRequest<Sound> {
 			this.callback(data, null);
 		});
 		sound.addEventListener(IOErrorEvent.IO_ERROR, (e) -> {
-			this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url));
+			this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url, this.url));
 		});
 		sound.load(url);
 	}
