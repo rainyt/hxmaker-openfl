@@ -41,31 +41,35 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 
 	private function __loadAstc():Void {
 		#if (wechat_zygame_dom && hx_astcenc)
-		var platform = System.getPlatform();
-		if (platform == "ios") {
-			// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
-			var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url.replace(".png", ".astc")]);
-			hx.utils.System.existFile(localFile).onComplete(function(exist) {
-				if (exist) {
-					#if assets_debug
-					trace("[Assets] Loading bitmap data from local file: " + localFile);
-					#end
-					ASTCBitmapData.loadFromFile(localFile).onComplete((data) -> {
-						this.callback(BitmapData.formData(new OpenFlBitmapData(data)), null);
+		if (!ASTCBitmapData.isSupportASTCConfig()) {
+			__loadPng();
+			return;
+		}
+		// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
+		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url.replace(".png", ".astc")]);
+		hx.utils.System.existFile(localFile).onComplete(function(exist) {
+			if (exist) {
+				#if assets_debug
+				trace("[Assets] Loading bitmap data from local file: " + localFile);
+				#end
+				new BytesRequest(localFile.replace(Wx.env.USER_DATA_PATH, ""), (bytes, err) -> {
+					if (err == null) {
+						trace("bytes=", bytes);
+						trace("bytes", bytes is haxe.io.Bytes);
+						trace("bytes", bytes.length, Type.typeof(bytes));
+						var bitmapData = ASTCBitmapData.fromBytes(bytes);
+						this.callback(BitmapData.formData(new OpenFlBitmapData(bitmapData)), null);
 						RequestQueue.loadComplete();
-					}).onError((err) -> {
-						err.path = localFile;
+					} else {
 						trace("Error loading bitmap data from local file: " + localFile);
 						this.callback(null, err);
 						RequestQueue.loadComplete();
-					});
-				} else {
-					__loadPng();
-				}
-			});
-		} else {
-			__loadPng();
-		}
+					}
+				}).request();
+			} else {
+				__loadPng();
+			}
+		});
 		#else
 		__loadPng();
 		#end
