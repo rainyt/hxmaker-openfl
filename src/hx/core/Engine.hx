@@ -362,6 +362,8 @@ class Engine extends EventDispatcher implements IEngine {
 		this.stage.addEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
+		this.stage.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN, __onMouseEvent);
+		this.stage.addEventListener(MouseEvent.RIGHT_MOUSE_UP, __onMouseEvent);
 		this.stage.addEventListener(TouchEvent.TOUCH_BEGIN, __onTouchEvent);
 		this.stage.addEventListener(TouchEvent.TOUCH_END, __onTouchEvent);
 		this.stage.addEventListener(TouchEvent.TOUCH_MOVE, __onTouchEvent);
@@ -426,6 +428,9 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onMouseEventImpl(e:MouseEvent):Void {
+		if (e.type == MouseEvent.MOUSE_MOVE) {
+			trace("move");
+		}
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
 			touchX = e.stageX / scaleFactor;
 			touchY = e.stageY / scaleFactor;
@@ -456,24 +461,29 @@ class Engine extends EventDispatcher implements IEngine {
 				}
 			}
 			switch e.type {
-				case MouseEvent.MOUSE_DOWN:
+				case MouseEvent.MOUSE_DOWN, MouseEvent.RIGHT_MOUSE_DOWN:
 					__lastMouseX = openflRenderer.stage.mouseX;
 					__lastMouseY = openflRenderer.stage.mouseY;
+				case MouseEvent.RIGHT_MOUSE_UP:
+					__onMouseClick(openflRenderer, hx.events.MouseEvent.RIGHT_CLICK, mouseX, mouseY);
 				case MouseEvent.MOUSE_UP:
-					// 判断距离
-					if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 80) {
-						var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(hx.events.MouseEvent.CLICK);
-						engineEvent.stageX = mouseX;
-						engineEvent.stageY = mouseY;
-						var i = stages.length;
-						var needHitTest = true;
-						while (i-- > 0) {
-							var stage = stages[i];
-							if (stage.handleMouseEvent(engineEvent, needHitTest)) {
-								needHitTest = false;
-							}
-						}
-					}
+					__onMouseClick(openflRenderer, hx.events.MouseEvent.CLICK, mouseX, mouseY);
+			}
+		}
+	}
+
+	private function __onMouseClick(openflRenderer:Render, type:String, mouseX:Float, mouseY:Float):Void {
+		if (Math.sqrt(Math.pow(__lastMouseX - openflRenderer.stage.mouseX, 2) + Math.pow(__lastMouseY - openflRenderer.stage.mouseY, 2)) < 80) {
+			var engineEvent:hx.events.MouseEvent = new hx.events.MouseEvent(type);
+			engineEvent.stageX = mouseX;
+			engineEvent.stageY = mouseY;
+			var i = stages.length;
+			var needHitTest = true;
+			while (i-- > 0) {
+				var stage = stages[i];
+				if (stage.handleMouseEvent(engineEvent, needHitTest)) {
+					needHitTest = false;
+				}
 			}
 		}
 	}
