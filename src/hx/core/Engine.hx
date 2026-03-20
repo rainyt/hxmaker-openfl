@@ -428,9 +428,6 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onMouseEventImpl(e:MouseEvent):Void {
-		if (e.type == MouseEvent.MOUSE_MOVE) {
-			trace("move");
-		}
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
 			touchX = e.stageX / scaleFactor;
 			touchY = e.stageY / scaleFactor;
