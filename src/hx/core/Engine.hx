@@ -454,7 +454,6 @@ class Engine extends EventDispatcher implements IEngine {
 				var stage = stages[i];
 				if (stage.handleMouseEvent(engineEvent, needHitTest)) {
 					needHitTest = false;
-					break;
 				}
 			}
 			switch e.type {
