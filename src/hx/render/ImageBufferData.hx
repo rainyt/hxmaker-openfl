@@ -321,7 +321,7 @@ class ImageBufferData {
 			if (!isSame)
 				isBad = true;
 		}
-		var isColorDirty = isBad || image.__colorTransformDirty;
+		// var isColorDirty = isBad || image.__colorTransformDirty;
 		var isTransformDirty = isBad || image.__transformDirty;
 
 		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
