@@ -222,35 +222,20 @@ class ImageBufferData {
 								colorOffset[dataPerVertex24 + i * 4 + 1] = colorTransform.greenOffset;
 								colorOffset[dataPerVertex24 + i * 4 + 2] = colorTransform.blueOffset;
 								colorOffset[dataPerVertex24 + i * 4 + 3] = colorTransform.alphaOffset;
-								// if (colorTransform != null) {
-								// 	colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier * colorTransform.redMultiplier;
-								// 	colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier * colorTransform.greenMultiplier;
-								// 	colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier * colorTransform.blueMultiplier;
-								// 	colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier * colorTransform.alphaMultiplier;
-								// 	colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset + colorTransform.redOffset;
-								// 	colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset + colorTransform.greenOffset;
-								// 	colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset + colorTransform.blueOffset;
-								// 	colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset + colorTransform.alphaOffset;
-								// } else {
-								// 	colorMultiplier[dataPerVertex24 + i * 4] = graphic.__colorTransform.redMultiplier;
-								// 	colorMultiplier[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenMultiplier;
-								// 	colorMultiplier[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueMultiplier;
-								// 	colorMultiplier[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaMultiplier;
-								// 	colorOffset[dataPerVertex24 + i * 4] = graphic.__colorTransform.redOffset;
-								// 	colorOffset[dataPerVertex24 + i * 4 + 1] = graphic.__colorTransform.greenOffset;
-								// 	colorOffset[dataPerVertex24 + i * 4 + 2] = graphic.__colorTransform.blueOffset;
-								// 	colorOffset[dataPerVertex24 + i * 4 + 3] = graphic.__colorTransform.alphaOffset;
-								// }
 							} else {
 								hasColorTransform[dataPerVertex6 + i] = 0;
-								colorMultiplier[dataPerVertex24 + i * 4] = 1;
-								colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
-								colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
-								colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
-								colorOffset[dataPerVertex24 + i * 4] = 0;
-								colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
-								colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
-								colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
+								if (graphic.colorTransform != null) {
+									colorMultiplier[dataPerVertex24 + i * 4] = 1;
+									colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
+									colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
+									colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
+									colorOffset[dataPerVertex24 + i * 4] = 0;
+									colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
+									colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
+									colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
+								} else {
+									colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
+								}
 							}
 							if (graphic.colorTransform != null) {
 								hasColorTransform[dataPerVertex6 + i] = 1;
@@ -364,13 +349,6 @@ class ImageBufferData {
 					colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
 				} else {
 					hasColorTransform[dataPerVertex6 + i] = 0;
-					colorMultiplier[dataPerVertex24 + i * 4] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
-					colorOffset[dataPerVertex24 + i * 4] = 0;
-					colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
-					colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
 					colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
 				}
 			}
