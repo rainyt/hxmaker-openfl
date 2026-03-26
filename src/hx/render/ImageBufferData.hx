@@ -336,7 +336,7 @@ class ImageBufferData {
 			for (i in 0...6) {
 				ids[dataPerVertex6 + i] = id;
 				alphas[dataPerVertex6 + i] = image.__worldAlpha;
-				addBlendModes[dataPerVertex6 + i] = image.blendMode == ADD ? 1 : 0;
+				addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
 				if (image.__colorTransform != null) {
 					hasColorTransform[dataPerVertex6 + i] = 1;
 					colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
