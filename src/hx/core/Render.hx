@@ -164,69 +164,85 @@ class Render implements IRender {
 		if (data.index > 0) {
 			// 图形绘制
 			data.endFill();
-			var shape:Sprite = __pool.get();
+			var shape:EngineSprite = __pool.get();
 			shape.graphics.clear();
 			if (currentShader == null) {
 				currentShader = defalutShader;
 			}
 			if (currentShader == defalutShader) {
+				shape.useNativeMultiTextureShader = true;
 				if (!data.smoothing) {
+					shape.useNativeMultiTextureShader = false;
 					currentShader = defalutUnSmoothingShader;
 				}
 			}
-			var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
-			var openfl_Alpha:ShaderParameter<Float> = currentShader.data.openfl_Alpha_multi;
-			var openfl_ColorMultiplier:ShaderParameter<Float> = currentShader.data.openfl_ColorMultiplier_muti;
-			var openfl_ColorOffer:ShaderParameter<Float> = currentShader.data.openfl_ColorOffset_muti;
-			var openfl_HasColorTransform:ShaderParameter<Float> = currentShader.data.openfl_HasColorTransform_muti;
-			var openfl_blendMode_add:ShaderParameter<Float> = currentShader.data.openfl_blendMode_add;
-			var offests:Array<Float> = [];
-			var mapIds:Map<BitmapData, Int> = [];
-			for (index => data2 in data.bitmapDatas) {
-				mapIds.set(data2, index);
-				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
-				sampler.input = data2;
-				sampler.filter = data.smoothing ? LINEAR : NEAREST;
-			}
-			openfl_ColorOffer.value = data.colorOffset;
-			openfl_ColorMultiplier.value = data.colorMultiplier;
-			openfl_TextureId.value = data.ids;
-			openfl_Alpha.value = data.alphas;
-			openfl_blendMode_add.value = data.addBlendModes;
-			openfl_HasColorTransform.value = data.hasColorTransform;
-			// 图形尺寸，暂永远设定为舞台大小
-			var openfl_TextureSize:ShaderParameter<Float> = currentShader.data.openfl_TextureSize;
-			openfl_TextureSize.value = [Hxmaker.engine.stageWidth, Hxmaker.engine.stageHeight];
-			// 开始渲染图形
-			shape.graphics.beginShaderFill(currentShader);
-			shape.graphics.drawTriangles(data.vertices, data.indices, data.uvtData);
-			shape.graphics.endFill();
-			drawImageBuffDataIndex++;
-			createImageBufferData(drawImageBuffDataIndex);
-			ContextStats.statsVertexCount(data.indices.length);
-			this.statsDrawCall();
-			switch data.blendMode {
-				case ADD:
-					// shape.blendMode = ADD;
-				case NORMAL:
-					shape.blendMode = NORMAL;
-				case SCREEN:
-					shape.blendMode = SCREEN;
-				default:
-			}
-
-			if (cacheAsBitmap) {
-				if (__maskSprite != null) {
-					__maskSprite.addChild(shape);
-				} else {
-					__drawMatrix.identity();
-					if (highDpi)
-						__drawMatrix.scale(2, 2);
-					__cacheBitmap.bitmapData.draw(shape, __drawMatrix, null, null, null, true);
-					__pool.release(cast shape);
-				}
-			} else {
+			if (shape.useNativeMultiTextureShader) {
+				// TODO 这里使用原始渲染方式
+				// shape.graphics.beginFill(0xff0000);
+				// shape.graphics.drawRect(0, 0, Hxmaker.engine.stageWidth, Hxmaker.engine.stageHeight);
+				// shape.graphics.endFill();
 				stage.addChild(shape);
+				shape.invalidate();
+				shape.drawImageBufferData(data);
+				drawImageBuffDataIndex++;
+				createImageBufferData(drawImageBuffDataIndex);
+				ContextStats.statsVertexCount(data.indices.length);
+				this.statsDrawCall();
+			} else {
+				var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
+				var openfl_Alpha:ShaderParameter<Float> = currentShader.data.openfl_Alpha_multi;
+				var openfl_ColorMultiplier:ShaderParameter<Float> = currentShader.data.openfl_ColorMultiplier_muti;
+				var openfl_ColorOffer:ShaderParameter<Float> = currentShader.data.openfl_ColorOffset_muti;
+				var openfl_HasColorTransform:ShaderParameter<Float> = currentShader.data.openfl_HasColorTransform_muti;
+				var openfl_blendMode_add:ShaderParameter<Float> = currentShader.data.openfl_blendMode_add;
+				var offests:Array<Float> = [];
+				var mapIds:Map<BitmapData, Int> = [];
+				for (index => data2 in data.bitmapDatas) {
+					mapIds.set(data2, index);
+					var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
+					sampler.input = data2;
+					sampler.filter = data.smoothing ? LINEAR : NEAREST;
+				}
+				openfl_ColorOffer.value = data.colorOffset;
+				openfl_ColorMultiplier.value = data.colorMultiplier;
+				openfl_TextureId.value = data.ids;
+				openfl_Alpha.value = data.alphas;
+				openfl_blendMode_add.value = data.addBlendModes;
+				openfl_HasColorTransform.value = data.hasColorTransform;
+				// 图形尺寸，暂永远设定为舞台大小
+				var openfl_TextureSize:ShaderParameter<Float> = currentShader.data.openfl_TextureSize;
+				openfl_TextureSize.value = [Hxmaker.engine.stageWidth, Hxmaker.engine.stageHeight];
+				// 开始渲染图形
+				shape.graphics.beginShaderFill(currentShader);
+				shape.graphics.drawTriangles(data.vertices, data.indices, data.uvtData);
+				shape.graphics.endFill();
+				drawImageBuffDataIndex++;
+				createImageBufferData(drawImageBuffDataIndex);
+				ContextStats.statsVertexCount(data.indices.length);
+				this.statsDrawCall();
+				switch data.blendMode {
+					case ADD:
+						// shape.blendMode = ADD;
+					case NORMAL:
+						shape.blendMode = NORMAL;
+					case SCREEN:
+						shape.blendMode = SCREEN;
+					default:
+				}
+
+				if (cacheAsBitmap) {
+					if (__maskSprite != null) {
+						__maskSprite.addChild(shape);
+					} else {
+						__drawMatrix.identity();
+						if (highDpi)
+							__drawMatrix.scale(2, 2);
+						__cacheBitmap.bitmapData.draw(shape, __drawMatrix, null, null, null, true);
+						__pool.release(cast shape);
+					}
+				} else {
+					stage.addChild(shape);
+				}
 			}
 			if (currentShader == defalutUnSmoothingShader) {
 				currentShader = defalutShader;

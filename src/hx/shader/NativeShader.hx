@@ -9,7 +9,7 @@ import openfl.display.OpenGLRenderer;
  * 原生着色器支持
  */
 class NativeShader {
-	private var __gl:WebGLRenderContext;
+	private var __renderer:OpenGLRenderer;
 
 	private var __shaderProgram:GLProgram;
 
@@ -25,10 +25,10 @@ class NativeShader {
 	/**
 	 * 初始化GLSL着色器
 	 */
-	private function __initGLSLShader(gl:WebGLRenderContext):Void {
+	private function __initGLSLShader(renderer:OpenGLRenderer):Void {
 		if (__shaderProgram != null)
 			return;
-		__gl = gl;
+		var __gl = renderer.gl;
 		// 编译顶点着色器
 		var vertexShader = __gl.createShader(__gl.VERTEX_SHADER);
 		__gl.shaderSource(vertexShader, __vertexSource);

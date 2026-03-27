@@ -12,6 +12,7 @@ import hx.core.Render;
 import openfl.display.BitmapData;
 import hx.display.Image;
 import openfl.Vector;
+import openfl.utils._internal.Float32Array;
 
 /**
  * 图片缓存数据
@@ -113,6 +114,86 @@ class ImageBufferData {
 	 * 数据索引
 	 */
 	public var index = 0;
+
+	/**
+	 * 每个顶点缓冲区所需的数据大小
+	 */
+	public var perBufferSize(get, never):Int;
+
+	private function get_perBufferSize():Int {
+		/**
+			attribute float openfl_Alpha_multi;
+			attribute vec4 openfl_ColorMultiplier_muti;
+			attribute vec4 openfl_ColorOffset_muti;
+			attribute vec4 openfl_Position;
+			attribute vec2 openfl_TextureCoord;
+			attribute float openfl_TextureId;
+			attribute float openfl_HasColorTransform_muti;
+			attribute float openfl_blendMode_add;
+
+			uniform mat4 openfl_Matrix;
+			uniform vec2 openfl_TextureSize;
+			uniform float time;
+
+		 */
+		return Std.int(this.vertices.length / 2) * perBufferCounts;
+	}
+
+	/**
+	 * 每个顶点缓冲区所需的数据数量
+	 */
+	public var perBufferCounts(get, never):Int;
+
+	private function get_perBufferCounts():Int {
+		return (1 + 4 + 4 + 4 + 2 + 1 + 1 + 1);
+	}
+
+	/**
+	 * 缓冲区数据
+	 */
+	private var __buffer:Float32Array;
+
+	/**
+	 * 构造缓冲数据，主要为`NativeMultiTextureShader`使用
+	 */
+	public function buildBuffer():Void {
+		var bufferSize = perBufferSize;
+		if (__buffer == null) {
+			__buffer = new Float32Array(bufferSize);
+		} else if (bufferSize > __buffer.length) {
+			__buffer = new Float32Array(bufferSize);
+		}
+		var bufferCounts = perBufferCounts;
+		var counts = Std.int(bufferSize / bufferCounts);
+		for (i in 0...counts) {
+			// openfl_Alpha_multi
+			__buffer[i * bufferCounts] = alphas[i];
+			// openfl_ColorMultiplier_muti
+			__buffer[i * bufferCounts + 1] = colorMultiplier[i * 4];
+			__buffer[i * bufferCounts + 2] = colorMultiplier[i * 4 + 1];
+			__buffer[i * bufferCounts + 3] = colorMultiplier[i * 4 + 2];
+			__buffer[i * bufferCounts + 4] = colorMultiplier[i * 4 + 3];
+			// openfl_ColorOffset_muti
+			__buffer[i * bufferCounts + 5] = colorOffset[i * 4];
+			__buffer[i * bufferCounts + 6] = colorOffset[i * 4 + 1];
+			__buffer[i * bufferCounts + 7] = colorOffset[i * 4 + 2];
+			__buffer[i * bufferCounts + 8] = colorOffset[i * 4 + 3];
+			// openfl_Position
+			__buffer[i * bufferCounts + 9] = vertices[i * 2];
+			__buffer[i * bufferCounts + 10] = vertices[i * 2 + 1];
+			__buffer[i * bufferCounts + 11] = 0;
+			__buffer[i * bufferCounts + 12] = 0;
+			// openfl_TextureCoord
+			__buffer[i * bufferCounts + 13] = uvtData[i * 2];
+			__buffer[i * bufferCounts + 14] = uvtData[i * 2 + 1];
+			// openfl_TextureId
+			__buffer[i * bufferCounts + 15] = ids[i];
+			// openfl_HasColorTransform_muti
+			__buffer[i * bufferCounts + 16] = hasColorTransform[i];
+			// openfl_blendMode_add
+			__buffer[i * bufferCounts + 17] = addBlendModes[i];
+		}
+	}
 
 	private var dataPerVertex6 = 0;
 	private var dataPerVertex24 = 0;
