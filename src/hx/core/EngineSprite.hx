@@ -18,7 +18,7 @@ class EngineSprite extends Sprite {
 	/**
 	 * 是否使用原生多纹理着色器
 	 */
-	public var useNativeMultiTextureShader = false;
+	public var useNativeMultiTextureShader = true;
 
 	/**
 	 * 图像数据
@@ -35,7 +35,7 @@ class EngineSprite extends Sprite {
 	private var indexBuffer:IndexBuffer3D;
 
 	private function onRenderOpenGL(event:RenderEvent) {
-		if (useNativeMultiTextureShader) {
+		if (useNativeMultiTextureShader && data != null && data.vertices != null && data.vertices.length > 0 && data.indices != null && data.indices.length > 0) {
 			// 渲染OpenGL
 			var renderer:OpenGLRenderer = cast event.renderer;
 			var context = Lib.application.window.stage.context3D;
@@ -52,7 +52,9 @@ class EngineSprite extends Sprite {
 				indexBuffer.dispose();
 			}
 
-			vertexBuffer = context.createVertexBuffer(Std.int(data.vertices.length / 2), data.perBufferCounts);
+			var vertexCount = Std.int(data.vertices.length / 2);
+			var perVertexDataSize = data.perBufferCounts;
+			vertexBuffer = context.createVertexBuffer(vertexCount, perVertexDataSize);
 			indexBuffer = context.createIndexBuffer(data.indices.length);
 			indexBuffer.uploadFromTypedArray(new UInt16Array(data.indices));
 			vertexBuffer.uploadFromTypedArray(@:privateAccess data.__buffer);
@@ -86,12 +88,12 @@ class EngineSprite extends Sprite {
 			]);
 			gl.uniformMatrix4fv(openfl_Matrix, false, matrix);
 			var openfl_TextureSize = gl.getUniformLocation(shaderProgram, "openfl_TextureSize");
-			// context.setUniform2fv(openfl_TextureSize, new Float32Array([data.textureWidth, data.textureHeight]));
+			gl.uniform2fv(openfl_TextureSize, new Float32Array([1024, 1024]));
 			var time = gl.getUniformLocation(shaderProgram, "time");
-			// context.setUniform1f(time, Lib.getTimer());
+			gl.uniform1f(time, Lib.getTimer());
 
-			for (index => data in data.bitmapDatas) {
-				context.setTextureAt(index, data.getTexture(context));
+			for (index => bitmapData in data.bitmapDatas) {
+				context.setTextureAt(index, bitmapData.getTexture(context));
 			}
 
 			context.drawTriangles(indexBuffer);
