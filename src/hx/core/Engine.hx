@@ -1,5 +1,7 @@
 package hx.core;
 
+import openfl.display.OpenGLRenderer;
+import openfl.events.RenderEvent;
 import haxe.CallStack;
 import haxe.Exception;
 import hx.events.UncaughtErrorEvent;

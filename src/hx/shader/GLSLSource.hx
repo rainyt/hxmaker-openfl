@@ -79,7 +79,7 @@ vec4 readColor(vec2 uv) {
 
 	public var fragmentSource:String;
 
-	public function new(vertexSource:String, fragmentSource:String) {
+	public function new(vertexSource:String = null, fragmentSource:String = null) {
 		this.vertexSource = vertexSource;
 		this.fragmentSource = fragmentSource;
 		this.vertexSource = this.vertexSource.replace("#pragma body", VERTEX_SOURCE);
