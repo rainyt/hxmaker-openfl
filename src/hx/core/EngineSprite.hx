@@ -80,14 +80,11 @@ class EngineSprite extends Sprite {
 			context.setVertexBufferAt(openfl_blendMode_add, vertexBuffer, 17, FLOAT_1);
 
 			var openfl_Matrix = gl.getUniformLocation(shaderProgram, "openfl_Matrix");
-
-			// var uMatrix = @:privateAccess renderer.__getMatrix(@:privateAccess graphics.__owner.__renderTransform, AUTO);
-
 			var p = new Matrix4();
 			@:privateAccess p.createOrtho(0, Lib.current.stage.stageWidth, Lib.current.stage.stageHeight, 0, -10000, 10000);
 			gl.uniformMatrix4fv(openfl_Matrix, false, new Float32Array(p));
 			var openfl_TextureSize = gl.getUniformLocation(shaderProgram, "openfl_TextureSize");
-			gl.uniform2fv(openfl_TextureSize, new Float32Array([1024, 1024]));
+			gl.uniform2fv(openfl_TextureSize, new Float32Array([Lib.current.stage.stageWidth, Lib.current.stage.stageHeight]));
 			var time = gl.getUniformLocation(shaderProgram, "time");
 			gl.uniform1f(time, Lib.getTimer());
 
