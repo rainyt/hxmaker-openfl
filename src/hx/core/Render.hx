@@ -170,7 +170,7 @@ class Render implements IRender {
 				currentShader = defalutShader;
 			}
 			if (currentShader == defalutShader) {
-				shape.useNativeMultiTextureShader = true;
+				shape.useNativeMultiTextureShader = false;
 				if (!data.smoothing) {
 					shape.useNativeMultiTextureShader = false;
 					currentShader = defalutUnSmoothingShader;

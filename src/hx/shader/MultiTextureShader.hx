@@ -111,9 +111,8 @@ class MultiTextureShader extends GraphicsShader {
 		void main(void) {
 
 			vec4 color;
-			//vec4 color = texture2D (openfl_Texture, openfl_TextureCoordv);
-			float vTextureId = openfl_TextureIdv;
-			color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);
+			
+			color = readColor(openfl_TextureCoordv);
 
 			if (color.a == 0.0) {
 
