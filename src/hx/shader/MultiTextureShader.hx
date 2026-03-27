@@ -161,7 +161,7 @@ class MultiTextureShader extends GraphicsShader {
 	@:glVertexHeader("attribute float openfl_Alpha_multi;
 		attribute vec4 openfl_ColorMultiplier_muti;
 		attribute vec4 openfl_ColorOffset_muti;
-		attribute bool openfl_HasColorTransform_muti;
+		attribute float openfl_HasColorTransform_muti;
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
