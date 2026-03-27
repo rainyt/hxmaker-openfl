@@ -182,7 +182,7 @@ class ImageBufferData {
 			__buffer[i * bufferCounts + 9] = vertices[i * 2];
 			__buffer[i * bufferCounts + 10] = vertices[i * 2 + 1];
 			__buffer[i * bufferCounts + 11] = 0;
-			__buffer[i * bufferCounts + 12] = 0;
+			__buffer[i * bufferCounts + 12] = 1;
 			// openfl_TextureCoord
 			__buffer[i * bufferCounts + 13] = uvtData[i * 2];
 			__buffer[i * bufferCounts + 14] = uvtData[i * 2 + 1];

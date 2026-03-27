@@ -1,5 +1,6 @@
 package hx.core;
 
+import lime.math.Matrix4;
 import hx.shader.NativeMultiTextureShader;
 import lime.graphics.opengl.GLProgram;
 import lime.utils.UInt16Array;
@@ -79,14 +80,12 @@ class EngineSprite extends Sprite {
 			context.setVertexBufferAt(openfl_blendMode_add, vertexBuffer, 17, FLOAT_1);
 
 			var openfl_Matrix = gl.getUniformLocation(shaderProgram, "openfl_Matrix");
-			// context.setUniformMatrix4fv(openfl_Matrix, false, data.matrix);
-			var matrix = new Float32Array([
-				1, 0, 0, 0,
-				0, 1, 0, 0,
-				0, 0, 1, 0,
-				0, 0, 0, 1
-			]);
-			gl.uniformMatrix4fv(openfl_Matrix, false, matrix);
+
+			// var uMatrix = @:privateAccess renderer.__getMatrix(@:privateAccess graphics.__owner.__renderTransform, AUTO);
+
+			var p = new Matrix4();
+			@:privateAccess p.createOrtho(0, Lib.current.stage.stageWidth, Lib.current.stage.stageHeight, 0, -10000, 10000);
+			gl.uniformMatrix4fv(openfl_Matrix, false, new Float32Array(p));
 			var openfl_TextureSize = gl.getUniformLocation(shaderProgram, "openfl_TextureSize");
 			gl.uniform2fv(openfl_TextureSize, new Float32Array([1024, 1024]));
 			var time = gl.getUniformLocation(shaderProgram, "time");
