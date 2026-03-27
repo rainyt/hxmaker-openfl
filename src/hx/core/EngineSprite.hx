@@ -13,6 +13,7 @@ import openfl.events.RenderEvent;
 import openfl.display.Sprite;
 import openfl.utils._internal.Float32Array;
 
+@:access(openfl.display3D.TextureBase)
 class EngineSprite extends Sprite {
 	public var isPool = true;
 
@@ -89,10 +90,21 @@ class EngineSprite extends Sprite {
 			gl.uniform1f(time, Lib.getTimer());
 
 			for (index => bitmapData in data.bitmapDatas) {
-				context.setTextureAt(index, bitmapData.getTexture(context));
+				var texture = bitmapData.getTexture(context);
+				gl.activeTexture(gl.TEXTURE0 + index);
+				gl.bindTexture(gl.TEXTURE_2D, @:privateAccess texture.__getTexture());
+				gl.texParameteri(@:privateAccess texture.__textureTarget, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+				gl.texParameteri(@:privateAccess texture.__textureTarget, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+				gl.texParameteri(@:privateAccess texture.__textureTarget, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+				gl.texParameteri(@:privateAccess texture.__textureTarget, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+				var sampler = gl.getUniformLocation(shaderProgram, "uSampler" + index);
+				gl.uniform1i(sampler, index);
+				// context.setTextureAt(index, bitmapData.getTexture(context));
 			}
 
-			context.drawTriangles(indexBuffer);
+			// context.drawTriangles(indexBuffer, 0, Std.int(data.indices.length / 3));
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, @:privateAccess indexBuffer.__id);
+			gl.drawElements(gl.TRIANGLES, Std.int(data.indices.length / 3), gl.UNSIGNED_SHORT, 0);
 		}
 	}
 
