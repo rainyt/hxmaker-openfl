@@ -102,9 +102,8 @@ class EngineSprite extends Sprite {
 				// context.setTextureAt(index, bitmapData.getTexture(context));
 			}
 
-			// context.drawTriangles(indexBuffer, 0, Std.int(data.indices.length / 3));
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, @:privateAccess indexBuffer.__id);
-			gl.drawElements(gl.TRIANGLES, Std.int(data.indices.length / 3), gl.UNSIGNED_SHORT, 0);
+			gl.drawElements(gl.TRIANGLES, @:privateAccess indexBuffer.__numIndices, gl.UNSIGNED_SHORT, 0);
 		}
 	}
 

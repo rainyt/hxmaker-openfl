@@ -111,7 +111,7 @@ class MultiTextureShader extends GraphicsShader {
 		void main(void) {
 
 			vec4 color;
-			
+
 			color = readColor(openfl_TextureCoordv);
 
 			if (color.a == 0.0) {
@@ -205,20 +205,10 @@ class MultiTextureShader extends GraphicsShader {
 		__glFragmentSource = __glFragmentSource.replace("uniform sampler2D SAMPLER_INJECT;", uSamplerVariableBuffer);
 
 		var uSamplerBodyBuffer:String = "";
-		for (i in 0...__supportedMultiTextureUnits) {
-			if (i == 0) {
-				uSamplerBodyBuffer += 'if (vTextureId < ${i}.5) {
-                    color = texture2D(uSampler${i}, openfl_TextureCoordv);
-                }';
-			} else if (i == __supportedMultiTextureUnits - 1) {
-				uSamplerBodyBuffer += 'else {
-                    color = texture2D(uSampler${i}, openfl_TextureCoordv);
-                }';
-			} else {
-				uSamplerBodyBuffer += 'else if (vTextureId < ${i}.5) {
-                    color = texture2D(uSampler${i}, openfl_TextureCoordv);
-                }';
-			}
+		if (__supportedMultiTextureUnits >= 16) {
+			uSamplerBodyBuffer = texture16Shader;
+		} else {
+			uSamplerBodyBuffer = texture8Shader;
 		}
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);", uSamplerBodyBuffer);
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, uv);", uSamplerBodyBuffer.replace("openfl_TextureCoordv", "uv"));
@@ -234,4 +224,66 @@ class MultiTextureShader extends GraphicsShader {
 	public function update(time:Float):Void {
 		this.time.value[0] += time;
 	}
+
+	/**
+	 * 16个纹理着色器
+	 */
+	private static inline var texture16Shader:String = "if (vTextureId < 7.5) {
+        if (vTextureId < 3.5) {
+            if (vTextureId < 1.5) {
+                if (vTextureId < 0.5) color = texture2D(uSampler0, openfl_TextureCoordv);
+                else color = texture2D(uSampler1, openfl_TextureCoordv);
+            } else {
+                if (vTextureId < 2.5) color = texture2D(uSampler2, openfl_TextureCoordv);
+                else color = texture2D(uSampler3, openfl_TextureCoordv);
+            }
+        } else {
+            if (vTextureId < 5.5) {
+                if (vTextureId < 4.5) color = texture2D(uSampler4, openfl_TextureCoordv);
+                else color = texture2D(uSampler5, openfl_TextureCoordv);
+            } else {
+                if (vTextureId < 6.5) color = texture2D(uSampler6, openfl_TextureCoordv);
+                else color = texture2D(uSampler7, openfl_TextureCoordv);
+            }
+        }
+    } else {
+        if (vTextureId < 11.5) {
+            if (vTextureId < 9.5) {
+                if (vTextureId < 8.5) color = texture2D(uSampler8, openfl_TextureCoordv);
+                else color = texture2D(uSampler9, openfl_TextureCoordv);
+            } else {
+                if (vTextureId < 10.5) color = texture2D(uSampler10, openfl_TextureCoordv);
+                else color = texture2D(uSampler11, openfl_TextureCoordv);
+            }
+        } else {
+            if (vTextureId < 13.5) {
+                if (vTextureId < 12.5) color = texture2D(uSampler12, openfl_TextureCoordv);
+                else color = texture2D(uSampler13, openfl_TextureCoordv);
+            } else {
+                if (vTextureId < 14.5) color = texture2D(uSampler14, openfl_TextureCoordv);
+                else color = texture2D(uSampler15, openfl_TextureCoordv);
+            }
+        }
+    }";
+
+	/**
+	 * 8个纹理着色器
+	 */
+	private static inline var texture8Shader:String = "if (vTextureId < 3.5) {
+		if (vTextureId < 1.5) {
+			if (vTextureId < 0.5) color = texture2D(uSampler0, openfl_TextureCoordv);
+			else color = texture2D(uSampler1, openfl_TextureCoordv);
+		} else {
+			if (vTextureId < 2.5) color = texture2D(uSampler2, openfl_TextureCoordv);
+			else color = texture2D(uSampler3, openfl_TextureCoordv);
+		}
+	} else {
+		if (vTextureId < 5.5) {
+			if (vTextureId < 4.5) color = texture2D(uSampler4, openfl_TextureCoordv);
+			else color = texture2D(uSampler5, openfl_TextureCoordv);
+		} else {
+			if (vTextureId < 6.5) color = texture2D(uSampler6, openfl_TextureCoordv);
+			else color = texture2D(uSampler7, openfl_TextureCoordv);
+		}
+	}";
 }
