@@ -43,7 +43,6 @@ class MultiTextureFastShader extends GraphicsShader {
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
-		attribute float openfl_blendMode_add;
 
 		varying float openfl_Alphav;
 		varying vec2 openfl_TextureCoordv;
@@ -58,8 +57,8 @@ class MultiTextureFastShader extends GraphicsShader {
 
 			openfl_Alphav = openfl_Alpha_multi;
             openfl_TextureCoordv = openfl_TextureCoord;
-            openfl_TextureIdv = openfl_TextureId;
-			openfl_blendMode_addv = openfl_blendMode_add;
+            openfl_TextureIdv = abs(openfl_TextureId - 1.);
+			openfl_blendMode_addv = step(openfl_TextureId, -0.5);
 
             gl_Position = openfl_Matrix * openfl_Position;
 
@@ -113,9 +112,8 @@ class MultiTextureFastShader extends GraphicsShader {
 
 			}
 
-			if(openfl_blendMode_addv > 0.5){
-				gl_FragColor.a = 0.;
-			}
+			// add blendMode
+			gl_FragColor.a = gl_FragColor.a * (1.0 - openfl_blendMode_addv);
 
 		}";
 	#end
@@ -124,7 +122,6 @@ class MultiTextureFastShader extends GraphicsShader {
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
-		attribute float openfl_blendMode_add;
 		uniform mat4 openfl_Matrix;
 		uniform vec2 openfl_TextureSize;
 		uniform float time;

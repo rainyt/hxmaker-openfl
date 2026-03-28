@@ -50,11 +50,6 @@ class ImageBufferData {
 	public var alphas:Array<Float> = [];
 
 	/**
-	 * 叠加渲染支持
-	 */
-	public var addBlendModes:Array<Float> = [];
-
-	/**
 	 * 是否包含颜色转换
 	 */
 	public var hasColorTransform:Array<Float> = [];
@@ -212,14 +207,16 @@ class ImageBufferData {
 						var id = mapIds.get(texture);
 						if (id == null) {
 							bitmapDatas.push(texture);
-							id = bitmapDatas.length - 1;
+							id = bitmapDatas.length;
 							mapIds.set(texture, id);
+						}
+						if (applyBlendAddMode) {
+							id *= -1;
 						}
 						// 根据顶点设置数据
 						for (i in 0...indices.length) {
 							ids[dataPerVertex6 + i] = id;
 							alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
-							addBlendModes[dataPerVertex6 + i] = applyBlendAddMode ? 1 : 0;
 							if (enabledColorTransform) {
 								if (colorTransform != null) {
 									hasColorTransform[dataPerVertex6 + i] = 1;
@@ -324,9 +321,13 @@ class ImageBufferData {
 		// 可以绘制，记录纹理ID
 		if (id == null) {
 			bitmapDatas.push(texture);
-			id = bitmapDatas.length - 1;
+			id = bitmapDatas.length;
 			mapIds.set(texture, id);
 		}
+
+		// if (image.__addBlendMode == 1) {
+		id *= -1;
+		// }
 
 		if (!isBad) {
 			var displayObject = drawDisplayList[index];
@@ -349,7 +350,6 @@ class ImageBufferData {
 			for (i in 0...6) {
 				ids[dataPerVertex6 + i] = id;
 				alphas[dataPerVertex6 + i] = image.__worldAlpha;
-				addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
 				if (enabledColorTransform) {
 					if (image.__colorTransform != null) {
 						hasColorTransform[dataPerVertex6 + i] = 1;
