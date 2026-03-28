@@ -322,40 +322,39 @@ class ImageBufferData {
 			if (!isSame)
 				isBad = true;
 		}
-		// var isColorDirty = isBad || image.__colorTransformDirty;
-		var isTransformDirty = isBad || image.__transformDirty;
-
 		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
-		// var isUvsDirty = isBad || image.__uvsDirty;
-		var isUvsDirty = true;
 		// TODO 同isUvsDirty，需要想办法优化解决所有可能发生的情况
-		var isColorDirty = true;
+		// var isColorDirty = isBad || image.__colorTransformDirty;
+		// var isTransformDirty = isBad || image.__transformDirty;
+		// var isUvsDirty = isBad || image.__uvsDirty;
+		// var isUvsDirty = true;
+		// var isColorDirty = true;
 
 		// if (displayObject != image || image.__transformDirty) {
-		if (isColorDirty) {
-			// 6个顶点数据
-			for (i in 0...6) {
-				ids[dataPerVertex6 + i] = id;
-				alphas[dataPerVertex6 + i] = image.__worldAlpha;
-				addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
-				if (enabledColorTransform) {
-					if (image.__colorTransform != null) {
-						hasColorTransform[dataPerVertex6 + i] = 1;
-						colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
-						colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
-					} else {
-						hasColorTransform[dataPerVertex6 + i] = 0;
-						colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
-					}
+		// if (isColorDirty) {
+		// 6个顶点数据
+		for (i in 0...6) {
+			ids[dataPerVertex6 + i] = id;
+			alphas[dataPerVertex6 + i] = image.__worldAlpha;
+			addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
+			if (enabledColorTransform) {
+				if (image.__colorTransform != null) {
+					hasColorTransform[dataPerVertex6 + i] = 1;
+					colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
+					colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
+				} else {
+					hasColorTransform[dataPerVertex6 + i] = 0;
+					colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
 				}
 			}
 		}
+		// }
 
 		// if (isTransformDirty) {
 		// 坐标顶点
@@ -444,33 +443,33 @@ class ImageBufferData {
 		// }
 
 		// UVs
-		if (isUvsDirty) {
-			if (image.data.rect != null) {
-				var imageWidth = image.data.data.getWidth();
-				var imageHeight = image.data.data.getHeight();
-				var uvX = image.data.rect.x / imageWidth;
-				var uvY = image.data.rect.y / imageHeight;
-				var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
-				var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
-				uvtData[dataPerVertex] = (uvX);
-				uvtData[dataPerVertex + 1] = (uvY);
-				uvtData[dataPerVertex + 2] = (uvW);
-				uvtData[dataPerVertex + 3] = (uvY);
-				uvtData[dataPerVertex + 4] = (uvX);
-				uvtData[dataPerVertex + 5] = (uvH);
-				uvtData[dataPerVertex + 6] = (uvW);
-				uvtData[dataPerVertex + 7] = (uvH);
-			} else {
-				uvtData[dataPerVertex] = (0);
-				uvtData[dataPerVertex + 1] = (0);
-				uvtData[dataPerVertex + 2] = (1);
-				uvtData[dataPerVertex + 3] = (0);
-				uvtData[dataPerVertex + 4] = (0);
-				uvtData[dataPerVertex + 5] = (1);
-				uvtData[dataPerVertex + 6] = (1);
-				uvtData[dataPerVertex + 7] = (1);
-			}
+		// if (isUvsDirty) {
+		if (image.data.rect != null) {
+			var imageWidth = image.data.data.getWidth();
+			var imageHeight = image.data.data.getHeight();
+			var uvX = image.data.rect.x / imageWidth;
+			var uvY = image.data.rect.y / imageHeight;
+			var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
+			var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
+			uvtData[dataPerVertex] = (uvX);
+			uvtData[dataPerVertex + 1] = (uvY);
+			uvtData[dataPerVertex + 2] = (uvW);
+			uvtData[dataPerVertex + 3] = (uvY);
+			uvtData[dataPerVertex + 4] = (uvX);
+			uvtData[dataPerVertex + 5] = (uvH);
+			uvtData[dataPerVertex + 6] = (uvW);
+			uvtData[dataPerVertex + 7] = (uvH);
+		} else {
+			uvtData[dataPerVertex] = (0);
+			uvtData[dataPerVertex + 1] = (0);
+			uvtData[dataPerVertex + 2] = (1);
+			uvtData[dataPerVertex + 3] = (0);
+			uvtData[dataPerVertex + 4] = (0);
+			uvtData[dataPerVertex + 5] = (1);
+			uvtData[dataPerVertex + 6] = (1);
+			uvtData[dataPerVertex + 7] = (1);
 		}
+		// }
 		// }
 		drawDisplayList[index] = image;
 		image.__transformDirty = false;
