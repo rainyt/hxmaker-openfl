@@ -200,7 +200,7 @@ class ImageBufferData {
 							} else {
 								return false;
 							}
-						} else if (enabledColorTransform != (graphic.colorTransform != null || colorTransform != null)) {
+						} else if (!enabledColorTransform && (graphic.colorTransform != null || colorTransform != null)) {
 							return false;
 						} else if (smoothing != data.smoothing) {
 							return false;
@@ -316,7 +316,7 @@ class ImageBufferData {
 			} else {
 				return false;
 			}
-		} else if (enabledColorTransform != (image.__colorTransform != null)) {
+		} else if (!enabledColorTransform && (image.__colorTransform != null)) {
 			return false;
 		} else if (smoothing != image.smoothing) {
 			return false;
