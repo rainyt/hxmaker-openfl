@@ -1,5 +1,6 @@
 package hx.core;
 
+import hx.shader.MultiTextureFastShader;
 import hx.filters.StageBitmapData;
 import openfl.display.Bitmap;
 import hx.shader.MultiTextureShader;
@@ -57,12 +58,17 @@ class Render implements IRender {
 	/**
 	 * 默认的着色器支持
 	 */
-	public static var defalutShader:Shader;
+	public static var defaultShader:Shader;
+
+	/**
+	 * 默认的快速着色器支持
+	 */
+	public static var defaultFastShader:Shader;
 
 	/**
 	 * 默认的无平滑着色器支持
 	 */
-	public static var defalutUnSmoothingShader:Shader;
+	public static var defaultUnSmoothingShader:Shader;
 
 	/**
 	 * 当前渲染的着色器
@@ -166,12 +172,11 @@ class Render implements IRender {
 			data.endFill();
 			var shape:Sprite = __pool.get();
 			shape.graphics.clear();
-			if (currentShader == null) {
-				currentShader = defalutShader;
-			}
-			if (currentShader == defalutShader) {
+			var isDefaultShader:Bool = currentShader == null || currentShader == defaultShader || currentShader == defaultFastShader;
+			if (isDefaultShader) {
+				currentShader = !data.enabledColorTransform ? defaultFastShader : defaultShader;
 				if (!data.smoothing) {
-					currentShader = defalutUnSmoothingShader;
+					currentShader = defaultUnSmoothingShader;
 				}
 			}
 			var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
@@ -188,12 +193,15 @@ class Render implements IRender {
 				sampler.input = data2;
 				sampler.filter = data.smoothing ? LINEAR : NEAREST;
 			}
-			openfl_ColorOffer.value = data.colorOffset;
-			openfl_ColorMultiplier.value = data.colorMultiplier;
+			if (openfl_ColorOffer != null)
+				openfl_ColorOffer.value = data.colorOffset;
+			if (openfl_ColorMultiplier != null)
+				openfl_ColorMultiplier.value = data.colorMultiplier;
+			if (openfl_HasColorTransform != null)
+				openfl_HasColorTransform.value = data.hasColorTransform;
 			openfl_TextureId.value = data.ids;
 			openfl_Alpha.value = data.alphas;
 			openfl_blendMode_add.value = data.addBlendModes;
-			openfl_HasColorTransform.value = data.hasColorTransform;
 			// 图形尺寸，暂永远设定为舞台大小
 			var openfl_TextureSize:ShaderParameter<Float> = currentShader.data.openfl_TextureSize;
 			openfl_TextureSize.value = [Hxmaker.engine.stageWidth, Hxmaker.engine.stageHeight];
@@ -228,8 +236,8 @@ class Render implements IRender {
 			} else {
 				stage.addChild(shape);
 			}
-			if (currentShader == defalutUnSmoothingShader) {
-				currentShader = defalutShader;
+			if (currentShader == defaultUnSmoothingShader) {
+				currentShader = defaultShader;
 			}
 			return shape;
 		}
@@ -319,11 +327,14 @@ class Render implements IRender {
 	public function new() {
 		this.__stage.mouseChildren = this.__stage.mouseEnabled = false;
 		// 使用多纹理支持
-		if (defalutShader == null) {
-			defalutShader = new MultiTextureShader();
+		if (defaultShader == null) {
+			defaultShader = new MultiTextureShader();
 		}
-		if (defalutUnSmoothingShader == null) {
-			defalutUnSmoothingShader = new MultiTextureShader();
+		if (defaultFastShader == null) {
+			defaultFastShader = new MultiTextureFastShader();
+		}
+		if (defaultUnSmoothingShader == null) {
+			defaultUnSmoothingShader = new MultiTextureShader();
 		}
 	}
 
