@@ -132,7 +132,7 @@ class ImageBufferData {
 		dataPerVertex24 = 0;
 		dataPerVertex = 0;
 		indicesOffset = 0;
-		setArrayLength(bitmapDatas, 0);
+		bitmapDatas.resize(0);
 		mapIds.clear();
 		isBad = false;
 		blendMode = null;
@@ -141,19 +141,7 @@ class ImageBufferData {
 	public function endFill():Void {
 		vertices.length = dataPerVertex;
 		indices.length = dataPerVertex6;
-		setArrayLength(ids, dataPerVertex6);
-		setArrayLength(alphas, dataPerVertex6);
-		setArrayLength(hasColorTransform, dataPerVertex6);
-		setArrayLength(colorMultiplier, dataPerVertex24);
-		setArrayLength(colorOffset, dataPerVertex24);
-		setArrayLength(drawDisplayList, index);
 		uvtData.length = dataPerVertex;
-	}
-
-	private function setArrayLength(array:Array<Dynamic>, length:Int):Void {
-		while (array.length > length) {
-			array.pop();
-		}
 	}
 
 	/**
