@@ -352,6 +352,10 @@ class ImageBufferData {
 					data.smoothing = smoothing;
 				case DRAW_TRIANGLE(vertices, indices, uvs, alpha, colorTransform, applyBlendAddMode):
 					// 开始绘制三角形
+					// 超出限制，则开始下一次绘制
+					if (__indicesBufferIndex + indices.length >= __indicesBuffer.length) {
+						return false;
+					}
 					if (data.currentBitmapData != null) {
 						var texture = data.currentBitmapData.data.getTexture();
 						if (index == 0 || !mapIds.exists(texture)) {
@@ -471,6 +475,12 @@ class ImageBufferData {
 		if (id == null && bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
 			return false;
 		}
+
+		// 超出限制，则开始下一次绘制
+		if (__indicesBufferIndex + 6 >= __indicesBuffer.length) {
+			return false;
+		}
+
 		// 如果平滑值不同，则产生新的绘制
 		if (index == 0) {
 			smoothing = image.smoothing;
