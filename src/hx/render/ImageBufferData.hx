@@ -1,5 +1,6 @@
 package hx.render;
 
+import lime.utils.UInt16Array;
 import hx.utils.ContextStats;
 import hx.geom.Matrix3D;
 import hx.shader.MultiTextureShader;
@@ -12,7 +13,7 @@ import hx.core.Render;
 import openfl.display.BitmapData;
 import hx.display.Image;
 import openfl.Vector;
-import openfl.utils._internal.Float32Array;
+import lime.utils.Float32Array;
 
 /**
  * 图片缓存数据
@@ -21,6 +22,11 @@ import openfl.utils._internal.Float32Array;
 @:access(hx.display.Graphics)
 @:access(hx.geom.Matrix)
 class ImageBufferData {
+	/**
+	 * 索引缓冲区大小
+	 */
+	public static inline var INDICES_SIZE = 65535;
+
 	/**
 	 * 只有1像素的位图
 	 */
@@ -142,66 +148,145 @@ class ImageBufferData {
 	/**
 	 * 每个顶点缓冲区所需的数据数量
 	 */
-	public var perBufferCounts(get, never):Int;
+	public var perBufferCounts:Int = 18;
 
-	private function get_perBufferCounts():Int {
-		return (1 + 4 + 4 + 4 + 2 + 1 + 1 + 1);
+	// private function get_perBufferCounts():Int {
+	// return (1 + 4 + 4 + 4 + 2 + 1 + 1 + 1);
+	// }
+
+	/**
+	 * 顶点缓冲区
+	 */
+	public var vertexBuffer(get, never):Float32Array;
+
+	private function get_vertexBuffer():Float32Array {
+		return __vertexBuffer;
+	}
+
+	/**
+	 * 索引缓冲区
+	 */
+	public var indicesBuffer(get, never):UInt16Array;
+
+	private function get_indicesBuffer():UInt16Array {
+		return __indicesBuffer;
 	}
 
 	/**
 	 * 缓冲区数据
 	 */
-	private var __buffer:Float32Array;
+	private var __vertexBuffer:Float32Array;
+
+	/**
+	 * 顶点缓冲区索引
+	 */
+	private var __vertexBufferIndex = 0;
+
+	/**
+	 * 索引缓冲区数据
+	 */
+	private var __indicesBuffer:UInt16Array = new UInt16Array(INDICES_SIZE);
+
+	/**
+	 * 索引缓冲区索引
+	 */
+	private var __indicesBufferIndex = 0;
 
 	/**
 	 * 缓冲区数据大小
 	 */
 	private var __bufferSize = 0;
 
-	public function getBuffer():Float32Array {
-		return __buffer;
+	/**
+	 * 写入缓冲区数据
+	 * @param buffer 缓冲区数据
+	 * @param step 顶点缓冲区索引
+	 * @param alpha 透明度渲染
+	 * @param multiplierR 颜色相乘R
+	 * @param multiplierG 颜色相乘G
+	 * @param multiplierB 颜色相乘B
+	 * @param multiplierA 颜色相乘A
+	 * @param colorR 颜色偏移R
+	 * @param colorG 颜色偏移G
+	 * @param colorB 颜色偏移B
+	 * @param colorA 颜色偏移A
+	 * @param verticeX 顶点X坐标
+	 * @param verticeY 顶点Y坐标
+	 * @param textureId 纹理ID
+	 * @param hasColorTransform 是否包含颜色转换
+	 * @param blendMode 叠加渲染支持
+	 * @param u 纹理U坐标
+	 * @param v 纹理V坐标
+	 */
+	public inline function writeBuffer(step:Int, alpha:Float, multiplierR:Float, multiplierG:Float, multiplierB:Float, multiplierA:Float, colorR:Float,
+			colorG:Float, colorB:Float, colorA:Float, verticeX:Float, verticeY:Float, textureId:Float, hasColorTransform:Float, blendMode:Float, u:Float,
+			v:Float):Void {
+		if (__vertexBuffer == null) {
+			__vertexBuffer = new Float32Array(1024);
+		}
+		if (step >= __vertexBuffer.length) {
+			__vertexBuffer = new Float32Array(step * 2);
+		}
+		__vertexBuffer[step] = alpha;
+		__vertexBuffer[step + 1] = multiplierR;
+		__vertexBuffer[step + 2] = multiplierG;
+		__vertexBuffer[step + 3] = multiplierB;
+		__vertexBuffer[step + 4] = multiplierA;
+		__vertexBuffer[step + 5] = colorR;
+		__vertexBuffer[step + 6] = colorG;
+		__vertexBuffer[step + 7] = colorB;
+		__vertexBuffer[step + 8] = colorA;
+		__vertexBuffer[step + 9] = verticeX;
+		__vertexBuffer[step + 10] = verticeY;
+		__vertexBuffer[step + 11] = 0;
+		__vertexBuffer[step + 12] = 1;
+		__vertexBuffer[step + 13] = u;
+		__vertexBuffer[step + 14] = v;
+		__vertexBuffer[step + 15] = textureId;
+		__vertexBuffer[step + 16] = hasColorTransform;
+		__vertexBuffer[step + 17] = blendMode;
 	}
 
 	/**
 	 * 构造缓冲数据，主要为`NativeMultiTextureShader`使用
 	 */
 	public function buildBuffer():Void {
-		var bufferSize = perBufferSize;
-		if (__buffer == null) {
-			__buffer = new Float32Array(bufferSize);
-		} else if (bufferSize > __buffer.length) {
-			__buffer = new Float32Array(bufferSize);
-		}
-		var bufferCounts = perBufferCounts;
-		var counts = Std.int(vertices.length / 2);
-		for (i in 0...counts) {
-			// openfl_Alpha_multi
-			__buffer[i * bufferCounts] = alphas[i];
-			// openfl_ColorMultiplier_muti
-			__buffer[i * bufferCounts + 1] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4] : 0;
-			__buffer[i * bufferCounts + 2] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 1] : 0;
-			__buffer[i * bufferCounts + 3] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 2] : 0;
-			__buffer[i * bufferCounts + 4] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 3] : 0;
-			// openfl_ColorOffset_muti
-			__buffer[i * bufferCounts + 5] = hasColorTransform[i] == 1 ? colorOffset[i * 4] : 0;
-			__buffer[i * bufferCounts + 6] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 1] : 0;
-			__buffer[i * bufferCounts + 7] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 2] : 0;
-			__buffer[i * bufferCounts + 8] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 3] : 0;
-			// openfl_Position
-			__buffer[i * bufferCounts + 9] = vertices[i * 2];
-			__buffer[i * bufferCounts + 10] = vertices[i * 2 + 1];
-			__buffer[i * bufferCounts + 11] = 0;
-			__buffer[i * bufferCounts + 12] = 1;
-			// openfl_TextureCoord
-			__buffer[i * bufferCounts + 13] = uvtData[i * 2];
-			__buffer[i * bufferCounts + 14] = uvtData[i * 2 + 1];
-			// openfl_TextureId
-			__buffer[i * bufferCounts + 15] = ids[i];
-			// openfl_HasColorTransform_muti
-			__buffer[i * bufferCounts + 16] = hasColorTransform[i];
-			// openfl_blendMode_add
-			__buffer[i * bufferCounts + 17] = addBlendModes[i];
-		}
+		// var bufferSize = perBufferSize;
+		// if (__vertexBuffer == null) {
+		// 	__vertexBuffer = new Float32Array(bufferSize);
+		// } else if (bufferSize > __vertexBuffer.length) {
+		// 	__vertexBuffer = new Float32Array(bufferSize);
+		// }
+		// var bufferCounts = perBufferCounts;
+		// var counts = Std.int(vertices.length / 2);
+		// for (i in 0...counts) {
+		// 	// openfl_Alpha_multi
+		// 	__vertexBuffer[i * bufferCounts] = alphas[i];
+		// 	// openfl_ColorMultiplier_muti
+		// 	__vertexBuffer[i * bufferCounts + 1] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4] : 0;
+		// 	__vertexBuffer[i * bufferCounts + 2] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 1] : 0;
+		// 	__vertexBuffer[i * bufferCounts + 3] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 2] : 0;
+		// 	__vertexBuffer[i * bufferCounts + 4] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 3] : 0;
+		// 	// openfl_ColorOffset_muti
+		// 	__vertexBuffer[i * bufferCounts + 5] = hasColorTransform[i] == 1 ? colorOffset[i * 4] : 0;
+		// 	__vertexBuffer[i * bufferCounts + 6] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 1] : 0;
+		// 	__vertexBuffer[i * bufferCounts + 7] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 2] : 0;
+		// 	__vertexBuffer[i * bufferCounts + 8] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 3] : 0;
+		// 	// openfl_Position
+		// 	__vertexBuffer[i * bufferCounts + 9] = vertices[i * 2];
+		// 	__vertexBuffer[i * bufferCounts + 10] = vertices[i * 2 + 1];
+		// 	__vertexBuffer[i * bufferCounts + 11] = 0;
+		// 	__vertexBuffer[i * bufferCounts + 12] = 1;
+		// 	// openfl_TextureCoord
+		// 	__vertexBuffer[i * bufferCounts + 13] = uvtData[i * 2];
+		// 	__vertexBuffer[i * bufferCounts + 14] = uvtData[i * 2 + 1];
+		// 	// openfl_TextureId
+		// 	__vertexBuffer[i * bufferCounts + 15] = ids[i];
+		// 	// openfl_HasColorTransform_muti
+		// 	__vertexBuffer[i * bufferCounts + 16] = hasColorTransform[i];
+		// 	// openfl_blendMode_add
+		// 	__vertexBuffer[i * bufferCounts + 17] = addBlendModes[i];
+		// }
 	}
 
 	private var dataPerVertex6 = 0;
@@ -217,6 +302,8 @@ class ImageBufferData {
 		dataPerVertex24 = 0;
 		dataPerVertex = 0;
 		indicesOffset = 0;
+		__vertexBufferIndex = 0;
+		__indicesBufferIndex = 0;
 		setArrayLength(bitmapDatas, 0);
 		mapIds.clear();
 		isBad = false;
@@ -299,58 +386,59 @@ class ImageBufferData {
 						}
 						// 根据顶点设置数据
 						for (i in 0...indices.length) {
-							ids[dataPerVertex6 + i] = id;
-							alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
-							addBlendModes[dataPerVertex6 + i] = applyBlendAddMode ? 1 : 0;
-							if (colorTransform != null) {
-								hasColorTransform[dataPerVertex6 + i] = 1;
-								colorMultiplier[dataPerVertex24 + i * 4] = colorTransform.redMultiplier;
-								colorMultiplier[dataPerVertex24 + i * 4 + 1] = colorTransform.greenMultiplier;
-								colorMultiplier[dataPerVertex24 + i * 4 + 2] = colorTransform.blueMultiplier;
-								colorMultiplier[dataPerVertex24 + i * 4 + 3] = colorTransform.alphaMultiplier;
-								colorOffset[dataPerVertex24 + i * 4] = colorTransform.redOffset;
-								colorOffset[dataPerVertex24 + i * 4 + 1] = colorTransform.greenOffset;
-								colorOffset[dataPerVertex24 + i * 4 + 2] = colorTransform.blueOffset;
-								colorOffset[dataPerVertex24 + i * 4 + 3] = colorTransform.alphaOffset;
-							} else {
-								hasColorTransform[dataPerVertex6 + i] = 0;
-								if (graphic.colorTransform != null) {
-									colorMultiplier[dataPerVertex24 + i * 4] = 1;
-									colorMultiplier[dataPerVertex24 + i * 4 + 1] = 1;
-									colorMultiplier[dataPerVertex24 + i * 4 + 2] = 1;
-									colorMultiplier[dataPerVertex24 + i * 4 + 3] = 1;
-									colorOffset[dataPerVertex24 + i * 4] = 0;
-									colorOffset[dataPerVertex24 + i * 4 + 1] = 0;
-									colorOffset[dataPerVertex24 + i * 4 + 2] = 0;
-									colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
-								} else {
-									colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
-								}
-							}
-							if (graphic.colorTransform != null) {
-								hasColorTransform[dataPerVertex6 + i] = 1;
-								colorMultiplier[dataPerVertex24 + i * 4] *= graphic.colorTransform.redMultiplier;
-								colorMultiplier[dataPerVertex24 + i * 4 + 1] *= graphic.colorTransform.greenMultiplier;
-								colorMultiplier[dataPerVertex24 + i * 4 + 2] *= graphic.colorTransform.blueMultiplier;
-								colorMultiplier[dataPerVertex24 + i * 4 + 3] *= graphic.colorTransform.alphaMultiplier;
-								colorOffset[dataPerVertex24 + i * 4] += graphic.colorTransform.redOffset;
-								colorOffset[dataPerVertex24 + i * 4 + 1] += graphic.colorTransform.greenOffset;
-								colorOffset[dataPerVertex24 + i * 4 + 2] += graphic.colorTransform.blueOffset;
-								colorOffset[dataPerVertex24 + i * 4 + 3] += graphic.colorTransform.alphaOffset;
-							}
-							this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
+							__indicesBuffer[__indicesBufferIndex] = indices[i];
+							__indicesBufferIndex++;
+						}
+
+						// 颜色处理
+						var isHasColorTransform = 0;
+						var pColorMultiplier:Array<Float> = [];
+						var pColorOffset:Array<Float> = [];
+						if (colorTransform != null) {
+							isHasColorTransform = 1;
+							pColorMultiplier[0] = colorTransform.redMultiplier;
+							pColorMultiplier[1] = colorTransform.greenMultiplier;
+							pColorMultiplier[2] = colorTransform.blueMultiplier;
+							pColorMultiplier[3] = colorTransform.alphaMultiplier;
+							pColorOffset[0] = colorTransform.redOffset;
+							pColorOffset[1] = colorTransform.greenOffset;
+							pColorOffset[2] = colorTransform.blueOffset;
+							pColorOffset[3] = colorTransform.alphaOffset;
+						} else {
+							isHasColorTransform = 0;
+							pColorMultiplier[0] = 1;
+							pColorMultiplier[1] = 1;
+							pColorMultiplier[2] = 1;
+							pColorMultiplier[3] = 1;
+							pColorOffset[0] = 0;
+							pColorOffset[1] = 0;
+							pColorOffset[2] = 0;
+							pColorOffset[3] = 0;
+						}
+						if (graphic.colorTransform != null) {
+							isHasColorTransform = 1;
+							pColorMultiplier[0] *= graphic.colorTransform.redMultiplier;
+							pColorMultiplier[1] *= graphic.colorTransform.greenMultiplier;
+							pColorMultiplier[2] *= graphic.colorTransform.blueMultiplier;
+							pColorMultiplier[3] *= graphic.colorTransform.alphaMultiplier;
+							pColorOffset[0] += graphic.colorTransform.redOffset;
+							pColorOffset[1] += graphic.colorTransform.greenOffset;
+							pColorOffset[2] += graphic.colorTransform.blueOffset;
+							pColorOffset[3] += graphic.colorTransform.alphaOffset;
 						}
 
 						// 顶点坐标
 						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
 						var len = Std.int(vertices.length / 2);
+						var blendModeValue = applyBlendAddMode ? 1 : 0;
 						for (i in 0...len) {
 							var x = vertices[i * 2];
 							var y = vertices[i * 2 + 1];
-							this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
-							this.vertices[dataPerVertex + i * 2 + 1] = tileTransform.__transformY(x, y);
-							this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
-							this.uvtData[dataPerVertex + i * 2 + 1] = uvs[i * 2 + 1];
+							var step = __vertexBufferIndex * perBufferCounts;
+							writeBuffer(step, alpha, pColorMultiplier[0], pColorMultiplier[1], pColorMultiplier[2], pColorMultiplier[3], pColorOffset[0],
+								pColorOffset[1], pColorOffset[2], pColorOffset[3], tileTransform.__transformX(x, y), tileTransform.__transformY(x, y), id,
+								isHasColorTransform, blendModeValue, uvs[i * 2], uvs[i * 2 + 1]);
+							__vertexBufferIndex++;
 						}
 
 						dataPerVertex6 += indices.length;
@@ -411,106 +499,106 @@ class ImageBufferData {
 			if (!isSame)
 				isBad = true;
 		}
-		// 6个顶点数据
-		for (i in 0...6) {
-			ids[dataPerVertex6 + i] = id;
-			alphas[dataPerVertex6 + i] = image.__worldAlpha;
-			addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
-			if (image.__colorTransform != null) {
-				hasColorTransform[dataPerVertex6 + i] = 1;
-				colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
-				colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
-				colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
-				colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
-				colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
-				colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
-				colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
-				colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
-			} else {
-				hasColorTransform[dataPerVertex6 + i] = 0;
-				colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
-			}
+
+		var isHasColorTransform = 0;
+		var pColorMultiplier:Array<Float> = [];
+		var pColorOffset:Array<Float> = [];
+		if (image.__colorTransform != null) {
+			isHasColorTransform = 1;
+			pColorMultiplier[0] = image.__colorTransform.redMultiplier;
+			pColorMultiplier[1] = image.__colorTransform.greenMultiplier;
+			pColorMultiplier[2] = image.__colorTransform.blueMultiplier;
+			pColorMultiplier[3] = image.__colorTransform.alphaMultiplier;
+			pColorOffset[0] = image.__colorTransform.redOffset;
+			pColorOffset[1] = image.__colorTransform.greenOffset;
+			pColorOffset[2] = image.__colorTransform.blueOffset;
+			pColorOffset[3] = image.__colorTransform.alphaOffset;
+		} else {
+			isHasColorTransform = 0;
+			pColorMultiplier[0] = 1;
+			pColorMultiplier[1] = 1;
+			pColorMultiplier[2] = 1;
+			pColorMultiplier[3] = 1;
+			pColorOffset[0] = 0;
+			pColorOffset[1] = 0;
+			pColorOffset[2] = 0;
+			pColorOffset[3] = 0;
 		}
 
-		// if (isTransformDirty) {
 		// 坐标顶点
 		var tileWidth:Float = image.data.rect != null ? image.data.rect.width : image.data.data.getWidth();
 		var tileHeight:Float = image.data.rect != null ? image.data.rect.height : image.data.data.getHeight();
 		var tileTransform = @:privateAccess image.__worldTransform;
-		var x = @:privateAccess tileTransform.__transformX(0, 0);
-		var y = @:privateAccess tileTransform.__transformY(0, 0);
-		var x2 = @:privateAccess tileTransform.__transformX(tileWidth, 0);
-		var y2 = @:privateAccess tileTransform.__transformY(tileWidth, 0);
-		var x3 = @:privateAccess tileTransform.__transformX(0, tileHeight);
-		var y3 = @:privateAccess tileTransform.__transformY(0, tileHeight);
-		var x4 = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
-		var y4 = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
+		var points = [@:privateAccess
+			tileTransform.__transformX(0, 0), @:privateAccess
+			tileTransform.__transformY(0, 0), @:privateAccess
+			tileTransform.__transformX(tileWidth, 0), @:privateAccess
+			tileTransform.__transformY(tileWidth, 0), @:privateAccess
+			tileTransform.__transformX(0, tileHeight), @:privateAccess
+			tileTransform.__transformY(0, tileHeight), @:privateAccess
+			tileTransform.__transformX(tileWidth, tileHeight), @:privateAccess
+			tileTransform.__transformY(tileWidth, tileHeight)
+		];
 
-		// 3D变化支持
-		var __transformMatrix3D = @:privateAccess image.__transformMatrix3D;
-		if (__transformMatrix3D.transform3D != null) {
-			var matrix3D = new Matrix3D();
-			matrix3D.identity();
-			matrix3D.appendTranslation(-tileTransform.tx, -tileTransform.ty, 0);
-			if (__transformMatrix3D.center3DVector != null)
-				matrix3D.appendTranslation(-__transformMatrix3D.center3DVector.x, -__transformMatrix3D.center3DVector.y, -__transformMatrix3D.center3DVector.z);
-			matrix3D.append(__transformMatrix3D.transform3D);
-			// if (__transformMatrix3D.projectionMatrix3D != null) {
-			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, 0, 400);
-			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-			// }
-			// if (__transformMatrix3D.projectionMatrix3D != null) {
-			// matrix3D.appendTranslation(0, 0, 1000);
-			// matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-			// }
-			if (__transformMatrix3D.center3DVector != null)
-				matrix3D.appendTranslation(__transformMatrix3D.center3DVector.x, __transformMatrix3D.center3DVector.y, __transformMatrix3D.center3DVector.z);
-			matrix3D.appendTranslation(tileTransform.tx, tileTransform.ty, 0);
-			// if (__transformMatrix3D.projectionMatrix3D != null) {
-			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, image.stage.stageHeight / 2, 1000);
-			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-			// }
-			var array = [x, y, 0, x2, y2, 0, x3, y3, 0, x4, y4, 0];
-			// var array = [0, 0, tileWidth, 0, 0, tileWidth, tileWidth, tileHeight];
-			var projected = [];
-			var uvt = [];
+		// TODO：3D变化支持
+		// var __transformMatrix3D = @:privateAccess image.__transformMatrix3D;
+		// if (__transformMatrix3D.transform3D != null) {
+		// 	var matrix3D = new Matrix3D();
+		// 	matrix3D.identity();
+		// 	matrix3D.appendTranslation(-tileTransform.tx, -tileTransform.ty, 0);
+		// 	if (__transformMatrix3D.center3DVector != null)
+		// 		matrix3D.appendTranslation(-__transformMatrix3D.center3DVector.x, -__transformMatrix3D.center3DVector.y, -__transformMatrix3D.center3DVector.z);
+		// 	matrix3D.append(__transformMatrix3D.transform3D);
+		// 	// if (__transformMatrix3D.projectionMatrix3D != null) {
+		// 	// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, 0, 400);
+		// 	// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+		// 	// }
+		// 	// if (__transformMatrix3D.projectionMatrix3D != null) {
+		// 	// matrix3D.appendTranslation(0, 0, 1000);
+		// 	// matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+		// 	// }
+		// 	if (__transformMatrix3D.center3DVector != null)
+		// 		matrix3D.appendTranslation(__transformMatrix3D.center3DVector.x, __transformMatrix3D.center3DVector.y, __transformMatrix3D.center3DVector.z);
+		// 	matrix3D.appendTranslation(tileTransform.tx, tileTransform.ty, 0);
+		// 	// if (__transformMatrix3D.projectionMatrix3D != null) {
+		// 	// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, image.stage.stageHeight / 2, 1000);
+		// 	// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+		// 	// }
+		// 	var array = [x, y, 0, x2, y2, 0, x3, y3, 0, x4, y4, 0];
+		// 	// var array = [0, 0, tileWidth, 0, 0, tileWidth, tileWidth, tileHeight];
+		// 	var projected = [];
+		// 	var uvt = [];
 
-			Utils3D.projectVectors2D(matrix3D, array, projected, uvt);
-			// trace(projected);
-			x = projected[0];
-			y = projected[1];
-			x2 = projected[2];
-			y2 = projected[3];
-			x3 = projected[4];
-			y3 = projected[5];
-			x4 = projected[6];
-			y4 = projected[7];
-			// x = @:privateAccess tileTransform.__transformX(x, y);
-			// y = @:privateAccess tileTransform.__transformY(x, y);
-			// x2 = @:privateAccess tileTransform.__transformX(x2, y2);
-			// y2 = @:privateAccess tileTransform.__transformY(x2, y2);
-			// x3 = @:privateAccess tileTransform.__transformX(x3, y3);
-			// y3 = @:privateAccess tileTransform.__transformY(x3, y3);
-			// x4 = @:privateAccess tileTransform.__transformX(x4, y4);
-			// y4 = @:privateAccess tileTransform.__transformY(x4, y4);
-		}
-		vertices[dataPerVertex] = x;
-		vertices[dataPerVertex + 1] = y;
-		vertices[dataPerVertex + 2] = (x2);
-		vertices[dataPerVertex + 3] = (y2);
-		vertices[dataPerVertex + 4] = (x3);
-		vertices[dataPerVertex + 5] = (y3);
-		vertices[dataPerVertex + 6] = (x4);
-		vertices[dataPerVertex + 7] = (y4);
-		// 顶点
-		indices[dataPerVertex6] = (indicesOffset);
-		indices[dataPerVertex6 + 1] = (indicesOffset + 1);
-		indices[dataPerVertex6 + 2] = (indicesOffset + 2);
-		indices[dataPerVertex6 + 3] = (indicesOffset + 1);
-		indices[dataPerVertex6 + 4] = (indicesOffset + 2);
-		indices[dataPerVertex6 + 5] = (indicesOffset + 3);
+		// 	Utils3D.projectVectors2D(matrix3D, array, projected, uvt);
+		// 	// trace(projected);
+		// 	x = projected[0];
+		// 	y = projected[1];
+		// 	x2 = projected[2];
+		// 	y2 = projected[3];
+		// 	x3 = projected[4];
+		// 	y3 = projected[5];
+		// 	x4 = projected[6];
+		// 	y4 = projected[7];
+		// 	// x = @:privateAccess tileTransform.__transformX(x, y);
+		// 	// y = @:privateAccess tileTransform.__transformY(x, y);
+		// 	// x2 = @:privateAccess tileTransform.__transformX(x2, y2);
+		// 	// y2 = @:privateAccess tileTransform.__transformY(x2, y2);
+		// 	// x3 = @:privateAccess tileTransform.__transformX(x3, y3);
+		// 	// y3 = @:privateAccess tileTransform.__transformY(x3, y3);
+		// 	// x4 = @:privateAccess tileTransform.__transformX(x4, y4);
+		// 	// y4 = @:privateAccess tileTransform.__transformY(x4, y4);
 		// }
-		// UVs
+
+		__indicesBuffer[__indicesBufferIndex] = (indicesOffset);
+		__indicesBuffer[__indicesBufferIndex + 1] = (indicesOffset + 1);
+		__indicesBuffer[__indicesBufferIndex + 2] = (indicesOffset + 2);
+		__indicesBuffer[__indicesBufferIndex + 3] = (indicesOffset + 1);
+		__indicesBuffer[__indicesBufferIndex + 4] = (indicesOffset + 2);
+		__indicesBuffer[__indicesBufferIndex + 5] = (indicesOffset + 3);
+		__indicesBufferIndex += 6;
+
+		var pUvtData:Array<Float> = [];
+
 		if (image.data.rect != null) {
 			var imageWidth = image.data.data.getWidth();
 			var imageHeight = image.data.data.getHeight();
@@ -518,25 +606,33 @@ class ImageBufferData {
 			var uvY = image.data.rect.y / imageHeight;
 			var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
 			var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
-			uvtData[dataPerVertex] = (uvX);
-			uvtData[dataPerVertex + 1] = (uvY);
-			uvtData[dataPerVertex + 2] = (uvW);
-			uvtData[dataPerVertex + 3] = (uvY);
-			uvtData[dataPerVertex + 4] = (uvX);
-			uvtData[dataPerVertex + 5] = (uvH);
-			uvtData[dataPerVertex + 6] = (uvW);
-			uvtData[dataPerVertex + 7] = (uvH);
+			pUvtData[dataPerVertex] = (uvX);
+			pUvtData[dataPerVertex + 1] = (uvY);
+			pUvtData[dataPerVertex + 2] = (uvW);
+			pUvtData[dataPerVertex + 3] = (uvY);
+			pUvtData[dataPerVertex + 4] = (uvX);
+			pUvtData[dataPerVertex + 5] = (uvH);
+			pUvtData[dataPerVertex + 6] = (uvW);
+			pUvtData[dataPerVertex + 7] = (uvH);
 		} else {
-			uvtData[dataPerVertex] = (0);
-			uvtData[dataPerVertex + 1] = (0);
-			uvtData[dataPerVertex + 2] = (1);
-			uvtData[dataPerVertex + 3] = (0);
-			uvtData[dataPerVertex + 4] = (0);
-			uvtData[dataPerVertex + 5] = (1);
-			uvtData[dataPerVertex + 6] = (1);
-			uvtData[dataPerVertex + 7] = (1);
+			pUvtData[dataPerVertex] = (0);
+			pUvtData[dataPerVertex + 1] = (0);
+			pUvtData[dataPerVertex + 2] = (1);
+			pUvtData[dataPerVertex + 3] = (0);
+			pUvtData[dataPerVertex + 4] = (0);
+			pUvtData[dataPerVertex + 5] = (1);
+			pUvtData[dataPerVertex + 6] = (1);
+			pUvtData[dataPerVertex + 7] = (1);
 		}
-		// }
+
+		for (i in 0...4) {
+			var step = __vertexBufferIndex * perBufferCounts;
+			writeBuffer(step, image.__worldAlpha, pColorMultiplier[0], pColorMultiplier[1], pColorMultiplier[2], pColorMultiplier[3], pColorOffset[0],
+				pColorOffset[1], pColorOffset[2], pColorOffset[3], points[i * 2], points[i * 2 + 1], id, isHasColorTransform, image.__addBlendMode,
+				pUvtData[i * 2], pUvtData[i * 2 + 1]);
+			__vertexBufferIndex++;
+		}
+
 		drawDisplayList[index] = image;
 		image.__transformDirty = false;
 		image.__colorTransformDirty = false;

@@ -58,8 +58,8 @@ class EngineSprite extends Sprite {
 			var perVertexDataSize = data.perBufferCounts;
 			vertexBuffer = context.createVertexBuffer(vertexCount, perVertexDataSize);
 			indexBuffer = context.createIndexBuffer(data.indices.length);
-			indexBuffer.uploadFromTypedArray(new UInt16Array(data.indices));
-			vertexBuffer.uploadFromTypedArray(@:privateAccess data.__buffer);
+			indexBuffer.uploadFromTypedArray(data.indicesBuffer);
+			vertexBuffer.uploadFromTypedArray(data.vertexBuffer);
 
 			gl.useProgram(shaderProgram);
 
