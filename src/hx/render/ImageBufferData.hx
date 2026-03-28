@@ -247,54 +247,12 @@ class ImageBufferData {
 		__vertexBuffer[step + 9] = verticeX;
 		__vertexBuffer[step + 10] = verticeY;
 		__vertexBuffer[step + 11] = 0;
-		__vertexBuffer[step + 12] = 1;
+		__vertexBuffer[step + 12] = 2;
 		__vertexBuffer[step + 13] = u;
 		__vertexBuffer[step + 14] = v;
 		__vertexBuffer[step + 15] = textureId;
 		__vertexBuffer[step + 16] = hasColorTransform;
 		__vertexBuffer[step + 17] = blendMode;
-	}
-
-	/**
-	 * 构造缓冲数据，主要为`NativeMultiTextureShader`使用
-	 */
-	public function buildBuffer():Void {
-		// var bufferSize = perBufferSize;
-		// if (__vertexBuffer == null) {
-		// 	__vertexBuffer = new Float32Array(bufferSize);
-		// } else if (bufferSize > __vertexBuffer.length) {
-		// 	__vertexBuffer = new Float32Array(bufferSize);
-		// }
-		// var bufferCounts = perBufferCounts;
-		// var counts = Std.int(vertices.length / 2);
-		// for (i in 0...counts) {
-		// 	// openfl_Alpha_multi
-		// 	__vertexBuffer[i * bufferCounts] = alphas[i];
-		// 	// openfl_ColorMultiplier_muti
-		// 	__vertexBuffer[i * bufferCounts + 1] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4] : 0;
-		// 	__vertexBuffer[i * bufferCounts + 2] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 1] : 0;
-		// 	__vertexBuffer[i * bufferCounts + 3] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 2] : 0;
-		// 	__vertexBuffer[i * bufferCounts + 4] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 3] : 0;
-		// 	// openfl_ColorOffset_muti
-		// 	__vertexBuffer[i * bufferCounts + 5] = hasColorTransform[i] == 1 ? colorOffset[i * 4] : 0;
-		// 	__vertexBuffer[i * bufferCounts + 6] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 1] : 0;
-		// 	__vertexBuffer[i * bufferCounts + 7] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 2] : 0;
-		// 	__vertexBuffer[i * bufferCounts + 8] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 3] : 0;
-		// 	// openfl_Position
-		// 	__vertexBuffer[i * bufferCounts + 9] = vertices[i * 2];
-		// 	__vertexBuffer[i * bufferCounts + 10] = vertices[i * 2 + 1];
-		// 	__vertexBuffer[i * bufferCounts + 11] = 0;
-		// 	__vertexBuffer[i * bufferCounts + 12] = 1;
-		// 	// openfl_TextureCoord
-		// 	__vertexBuffer[i * bufferCounts + 13] = uvtData[i * 2];
-		// 	__vertexBuffer[i * bufferCounts + 14] = uvtData[i * 2 + 1];
-		// 	// openfl_TextureId
-		// 	__vertexBuffer[i * bufferCounts + 15] = ids[i];
-		// 	// openfl_HasColorTransform_muti
-		// 	__vertexBuffer[i * bufferCounts + 16] = hasColorTransform[i];
-		// 	// openfl_blendMode_add
-		// 	__vertexBuffer[i * bufferCounts + 17] = addBlendModes[i];
-		// }
 	}
 
 	private var dataPerVertex6 = 0;
