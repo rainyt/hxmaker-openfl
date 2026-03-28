@@ -59,7 +59,7 @@ class MultiTextureShader extends GraphicsShader {
 
 			openfl_Alphav = openfl_Alpha_multi;
             openfl_TextureCoordv = openfl_TextureCoord;
-            openfl_TextureIdv = abs(openfl_TextureId - 1.);
+            openfl_TextureIdv = abs(openfl_TextureId)- 1.;
 			openfl_HasColorTransform_mutiv = openfl_HasColorTransform_muti;
 			openfl_blendMode_addv = step(openfl_TextureId, -0.5);
 

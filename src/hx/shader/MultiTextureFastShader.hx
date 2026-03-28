@@ -57,7 +57,7 @@ class MultiTextureFastShader extends GraphicsShader {
 
 			openfl_Alphav = openfl_Alpha_multi;
             openfl_TextureCoordv = openfl_TextureCoord;
-            openfl_TextureIdv = abs(openfl_TextureId - 1.);
+            openfl_TextureIdv = abs(openfl_TextureId) - 1.;
 			openfl_blendMode_addv = step(openfl_TextureId, -0.5);
 
             gl_Position = openfl_Matrix * openfl_Position;
