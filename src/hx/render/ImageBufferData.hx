@@ -142,13 +142,22 @@ class ImageBufferData {
 			uniform float time;
 
 		 */
-		return Std.int(this.vertices.length / 2) * perBufferCounts;
+		return __vertexBufferIndex * perBufferCounts;
 	}
 
-	/**
-	 * 每个顶点缓冲区所需的数据数量
-	 */
+	public var vertexCount(get, never):Int;
+
+	private function get_vertexCount():Int {
+		return __vertexBufferIndex;
+	}
+
 	public var perBufferCounts:Int = 18;
+
+	public var indicesCount(get, never):Int;
+
+	private function get_indicesCount():Int {
+		return __indicesBufferIndex;
+	}
 
 	// private function get_perBufferCounts():Int {
 	// return (1 + 4 + 4 + 4 + 2 + 1 + 1 + 1);
@@ -218,9 +227,8 @@ class ImageBufferData {
 	 * @param u 纹理U坐标
 	 * @param v 纹理V坐标
 	 */
-	public inline function writeBuffer(step:Int, alpha:Float, multiplierR:Float, multiplierG:Float, multiplierB:Float, multiplierA:Float, colorR:Float,
-			colorG:Float, colorB:Float, colorA:Float, verticeX:Float, verticeY:Float, textureId:Float, hasColorTransform:Float, blendMode:Float, u:Float,
-			v:Float):Void {
+	public function writeBuffer(step:Int, alpha:Float, multiplierR:Float, multiplierG:Float, multiplierB:Float, multiplierA:Float, colorR:Float, colorG:Float,
+			colorB:Float, colorA:Float, verticeX:Float, verticeY:Float, textureId:Float, hasColorTransform:Float, blendMode:Float, u:Float, v:Float):Void {
 		if (__vertexBuffer == null) {
 			__vertexBuffer = new Float32Array(1024);
 		}
@@ -311,13 +319,13 @@ class ImageBufferData {
 	}
 
 	public function endFill():Void {
-		vertices.length = dataPerVertex;
-		indices.length = dataPerVertex6;
-		setArrayLength(ids, dataPerVertex6);
-		setArrayLength(alphas, dataPerVertex6);
-		setArrayLength(hasColorTransform, dataPerVertex6);
-		setArrayLength(colorMultiplier, dataPerVertex24);
-		setArrayLength(colorOffset, dataPerVertex24);
+		// vertices.length = dataPerVertex;
+		// indices.length = dataPerVertex6;
+		// setArrayLength(ids, dataPerVertex6);
+		// setArrayLength(alphas, dataPerVertex6);
+		// setArrayLength(hasColorTransform, dataPerVertex6);
+		// setArrayLength(colorMultiplier, dataPerVertex24);
+		// setArrayLength(colorOffset, dataPerVertex24);
 		setArrayLength(drawDisplayList, index);
 		uvtData.length = dataPerVertex;
 	}
@@ -353,7 +361,7 @@ class ImageBufferData {
 				case DRAW_TRIANGLE(vertices, indices, uvs, alpha, colorTransform, applyBlendAddMode):
 					// 开始绘制三角形
 					// 超出限制，则开始下一次绘制
-					if (__indicesBufferIndex + indices.length >= __indicesBuffer.length) {
+					if (__indicesBufferIndex + 6 >= __indicesBuffer.length) {
 						return false;
 					}
 					if (data.currentBitmapData != null) {
@@ -616,14 +624,14 @@ class ImageBufferData {
 			var uvY = image.data.rect.y / imageHeight;
 			var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
 			var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
-			pUvtData[dataPerVertex] = (uvX);
-			pUvtData[dataPerVertex + 1] = (uvY);
-			pUvtData[dataPerVertex + 2] = (uvW);
-			pUvtData[dataPerVertex + 3] = (uvY);
-			pUvtData[dataPerVertex + 4] = (uvX);
-			pUvtData[dataPerVertex + 5] = (uvH);
-			pUvtData[dataPerVertex + 6] = (uvW);
-			pUvtData[dataPerVertex + 7] = (uvH);
+			pUvtData[0] = (uvX);
+			pUvtData[1] = (uvY);
+			pUvtData[2] = (uvW);
+			pUvtData[3] = (uvY);
+			pUvtData[4] = (uvX);
+			pUvtData[5] = (uvH);
+			pUvtData[6] = (uvW);
+			pUvtData[7] = (uvH);
 		} else {
 			pUvtData[dataPerVertex] = (0);
 			pUvtData[dataPerVertex + 1] = (0);

@@ -37,7 +37,7 @@ class EngineSprite extends Sprite {
 	private var indexBuffer:IndexBuffer3D;
 
 	private function onRenderOpenGL(event:RenderEvent) {
-		if (useNativeMultiTextureShader && data != null && data.vertices != null && data.vertices.length > 0 && data.indices != null && data.indices.length > 0) {
+		if (useNativeMultiTextureShader && data != null && data.perBufferSize > 0) {
 			// 渲染OpenGL
 			var renderer:OpenGLRenderer = cast event.renderer;
 			var context = Lib.application.window.stage.context3D;
@@ -54,10 +54,10 @@ class EngineSprite extends Sprite {
 				indexBuffer.dispose();
 			}
 
-			var vertexCount = Std.int(data.vertices.length / 2);
+			var vertexCount = data.vertexCount;
 			var perVertexDataSize = data.perBufferCounts;
 			vertexBuffer = context.createVertexBuffer(vertexCount, perVertexDataSize);
-			indexBuffer = context.createIndexBuffer(data.indices.length);
+			indexBuffer = context.createIndexBuffer(data.indicesCount);
 			indexBuffer.uploadFromTypedArray(data.indicesBuffer);
 			vertexBuffer.uploadFromTypedArray(data.vertexBuffer);
 
@@ -109,6 +109,5 @@ class EngineSprite extends Sprite {
 	public function drawImageBufferData(data:ImageBufferData) {
 		// 这里会进行updateBuffer
 		this.data = data;
-		this.data.buildBuffer();
 	}
 }
