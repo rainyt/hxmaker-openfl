@@ -191,12 +191,16 @@ class ImageBufferData {
 						if (index == 0) {
 							smoothing = data.smoothing;
 							blendMode = graphic.blendMode;
+							enabledColorTransform = colorTransform != null || graphic.colorTransform != null;
 						} else if (blendMode != graphic.blendMode) {
 							if (blendMode == ADD || blendMode == NORMAL) {
 								if (graphic.blendMode != ADD && graphic.blendMode != NORMAL) {
 									return false;
 								}
 							} else {
+								return false;
+							}
+							if (enabledColorTransform && graphic.colorTransform == null && colorTransform == null) {
 								return false;
 							}
 						} else if (smoothing != data.smoothing) {
@@ -304,12 +308,16 @@ class ImageBufferData {
 		if (index == 0) {
 			smoothing = image.smoothing;
 			blendMode = image.blendMode;
+			enabledColorTransform = image.__colorTransform != null;
 		} else if (blendMode != image.blendMode) {
 			if (blendMode == ADD || blendMode == NORMAL) {
 				if (image.blendMode != ADD && image.blendMode != NORMAL) {
 					return false;
 				}
 			} else {
+				return false;
+			}
+			if (enabledColorTransform && image.__colorTransform == null) {
 				return false;
 			}
 		} else if (smoothing != image.smoothing) {

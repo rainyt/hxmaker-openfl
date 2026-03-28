@@ -172,10 +172,9 @@ class Render implements IRender {
 			data.endFill();
 			var shape:Sprite = __pool.get();
 			shape.graphics.clear();
-			if (currentShader == null) {
+			var isDefaultShader:Bool = currentShader == null || currentShader == defaultShader || currentShader == defaultFastShader;
+			if (isDefaultShader) {
 				currentShader = !data.enabledColorTransform ? defaultFastShader : defaultShader;
-			}
-			if (currentShader == defaultShader) {
 				if (!data.smoothing) {
 					currentShader = defaultUnSmoothingShader;
 				}
