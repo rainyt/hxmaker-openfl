@@ -201,6 +201,7 @@ class Render implements IRender {
 				openfl_HasColorTransform.value = data.hasColorTransform;
 			openfl_TextureId.value = data.ids;
 			openfl_Alpha.value = data.alphas;
+			openfl_blendMode_add.value = data.addBlendModes;
 			// 图形尺寸，暂永远设定为舞台大小
 			var openfl_TextureSize:ShaderParameter<Float> = currentShader.data.openfl_TextureSize;
 			openfl_TextureSize.value = [Hxmaker.engine.stageWidth, Hxmaker.engine.stageHeight];
