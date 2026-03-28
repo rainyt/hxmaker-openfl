@@ -11,7 +11,11 @@ using StringTools;
 @:fileXml('tags="haxe,release"')
 @:noDebug
 #end
-// TODO: Currently this feature needs macro for optimization
+
+/**
+ * 多纹理快速渲染色器，该渲染器不支持颜色变换，主要提高无颜色的渲染效率
+ * 由18个步长调整后，会变更为13个步长
+ */
 @:build(hx.macro.InstanceMacro.build())
 class MultiTextureFastShader extends GraphicsShader {
 	/**
@@ -36,20 +40,14 @@ class MultiTextureFastShader extends GraphicsShader {
 		precision highp float;
 
 		attribute float openfl_Alpha_multi;
-		attribute vec4 openfl_ColorMultiplier_muti;
-		attribute vec4 openfl_ColorOffset_muti;
 		attribute vec4 openfl_Position;
 		attribute vec2 openfl_TextureCoord;
 		attribute float openfl_TextureId;
-		attribute float openfl_HasColorTransform_muti;
 		attribute float openfl_blendMode_add;
 
 		varying float openfl_Alphav;
-		varying vec4 openfl_ColorMultiplierv;
-		varying vec4 openfl_ColorOffsetv;
 		varying vec2 openfl_TextureCoordv;
 		varying float openfl_TextureIdv;
-		varying float openfl_HasColorTransform_mutiv;
 		varying float openfl_blendMode_addv;
 		
 		uniform mat4 openfl_Matrix;
@@ -61,15 +59,7 @@ class MultiTextureFastShader extends GraphicsShader {
 			openfl_Alphav = openfl_Alpha_multi;
             openfl_TextureCoordv = openfl_TextureCoord;
             openfl_TextureIdv = openfl_TextureId;
-			openfl_HasColorTransform_mutiv = openfl_HasColorTransform_muti;
 			openfl_blendMode_addv = openfl_blendMode_add;
-
-			if (openfl_HasColorTransform_muti > 0.5) {
-
-				openfl_ColorMultiplierv = openfl_ColorMultiplier_muti;
-				openfl_ColorOffsetv = openfl_ColorOffset_muti / 255.0;
-
-			}
 
             gl_Position = openfl_Matrix * openfl_Position;
 
@@ -89,10 +79,7 @@ class MultiTextureFastShader extends GraphicsShader {
 		precision highp float; 
 		
 		varying float openfl_Alphav;
-		varying vec4 openfl_ColorMultiplierv;
-		varying vec4 openfl_ColorOffsetv;
 		varying vec2 openfl_TextureCoordv;
-		varying float openfl_HasColorTransform_mutiv;
 		varying float openfl_TextureIdv;
 		varying float openfl_blendMode_addv;
 		uniform float time;
@@ -117,30 +104,6 @@ class MultiTextureFastShader extends GraphicsShader {
 			if (color.a == 0.0) {
 
 				gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
-
-			} else if (openfl_HasColorTransform_mutiv > 0.5) {
-
-				color = vec4 (color.rgb / color.a, color.a);
-
-				mat4 colorMultiplier = mat4 (0);
-				colorMultiplier[0][0] = openfl_ColorMultiplierv.x;
-				colorMultiplier[1][1] = openfl_ColorMultiplierv.y;
-				colorMultiplier[2][2] = openfl_ColorMultiplierv.z;
-				colorMultiplier[3][3] = 1.0; // openfl_ColorMultiplierv.w;
-
-				color = clamp (openfl_ColorOffsetv + (color * colorMultiplier), 0.0, 1.0);
-
-				::CUSTOM_FRAGMENT_SHADER::
-
-				if (color.a > 0.0) {
-
-					gl_FragColor = vec4 (color.rgb * color.a * openfl_Alphav, color.a * openfl_Alphav);
-
-				} else {
-
-					gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
-
-				}
 
 			} else {
 
