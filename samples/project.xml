@@ -5,6 +5,8 @@
 		company="Company Name" />
 	<app main="Main" path="Export" file="HxmakerOpenfl" />
 
+	<haxelib name="spine-haxe"/>
+
 	<!-- <window width="800" height="600" fps="61" /> -->
 
 	<source path="Source" />
