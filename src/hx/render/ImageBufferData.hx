@@ -154,6 +154,15 @@ class ImageBufferData {
 	private var __buffer:Float32Array;
 
 	/**
+	 * 缓冲区数据大小
+	 */
+	private var __bufferSize = 0;
+
+	public function getBuffer():Float32Array {
+		return __buffer;
+	}
+
+	/**
 	 * 构造缓冲数据，主要为`NativeMultiTextureShader`使用
 	 */
 	public function buildBuffer():Void {
@@ -164,20 +173,20 @@ class ImageBufferData {
 			__buffer = new Float32Array(bufferSize);
 		}
 		var bufferCounts = perBufferCounts;
-		var counts = Std.int(bufferSize / bufferCounts);
+		var counts = Std.int(vertices.length / 2);
 		for (i in 0...counts) {
 			// openfl_Alpha_multi
 			__buffer[i * bufferCounts] = alphas[i];
 			// openfl_ColorMultiplier_muti
-			__buffer[i * bufferCounts + 1] = colorMultiplier[i * 4];
-			__buffer[i * bufferCounts + 2] = colorMultiplier[i * 4 + 1];
-			__buffer[i * bufferCounts + 3] = colorMultiplier[i * 4 + 2];
-			__buffer[i * bufferCounts + 4] = colorMultiplier[i * 4 + 3];
+			__buffer[i * bufferCounts + 1] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4] : 0;
+			__buffer[i * bufferCounts + 2] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 1] : 0;
+			__buffer[i * bufferCounts + 3] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 2] : 0;
+			__buffer[i * bufferCounts + 4] = hasColorTransform[i] == 1 ? colorMultiplier[i * 4 + 3] : 0;
 			// openfl_ColorOffset_muti
-			__buffer[i * bufferCounts + 5] = colorOffset[i * 4];
-			__buffer[i * bufferCounts + 6] = colorOffset[i * 4 + 1];
-			__buffer[i * bufferCounts + 7] = colorOffset[i * 4 + 2];
-			__buffer[i * bufferCounts + 8] = colorOffset[i * 4 + 3];
+			__buffer[i * bufferCounts + 5] = hasColorTransform[i] == 1 ? colorOffset[i * 4] : 0;
+			__buffer[i * bufferCounts + 6] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 1] : 0;
+			__buffer[i * bufferCounts + 7] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 2] : 0;
+			__buffer[i * bufferCounts + 8] = hasColorTransform[i] == 1 ? colorOffset[i * 4 + 3] : 0;
 			// openfl_Position
 			__buffer[i * bufferCounts + 9] = vertices[i * 2];
 			__buffer[i * bufferCounts + 10] = vertices[i * 2 + 1];
@@ -402,36 +411,24 @@ class ImageBufferData {
 			if (!isSame)
 				isBad = true;
 		}
-		// var isColorDirty = isBad || image.__colorTransformDirty;
-		var isTransformDirty = isBad || image.__transformDirty;
-
-		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
-		// var isUvsDirty = isBad || image.__uvsDirty;
-		var isUvsDirty = true;
-		// TODO 同isUvsDirty，需要想办法优化解决所有可能发生的情况
-		var isColorDirty = true;
-
-		// if (displayObject != image || image.__transformDirty) {
-		if (isColorDirty) {
-			// 6个顶点数据
-			for (i in 0...6) {
-				ids[dataPerVertex6 + i] = id;
-				alphas[dataPerVertex6 + i] = image.__worldAlpha;
-				addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
-				if (image.__colorTransform != null) {
-					hasColorTransform[dataPerVertex6 + i] = 1;
-					colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
-					colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
-					colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
-					colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
-					colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
-					colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
-					colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
-					colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
-				} else {
-					hasColorTransform[dataPerVertex6 + i] = 0;
-					colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
-				}
+		// 6个顶点数据
+		for (i in 0...6) {
+			ids[dataPerVertex6 + i] = id;
+			alphas[dataPerVertex6 + i] = image.__worldAlpha;
+			addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
+			if (image.__colorTransform != null) {
+				hasColorTransform[dataPerVertex6 + i] = 1;
+				colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
+				colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
+				colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
+				colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
+				colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
+				colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
+				colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
+				colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
+			} else {
+				hasColorTransform[dataPerVertex6 + i] = 0;
+				colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
 			}
 		}
 
@@ -458,30 +455,26 @@ class ImageBufferData {
 			if (__transformMatrix3D.center3DVector != null)
 				matrix3D.appendTranslation(-__transformMatrix3D.center3DVector.x, -__transformMatrix3D.center3DVector.y, -__transformMatrix3D.center3DVector.z);
 			matrix3D.append(__transformMatrix3D.transform3D);
-
 			// if (__transformMatrix3D.projectionMatrix3D != null) {
 			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, 0, 400);
 			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
 			// }
-
 			// if (__transformMatrix3D.projectionMatrix3D != null) {
 			// matrix3D.appendTranslation(0, 0, 1000);
 			// matrix3D.append(__transformMatrix3D.projectionMatrix3D);
 			// }
-
 			if (__transformMatrix3D.center3DVector != null)
 				matrix3D.appendTranslation(__transformMatrix3D.center3DVector.x, __transformMatrix3D.center3DVector.y, __transformMatrix3D.center3DVector.z);
 			matrix3D.appendTranslation(tileTransform.tx, tileTransform.ty, 0);
-
 			// if (__transformMatrix3D.projectionMatrix3D != null) {
 			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, image.stage.stageHeight / 2, 1000);
 			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
 			// }
-
 			var array = [x, y, 0, x2, y2, 0, x3, y3, 0, x4, y4, 0];
 			// var array = [0, 0, tileWidth, 0, 0, tileWidth, tileWidth, tileHeight];
 			var projected = [];
 			var uvt = [];
+
 			Utils3D.projectVectors2D(matrix3D, array, projected, uvt);
 			// trace(projected);
 			x = projected[0];
@@ -492,7 +485,6 @@ class ImageBufferData {
 			y3 = projected[5];
 			x4 = projected[6];
 			y4 = projected[7];
-
 			// x = @:privateAccess tileTransform.__transformX(x, y);
 			// y = @:privateAccess tileTransform.__transformY(x, y);
 			// x2 = @:privateAccess tileTransform.__transformX(x2, y2);
@@ -502,7 +494,6 @@ class ImageBufferData {
 			// x4 = @:privateAccess tileTransform.__transformX(x4, y4);
 			// y4 = @:privateAccess tileTransform.__transformY(x4, y4);
 		}
-
 		vertices[dataPerVertex] = x;
 		vertices[dataPerVertex + 1] = y;
 		vertices[dataPerVertex + 2] = (x2);
@@ -511,7 +502,6 @@ class ImageBufferData {
 		vertices[dataPerVertex + 5] = (y3);
 		vertices[dataPerVertex + 6] = (x4);
 		vertices[dataPerVertex + 7] = (y4);
-
 		// 顶点
 		indices[dataPerVertex6] = (indicesOffset);
 		indices[dataPerVertex6 + 1] = (indicesOffset + 1);
@@ -520,34 +510,31 @@ class ImageBufferData {
 		indices[dataPerVertex6 + 4] = (indicesOffset + 2);
 		indices[dataPerVertex6 + 5] = (indicesOffset + 3);
 		// }
-
 		// UVs
-		if (isUvsDirty) {
-			if (image.data.rect != null) {
-				var imageWidth = image.data.data.getWidth();
-				var imageHeight = image.data.data.getHeight();
-				var uvX = image.data.rect.x / imageWidth;
-				var uvY = image.data.rect.y / imageHeight;
-				var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
-				var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
-				uvtData[dataPerVertex] = (uvX);
-				uvtData[dataPerVertex + 1] = (uvY);
-				uvtData[dataPerVertex + 2] = (uvW);
-				uvtData[dataPerVertex + 3] = (uvY);
-				uvtData[dataPerVertex + 4] = (uvX);
-				uvtData[dataPerVertex + 5] = (uvH);
-				uvtData[dataPerVertex + 6] = (uvW);
-				uvtData[dataPerVertex + 7] = (uvH);
-			} else {
-				uvtData[dataPerVertex] = (0);
-				uvtData[dataPerVertex + 1] = (0);
-				uvtData[dataPerVertex + 2] = (1);
-				uvtData[dataPerVertex + 3] = (0);
-				uvtData[dataPerVertex + 4] = (0);
-				uvtData[dataPerVertex + 5] = (1);
-				uvtData[dataPerVertex + 6] = (1);
-				uvtData[dataPerVertex + 7] = (1);
-			}
+		if (image.data.rect != null) {
+			var imageWidth = image.data.data.getWidth();
+			var imageHeight = image.data.data.getHeight();
+			var uvX = image.data.rect.x / imageWidth;
+			var uvY = image.data.rect.y / imageHeight;
+			var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
+			var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
+			uvtData[dataPerVertex] = (uvX);
+			uvtData[dataPerVertex + 1] = (uvY);
+			uvtData[dataPerVertex + 2] = (uvW);
+			uvtData[dataPerVertex + 3] = (uvY);
+			uvtData[dataPerVertex + 4] = (uvX);
+			uvtData[dataPerVertex + 5] = (uvH);
+			uvtData[dataPerVertex + 6] = (uvW);
+			uvtData[dataPerVertex + 7] = (uvH);
+		} else {
+			uvtData[dataPerVertex] = (0);
+			uvtData[dataPerVertex + 1] = (0);
+			uvtData[dataPerVertex + 2] = (1);
+			uvtData[dataPerVertex + 3] = (0);
+			uvtData[dataPerVertex + 4] = (0);
+			uvtData[dataPerVertex + 5] = (1);
+			uvtData[dataPerVertex + 6] = (1);
+			uvtData[dataPerVertex + 7] = (1);
 		}
 		// }
 		drawDisplayList[index] = image;

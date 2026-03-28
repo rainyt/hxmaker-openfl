@@ -99,7 +99,6 @@ class EngineSprite extends Sprite {
 				gl.texParameteri(@:privateAccess texture.__textureTarget, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 				var sampler = gl.getUniformLocation(shaderProgram, "uSampler" + index);
 				gl.uniform1i(sampler, index);
-				// context.setTextureAt(index, bitmapData.getTexture(context));
 			}
 
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, @:privateAccess indexBuffer.__id);
