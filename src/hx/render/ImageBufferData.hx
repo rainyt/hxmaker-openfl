@@ -325,9 +325,9 @@ class ImageBufferData {
 			mapIds.set(texture, id);
 		}
 
-		// if (image.__addBlendMode == 1) {
-		id *= -1;
-		// }
+		if (image.__addBlendMode == 1) {
+			id *= -1;
+		}
 
 		if (!isBad) {
 			var displayObject = drawDisplayList[index];
