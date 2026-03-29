@@ -92,7 +92,7 @@ class ImageBufferData {
 	/**
 	 * 渲染列表
 	 */
-	public var drawDisplayList:Array<DisplayObject> = [];
+	// public var drawDisplayList:Array<DisplayObject> = [];
 
 	/**
 	 * 纹理ID映射表
@@ -267,7 +267,7 @@ class ImageBufferData {
 						this.indicesOffset = Std.int(dataPerVertex / 2);
 						this.index++;
 						// 写入
-						drawDisplayList[index] = graphic;
+						// drawDisplayList[index] = graphic;
 						graphic.__transformDirty = false;
 						graphic.__colorTransformDirty = false;
 						graphic.__uvsDirty = false;
@@ -471,7 +471,7 @@ class ImageBufferData {
 		}
 		// }
 		// }
-		drawDisplayList[index] = image;
+		// drawDisplayList[index] = image;
 		image.__transformDirty = false;
 		image.__colorTransformDirty = false;
 		image.__uvsDirty = false;
