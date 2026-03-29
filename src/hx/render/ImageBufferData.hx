@@ -112,7 +112,7 @@ class ImageBufferData {
 	/**
 	 * 数据缓存是否已经损坏
 	 */
-	public var isBad:Bool = false;
+	// public var isBad:Bool = false;
 
 	/**
 	 * 数据索引
@@ -134,7 +134,7 @@ class ImageBufferData {
 		indicesOffset = 0;
 		bitmapDatas.resize(0);
 		mapIds.clear();
-		isBad = false;
+		// isBad = false;
 		blendMode = null;
 	}
 
@@ -271,7 +271,7 @@ class ImageBufferData {
 						graphic.__transformDirty = false;
 						graphic.__colorTransformDirty = false;
 						graphic.__uvsDirty = false;
-						this.isBad = true;
+						// this.isBad = true;
 					}
 			}
 			data.index++;
@@ -316,12 +316,12 @@ class ImageBufferData {
 			mapIds.set(texture, id);
 		}
 
-		if (!isBad) {
-			var displayObject = drawDisplayList[index];
-			var isSame = displayObject == image;
-			if (!isSame)
-				isBad = true;
-		}
+		// if (!isBad) {
+		// 	var displayObject = drawDisplayList[index];
+		// 	var isSame = displayObject == image;
+		// 	if (!isSame)
+		// 		isBad = true;
+		// }
 		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
 		// TODO 同isUvsDirty，需要想办法优化解决所有可能发生的情况
 		// var isColorDirty = isBad || image.__colorTransformDirty;
