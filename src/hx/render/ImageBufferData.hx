@@ -92,7 +92,7 @@ class ImageBufferData {
 	/**
 	 * 渲染列表
 	 */
-	public var drawDisplayList:Array<DisplayObject> = [];
+	// public var drawDisplayList:Array<DisplayObject> = [];
 
 	/**
 	 * 纹理ID映射表
@@ -112,7 +112,7 @@ class ImageBufferData {
 	/**
 	 * 数据缓存是否已经损坏
 	 */
-	public var isBad:Bool = false;
+	// public var isBad:Bool = false;
 
 	/**
 	 * 数据索引
@@ -132,28 +132,16 @@ class ImageBufferData {
 		dataPerVertex24 = 0;
 		dataPerVertex = 0;
 		indicesOffset = 0;
-		setArrayLength(bitmapDatas, 0);
+		bitmapDatas.resize(0);
 		mapIds.clear();
-		isBad = false;
+		// isBad = false;
 		blendMode = null;
 	}
 
 	public function endFill():Void {
 		vertices.length = dataPerVertex;
 		indices.length = dataPerVertex6;
-		setArrayLength(ids, dataPerVertex6);
-		setArrayLength(alphas, dataPerVertex6);
-		setArrayLength(hasColorTransform, dataPerVertex6);
-		setArrayLength(colorMultiplier, dataPerVertex24);
-		setArrayLength(colorOffset, dataPerVertex24);
-		setArrayLength(drawDisplayList, index);
 		uvtData.length = dataPerVertex;
-	}
-
-	private function setArrayLength(array:Array<Dynamic>, length:Int):Void {
-		while (array.length > length) {
-			array.pop();
-		}
 	}
 
 	/**
@@ -279,11 +267,11 @@ class ImageBufferData {
 						this.indicesOffset = Std.int(dataPerVertex / 2);
 						this.index++;
 						// 写入
-						drawDisplayList[index] = graphic;
+						// drawDisplayList[index] = graphic;
 						graphic.__transformDirty = false;
 						graphic.__colorTransformDirty = false;
 						graphic.__uvsDirty = false;
-						this.isBad = true;
+						// this.isBad = true;
 					}
 			}
 			data.index++;
@@ -328,46 +316,45 @@ class ImageBufferData {
 			mapIds.set(texture, id);
 		}
 
-		if (!isBad) {
-			var displayObject = drawDisplayList[index];
-			var isSame = displayObject == image;
-			if (!isSame)
-				isBad = true;
-		}
-		// var isColorDirty = isBad || image.__colorTransformDirty;
-		var isTransformDirty = isBad || image.__transformDirty;
-
+		// if (!isBad) {
+		// 	var displayObject = drawDisplayList[index];
+		// 	var isSame = displayObject == image;
+		// 	if (!isSame)
+		// 		isBad = true;
+		// }
 		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
-		// var isUvsDirty = isBad || image.__uvsDirty;
-		var isUvsDirty = true;
 		// TODO 同isUvsDirty，需要想办法优化解决所有可能发生的情况
-		var isColorDirty = true;
+		// var isColorDirty = isBad || image.__colorTransformDirty;
+		// var isTransformDirty = isBad || image.__transformDirty;
+		// var isUvsDirty = isBad || image.__uvsDirty;
+		// var isUvsDirty = true;
+		// var isColorDirty = true;
 
 		// if (displayObject != image || image.__transformDirty) {
-		if (isColorDirty) {
-			// 6个顶点数据
-			for (i in 0...6) {
-				ids[dataPerVertex6 + i] = id;
-				alphas[dataPerVertex6 + i] = image.__worldAlpha;
-				addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
-				if (enabledColorTransform) {
-					if (image.__colorTransform != null) {
-						hasColorTransform[dataPerVertex6 + i] = 1;
-						colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
-						colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
-						colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
-						colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
-					} else {
-						hasColorTransform[dataPerVertex6 + i] = 0;
-						colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
-					}
+		// if (isColorDirty) {
+		// 6个顶点数据
+		for (i in 0...6) {
+			ids[dataPerVertex6 + i] = id;
+			alphas[dataPerVertex6 + i] = image.__worldAlpha;
+			addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
+			if (enabledColorTransform) {
+				if (image.__colorTransform != null) {
+					hasColorTransform[dataPerVertex6 + i] = 1;
+					colorMultiplier[dataPerVertex24 + i * 4] = image.__colorTransform.redMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueMultiplier;
+					colorMultiplier[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaMultiplier;
+					colorOffset[dataPerVertex24 + i * 4] = image.__colorTransform.redOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 1] = image.__colorTransform.greenOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 2] = image.__colorTransform.blueOffset;
+					colorOffset[dataPerVertex24 + i * 4 + 3] = image.__colorTransform.alphaOffset;
+				} else {
+					hasColorTransform[dataPerVertex6 + i] = 0;
+					colorOffset[dataPerVertex24 + i * 4 + 3] = 0;
 				}
 			}
 		}
+		// }
 
 		// if (isTransformDirty) {
 		// 坐标顶点
@@ -383,59 +370,59 @@ class ImageBufferData {
 		var x4 = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
 		var y4 = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
 
-		// 3D变化支持
-		var __transformMatrix3D = @:privateAccess image.__transformMatrix3D;
-		if (__transformMatrix3D.transform3D != null) {
-			var matrix3D = new Matrix3D();
-			matrix3D.identity();
-			matrix3D.appendTranslation(-tileTransform.tx, -tileTransform.ty, 0);
-			if (__transformMatrix3D.center3DVector != null)
-				matrix3D.appendTranslation(-__transformMatrix3D.center3DVector.x, -__transformMatrix3D.center3DVector.y, -__transformMatrix3D.center3DVector.z);
-			matrix3D.append(__transformMatrix3D.transform3D);
+		// TODO 3D变化支持
+		// var __transformMatrix3D = @:privateAccess image.__transformMatrix3D;
+		// if (__transformMatrix3D.transform3D != null) {
+		// 	var matrix3D = new Matrix3D();
+		// 	matrix3D.identity();
+		// 	matrix3D.appendTranslation(-tileTransform.tx, -tileTransform.ty, 0);
+		// 	if (__transformMatrix3D.center3DVector != null)
+		// 		matrix3D.appendTranslation(-__transformMatrix3D.center3DVector.x, -__transformMatrix3D.center3DVector.y, -__transformMatrix3D.center3DVector.z);
+		// 	matrix3D.append(__transformMatrix3D.transform3D);
 
-			// if (__transformMatrix3D.projectionMatrix3D != null) {
-			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, 0, 400);
-			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-			// }
+		// if (__transformMatrix3D.projectionMatrix3D != null) {
+		// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, 0, 400);
+		// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+		// }
 
-			// if (__transformMatrix3D.projectionMatrix3D != null) {
-			// matrix3D.appendTranslation(0, 0, 1000);
-			// matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-			// }
+		// if (__transformMatrix3D.projectionMatrix3D != null) {
+		// matrix3D.appendTranslation(0, 0, 1000);
+		// matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+		// }
 
-			if (__transformMatrix3D.center3DVector != null)
-				matrix3D.appendTranslation(__transformMatrix3D.center3DVector.x, __transformMatrix3D.center3DVector.y, __transformMatrix3D.center3DVector.z);
-			matrix3D.appendTranslation(tileTransform.tx, tileTransform.ty, 0);
+		// if (__transformMatrix3D.center3DVector != null)
+		// 	matrix3D.appendTranslation(__transformMatrix3D.center3DVector.x, __transformMatrix3D.center3DVector.y, __transformMatrix3D.center3DVector.z);
+		// matrix3D.appendTranslation(tileTransform.tx, tileTransform.ty, 0);
 
-			// if (__transformMatrix3D.projectionMatrix3D != null) {
-			// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, image.stage.stageHeight / 2, 1000);
-			// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-			// }
+		// if (__transformMatrix3D.projectionMatrix3D != null) {
+		// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, image.stage.stageHeight / 2, 1000);
+		// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
+		// }
 
-			var array = [x, y, 0, x2, y2, 0, x3, y3, 0, x4, y4, 0];
-			// var array = [0, 0, tileWidth, 0, 0, tileWidth, tileWidth, tileHeight];
-			var projected = [];
-			var uvt = [];
-			Utils3D.projectVectors2D(matrix3D, array, projected, uvt);
-			// trace(projected);
-			x = projected[0];
-			y = projected[1];
-			x2 = projected[2];
-			y2 = projected[3];
-			x3 = projected[4];
-			y3 = projected[5];
-			x4 = projected[6];
-			y4 = projected[7];
+		// var array = [x, y, 0, x2, y2, 0, x3, y3, 0, x4, y4, 0];
+		// var array = [0, 0, tileWidth, 0, 0, tileWidth, tileWidth, tileHeight];
+		// var projected = [];
+		// var uvt = [];
+		// Utils3D.projectVectors2D(matrix3D, array, projected, uvt);
+		// trace(projected);
+		// x = projected[0];
+		// y = projected[1];
+		// x2 = projected[2];
+		// y2 = projected[3];
+		// x3 = projected[4];
+		// y3 = projected[5];
+		// x4 = projected[6];
+		// y4 = projected[7];
 
-			// x = @:privateAccess tileTransform.__transformX(x, y);
-			// y = @:privateAccess tileTransform.__transformY(x, y);
-			// x2 = @:privateAccess tileTransform.__transformX(x2, y2);
-			// y2 = @:privateAccess tileTransform.__transformY(x2, y2);
-			// x3 = @:privateAccess tileTransform.__transformX(x3, y3);
-			// y3 = @:privateAccess tileTransform.__transformY(x3, y3);
-			// x4 = @:privateAccess tileTransform.__transformX(x4, y4);
-			// y4 = @:privateAccess tileTransform.__transformY(x4, y4);
-		}
+		// x = @:privateAccess tileTransform.__transformX(x, y);
+		// y = @:privateAccess tileTransform.__transformY(x, y);
+		// x2 = @:privateAccess tileTransform.__transformX(x2, y2);
+		// y2 = @:privateAccess tileTransform.__transformY(x2, y2);
+		// x3 = @:privateAccess tileTransform.__transformX(x3, y3);
+		// y3 = @:privateAccess tileTransform.__transformY(x3, y3);
+		// x4 = @:privateAccess tileTransform.__transformX(x4, y4);
+		// y4 = @:privateAccess tileTransform.__transformY(x4, y4);
+		// }
 
 		vertices[dataPerVertex] = x;
 		vertices[dataPerVertex + 1] = y;
@@ -456,35 +443,35 @@ class ImageBufferData {
 		// }
 
 		// UVs
-		if (isUvsDirty) {
-			if (image.data.rect != null) {
-				var imageWidth = image.data.data.getWidth();
-				var imageHeight = image.data.data.getHeight();
-				var uvX = image.data.rect.x / imageWidth;
-				var uvY = image.data.rect.y / imageHeight;
-				var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
-				var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
-				uvtData[dataPerVertex] = (uvX);
-				uvtData[dataPerVertex + 1] = (uvY);
-				uvtData[dataPerVertex + 2] = (uvW);
-				uvtData[dataPerVertex + 3] = (uvY);
-				uvtData[dataPerVertex + 4] = (uvX);
-				uvtData[dataPerVertex + 5] = (uvH);
-				uvtData[dataPerVertex + 6] = (uvW);
-				uvtData[dataPerVertex + 7] = (uvH);
-			} else {
-				uvtData[dataPerVertex] = (0);
-				uvtData[dataPerVertex + 1] = (0);
-				uvtData[dataPerVertex + 2] = (1);
-				uvtData[dataPerVertex + 3] = (0);
-				uvtData[dataPerVertex + 4] = (0);
-				uvtData[dataPerVertex + 5] = (1);
-				uvtData[dataPerVertex + 6] = (1);
-				uvtData[dataPerVertex + 7] = (1);
-			}
+		// if (isUvsDirty) {
+		if (image.data.rect != null) {
+			var imageWidth = image.data.data.getWidth();
+			var imageHeight = image.data.data.getHeight();
+			var uvX = image.data.rect.x / imageWidth;
+			var uvY = image.data.rect.y / imageHeight;
+			var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
+			var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
+			uvtData[dataPerVertex] = (uvX);
+			uvtData[dataPerVertex + 1] = (uvY);
+			uvtData[dataPerVertex + 2] = (uvW);
+			uvtData[dataPerVertex + 3] = (uvY);
+			uvtData[dataPerVertex + 4] = (uvX);
+			uvtData[dataPerVertex + 5] = (uvH);
+			uvtData[dataPerVertex + 6] = (uvW);
+			uvtData[dataPerVertex + 7] = (uvH);
+		} else {
+			uvtData[dataPerVertex] = (0);
+			uvtData[dataPerVertex + 1] = (0);
+			uvtData[dataPerVertex + 2] = (1);
+			uvtData[dataPerVertex + 3] = (0);
+			uvtData[dataPerVertex + 4] = (0);
+			uvtData[dataPerVertex + 5] = (1);
+			uvtData[dataPerVertex + 6] = (1);
+			uvtData[dataPerVertex + 7] = (1);
 		}
 		// }
-		drawDisplayList[index] = image;
+		// }
+		// drawDisplayList[index] = image;
 		image.__transformDirty = false;
 		image.__colorTransformDirty = false;
 		image.__uvsDirty = false;
