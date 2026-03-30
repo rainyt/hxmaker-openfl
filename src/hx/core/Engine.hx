@@ -165,6 +165,11 @@ class Engine extends EventDispatcher implements IEngine {
 	 */
 	public var scaleFactor:Float = 1;
 
+	/**
+	 * 着色器缩放比例
+	 */
+	public var shaderScaleFactor:Float = 1;
+
 	@:noCompletion private var ____stageWidth:Float = 0;
 	@:noCompletion private var ____stageHeight:Float = 0;
 
@@ -203,6 +208,7 @@ class Engine extends EventDispatcher implements IEngine {
 	 */
 	private function __onStageSizeEventImpl(e:Event):Void {
 		scaleFactor = ScaleUtils.mathScale(this.stage.stageWidth, this.stage.stageHeight, __stageWidth, __stageHeight, __lockLandscape);
+		shaderScaleFactor = 1 / scaleFactor;
 		____stageWidth = Std.int(this.stage.stageWidth / scaleFactor);
 		____stageHeight = Std.int(this.stage.stageHeight / scaleFactor);
 

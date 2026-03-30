@@ -392,10 +392,9 @@ class Render implements IRender {
 	public var enableRenderFilterDisplayObject:DisplayObject = null;
 
 	public function renderDisplayObject(object:DisplayObject):Void {
-		// TODO 这里的矩阵判断应该是多余了
-		// if (object.parent != null && object.parent.__transformDirty) {
-		// object.setTransformDirty();
-		// }
+		if (object.parent != null && object.parent.__transformDirty) {
+			object.setTransformDirty();
+		}
 		// 过滤器渲染支持
 		if (enableRenderFilterDisplayObject != object) {
 			// 这是BlendMode的增强渲染处理
