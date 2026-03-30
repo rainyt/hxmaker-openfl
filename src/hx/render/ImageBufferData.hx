@@ -592,14 +592,14 @@ class ImageBufferData {
 			pUvtData[6] = (uvW);
 			pUvtData[7] = (uvH);
 		} else {
-			pUvtData[dataPerVertex] = (0);
-			pUvtData[dataPerVertex + 1] = (0);
-			pUvtData[dataPerVertex + 2] = (1);
-			pUvtData[dataPerVertex + 3] = (0);
-			pUvtData[dataPerVertex + 4] = (0);
-			pUvtData[dataPerVertex + 5] = (1);
-			pUvtData[dataPerVertex + 6] = (1);
-			pUvtData[dataPerVertex + 7] = (1);
+			pUvtData[0] = (0);
+			pUvtData[1] = (0);
+			pUvtData[2] = (1);
+			pUvtData[3] = (0);
+			pUvtData[4] = (0);
+			pUvtData[5] = (1);
+			pUvtData[6] = (1);
+			pUvtData[7] = (1);
 		}
 
 		for (i in 0...4) {
