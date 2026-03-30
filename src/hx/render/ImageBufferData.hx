@@ -247,7 +247,7 @@ class ImageBufferData {
 		__vertexBuffer[step + 9] = verticeX;
 		__vertexBuffer[step + 10] = verticeY;
 		__vertexBuffer[step + 11] = 0;
-		__vertexBuffer[step + 12] = 2;
+		__vertexBuffer[step + 12] = 1;
 		__vertexBuffer[step + 13] = u;
 		__vertexBuffer[step + 14] = v;
 		__vertexBuffer[step + 15] = textureId;
