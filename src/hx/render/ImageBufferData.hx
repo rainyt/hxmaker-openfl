@@ -207,6 +207,19 @@ class ImageBufferData {
 						}
 						// 根据顶点设置数据
 						for (i in 0...indices.length) {
+							this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
+						}
+
+						// 顶点坐标
+						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
+						var len = Std.int(vertices.length / 2);
+						for (i in 0...len) {
+							var x = vertices[i * 2];
+							var y = vertices[i * 2 + 1];
+							this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
+							this.vertices[dataPerVertex + i * 2 + 1] = tileTransform.__transformY(x, y);
+							this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
+							this.uvtData[dataPerVertex + i * 2 + 1] = uvs[i * 2 + 1];
 							ids[dataPerVertex6 + i] = id;
 							alphas[dataPerVertex6 + i] = graphic.__worldAlpha * alpha;
 							addBlendModes[dataPerVertex6 + i] = applyBlendAddMode ? 1 : 0;
@@ -248,19 +261,6 @@ class ImageBufferData {
 									colorOffset[dataPerVertex24 + i * 4 + 3] += graphic.colorTransform.alphaOffset;
 								}
 							}
-							this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
-						}
-
-						// 顶点坐标
-						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
-						var len = Std.int(vertices.length / 2);
-						for (i in 0...len) {
-							var x = vertices[i * 2];
-							var y = vertices[i * 2 + 1];
-							this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
-							this.vertices[dataPerVertex + i * 2 + 1] = tileTransform.__transformY(x, y);
-							this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
-							this.uvtData[dataPerVertex + i * 2 + 1] = uvs[i * 2 + 1];
 						}
 
 						dataPerVertex6 += indices.length;
@@ -335,7 +335,7 @@ class ImageBufferData {
 		// if (displayObject != image || image.__transformDirty) {
 		// if (isColorDirty) {
 		// 6个顶点数据
-		for (i in 0...6) {
+		for (i in 0...4) {
 			ids[dataPerVertex6 + i] = id;
 			alphas[dataPerVertex6 + i] = image.__worldAlpha;
 			addBlendModes[dataPerVertex6 + i] = image.__addBlendMode;
