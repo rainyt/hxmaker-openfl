@@ -234,7 +234,9 @@ class ImageBufferData {
 			__vertexBuffer = new Float32Array(1024);
 		}
 		if (step >= __vertexBuffer.length) {
+			var old = __vertexBuffer;
 			__vertexBuffer = new Float32Array(step * 2);
+			__vertexBuffer.set(old);
 		}
 		__vertexBuffer[step] = alpha;
 		__vertexBuffer[step + 1] = multiplierR;
@@ -357,7 +359,7 @@ class ImageBufferData {
 						}
 						// 根据顶点设置数据
 						for (i in 0...indices.length) {
-							__indicesBuffer[__indicesBufferIndex] =indicesOffset+ indices[i];
+							__indicesBuffer[__indicesBufferIndex] = indicesOffset + indices[i];
 							__indicesBufferIndex++;
 						}
 
