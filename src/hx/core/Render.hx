@@ -236,9 +236,9 @@ class Render implements IRender {
 			} else {
 				stage.addChild(shape);
 			}
-			if (currentShader == defaultUnSmoothingShader) {
-				currentShader = defaultShader;
-			}
+			// if (currentShader == defaultUnSmoothingShader) {
+			currentShader = null;
+			// }
 			return shape;
 		}
 		return null;
