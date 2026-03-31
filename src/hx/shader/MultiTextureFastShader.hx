@@ -113,9 +113,7 @@ class MultiTextureFastShader extends GraphicsShader {
 
 			}
 
-			if(openfl_blendMode_addv > 0.5){
-				gl_FragColor.a = 0.;
-			}
+			gl_FragColor.a *= (1. - step(0.5, openfl_blendMode_addv));
 
 		}";
 	#end
