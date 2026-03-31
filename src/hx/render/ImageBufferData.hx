@@ -357,7 +357,7 @@ class ImageBufferData {
 						}
 						// 根据顶点设置数据
 						for (i in 0...indices.length) {
-							__indicesBuffer[__indicesBufferIndex] = indices[i];
+							__indicesBuffer[__indicesBufferIndex] =indicesOffset+ indices[i];
 							__indicesBufferIndex++;
 						}
 
