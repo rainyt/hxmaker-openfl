@@ -101,17 +101,9 @@ class MultiTextureFastShader extends GraphicsShader {
 
 			color = readColor(openfl_TextureCoordv);
 
-			if (color.a == 0.0) {
+			::CUSTOM_FRAGMENT_SHADER::
 
-				gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
-
-			} else {
-
-				::CUSTOM_FRAGMENT_SHADER::
-
-				gl_FragColor = color * openfl_Alphav;
-
-			}
+			gl_FragColor = color * openfl_Alphav;
 
 			gl_FragColor.a *= (1. - step(0.5, openfl_blendMode_addv));
 
