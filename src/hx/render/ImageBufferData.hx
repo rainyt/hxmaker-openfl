@@ -127,6 +127,7 @@ class ImageBufferData {
 	public function new() {}
 
 	public function reset() {
+		enabledColorTransform = false;
 		index = 0;
 		dataPerVertex6 = 0;
 		dataPerVertex24 = 0;

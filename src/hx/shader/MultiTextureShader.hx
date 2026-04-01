@@ -64,12 +64,8 @@ class MultiTextureShader extends GraphicsShader {
 			openfl_HasColorTransform_mutiv = openfl_HasColorTransform_muti;
 			openfl_blendMode_addv = openfl_blendMode_add;
 
-			if (openfl_HasColorTransform_muti > 0.5) {
-
-				openfl_ColorMultiplierv = openfl_ColorMultiplier_muti;
-				openfl_ColorOffsetv = openfl_ColorOffset_muti / 255.0;
-
-			}
+			openfl_ColorMultiplierv = openfl_ColorMultiplier_muti;
+			openfl_ColorOffsetv = openfl_ColorOffset_muti / 255.0;
 
             gl_Position = openfl_Matrix * openfl_Position;
 
