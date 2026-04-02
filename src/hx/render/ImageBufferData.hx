@@ -135,12 +135,14 @@ class ImageBufferData {
 		dataPerVertex16 = 0;
 		dataPerVertex = 0;
 		indicesOffset = 0;
-		colorMultiplier.resize(0);
-		colorOffset.resize(0);
-		hasColorTransform.resize(0);
-		alphas.resize(0);
-		addBlendModes.resize(0);
-		ids.resize(0);
+
+		// colorMultiplier.resize(0);
+		// colorOffset.resize(0);
+		// hasColorTransform.resize(0);
+		// alphas.resize(0);
+		// addBlendModes.resize(0);
+		// ids.resize(0);
+
 		bitmapDatas.resize(0);
 		mapIds.clear();
 		// isBad = false;
