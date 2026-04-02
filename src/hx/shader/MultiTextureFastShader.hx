@@ -177,6 +177,7 @@ class MultiTextureFastShader extends GraphicsShader {
 		super(null);
 		this.__initGL();
 		this.time.value = [0];
+		this.useDrawElements();
 	}
 
 	public function update(time:Float):Void {
