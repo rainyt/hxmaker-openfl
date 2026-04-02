@@ -71,6 +71,11 @@ class Render implements IRender {
 	public static var defaultUnSmoothingShader:Shader;
 
 	/**
+	 * 默认的无平滑快速着色器支持
+	 */
+	public static var defaultUnSmootingFastShader:Shader;
+
+	/**
 	 * 当前渲染的着色器
 	 */
 	public var currentShader:Shader;
@@ -176,9 +181,8 @@ class Render implements IRender {
 			if (isDefaultShader) {
 				currentShader = !data.enabledColorTransform ? defaultFastShader : defaultShader;
 				if (!data.smoothing) {
-					currentShader = defaultUnSmoothingShader;
+					currentShader = !data.enabledColorTransform ? defaultUnSmootingFastShader : defaultUnSmoothingShader;
 				}
-				// currentShader.useDrawElements();
 			}
 			var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
 			var openfl_Alpha:ShaderParameter<Float> = currentShader.data.openfl_Alpha_multi;
@@ -336,6 +340,9 @@ class Render implements IRender {
 		}
 		if (defaultUnSmoothingShader == null) {
 			defaultUnSmoothingShader = new MultiTextureShader();
+		}
+		if (defaultUnSmootingFastShader == null) {
+			defaultUnSmootingFastShader = new MultiTextureFastShader();
 		}
 	}
 

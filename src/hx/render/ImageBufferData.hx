@@ -155,9 +155,16 @@ class ImageBufferData {
 		indices.length = dataPerVertex6;
 		uvtData.length = dataPerVertex;
 
-		colorMultiplier.resize(dataPerVertex16);
-		colorOffset.resize(dataPerVertex16);
-		hasColorTransform.resize(dataPerVertex4);
+		if (enabledColorTransform) {
+			colorMultiplier.resize(dataPerVertex16);
+			colorOffset.resize(dataPerVertex16);
+			hasColorTransform.resize(dataPerVertex4);
+		} else {
+			colorMultiplier.resize(0);
+			colorOffset.resize(0);
+			hasColorTransform.resize(0);
+		}
+
 		alphas.resize(dataPerVertex4);
 		addBlendModes.resize(dataPerVertex4);
 		ids.resize(dataPerVertex4);
@@ -198,8 +205,9 @@ class ImageBufferData {
 						if (index == 0) {
 							smoothing = data.smoothing;
 							blendMode = graphic.blendMode;
-							// enabledColorTransform = colorTransform != null || graphic.colorTransform != null;
-							enabledColorTransform = true;
+							enabledColorTransform = colorTransform != null
+								|| graphic.colorTransform != null
+								|| render.currentShader is MultiTextureShader;
 						} else if (!enabledColorTransform && (graphic.colorTransform != null || colorTransform != null)) {
 							return false;
 						} else if (smoothing != data.smoothing) {
@@ -244,18 +252,14 @@ class ImageBufferData {
 									colorOffset[dataPerVertex16 + i * 4 + 3] = colorTransform.alphaOffset;
 								} else {
 									hasColorTransform[dataPerVertex4 + i] = 0;
-									if (graphic.colorTransform != null) {
-										colorMultiplier[dataPerVertex16 + i * 4] = 1;
-										colorMultiplier[dataPerVertex16 + i * 4 + 1] = 1;
-										colorMultiplier[dataPerVertex16 + i * 4 + 2] = 1;
-										colorMultiplier[dataPerVertex16 + i * 4 + 3] = 1;
-										colorOffset[dataPerVertex16 + i * 4] = 0;
-										colorOffset[dataPerVertex16 + i * 4 + 1] = 0;
-										colorOffset[dataPerVertex16 + i * 4 + 2] = 0;
-										colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
-									} else {
-										colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
-									}
+									colorMultiplier[dataPerVertex16 + i * 4] = 1;
+									colorMultiplier[dataPerVertex16 + i * 4 + 1] = 1;
+									colorMultiplier[dataPerVertex16 + i * 4 + 2] = 1;
+									colorMultiplier[dataPerVertex16 + i * 4 + 3] = 1;
+									colorOffset[dataPerVertex16 + i * 4] = 0;
+									colorOffset[dataPerVertex16 + i * 4 + 1] = 0;
+									colorOffset[dataPerVertex16 + i * 4 + 2] = 0;
+									colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
 								}
 								if (graphic.colorTransform != null) {
 									hasColorTransform[dataPerVertex4 + i] = 1;
@@ -314,8 +318,7 @@ class ImageBufferData {
 		if (index == 0) {
 			smoothing = image.smoothing;
 			blendMode = image.blendMode;
-			// enabledColorTransform = image.__colorTransform != null;
-			enabledColorTransform = true;
+			enabledColorTransform = image.__colorTransform != null || render.currentShader is MultiTextureShader;
 		} else if (!enabledColorTransform && (image.__colorTransform != null)) {
 			return false;
 		} else if (smoothing != image.smoothing) {
@@ -370,6 +373,13 @@ class ImageBufferData {
 					colorOffset[dataPerVertex16 + i * 4 + 3] = image.__colorTransform.alphaOffset;
 				} else {
 					hasColorTransform[dataPerVertex4 + i] = 0;
+					colorMultiplier[dataPerVertex16 + i * 4] = 1;
+					colorMultiplier[dataPerVertex16 + i * 4 + 1] = 1;
+					colorMultiplier[dataPerVertex16 + i * 4 + 2] = 1;
+					colorMultiplier[dataPerVertex16 + i * 4 + 3] = 1;
+					colorOffset[dataPerVertex16 + i * 4] = 0;
+					colorOffset[dataPerVertex16 + i * 4 + 1] = 0;
+					colorOffset[dataPerVertex16 + i * 4 + 2] = 0;
 					colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
 				}
 			}
