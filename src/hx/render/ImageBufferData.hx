@@ -155,9 +155,16 @@ class ImageBufferData {
 		indices.length = dataPerVertex6;
 		uvtData.length = dataPerVertex;
 
-		colorMultiplier.resize(dataPerVertex16);
-		colorOffset.resize(dataPerVertex16);
-		hasColorTransform.resize(dataPerVertex4);
+		if (enabledColorTransform) {
+			colorMultiplier.resize(dataPerVertex16);
+			colorOffset.resize(dataPerVertex16);
+			hasColorTransform.resize(dataPerVertex4);
+		} else {
+			colorMultiplier.resize(0);
+			colorOffset.resize(0);
+			hasColorTransform.resize(0);
+		}
+
 		alphas.resize(dataPerVertex4);
 		addBlendModes.resize(dataPerVertex4);
 		ids.resize(dataPerVertex4);
@@ -198,7 +205,9 @@ class ImageBufferData {
 						if (index == 0) {
 							smoothing = data.smoothing;
 							blendMode = graphic.blendMode;
-							enabledColorTransform = colorTransform != null || graphic.colorTransform != null;
+							enabledColorTransform = colorTransform != null
+								|| graphic.colorTransform != null
+								|| render.currentShader is MultiTextureShader;
 						} else if (!enabledColorTransform && (graphic.colorTransform != null || colorTransform != null)) {
 							return false;
 						} else if (smoothing != data.smoothing) {
@@ -309,7 +318,7 @@ class ImageBufferData {
 		if (index == 0) {
 			smoothing = image.smoothing;
 			blendMode = image.blendMode;
-			enabledColorTransform = image.__colorTransform != null;
+			enabledColorTransform = image.__colorTransform != null || render.currentShader is MultiTextureShader;
 		} else if (!enabledColorTransform && (image.__colorTransform != null)) {
 			return false;
 		} else if (smoothing != image.smoothing) {
