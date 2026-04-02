@@ -243,18 +243,14 @@ class ImageBufferData {
 									colorOffset[dataPerVertex16 + i * 4 + 3] = colorTransform.alphaOffset;
 								} else {
 									hasColorTransform[dataPerVertex4 + i] = 0;
-									if (graphic.colorTransform != null) {
-										colorMultiplier[dataPerVertex16 + i * 4] = 1;
-										colorMultiplier[dataPerVertex16 + i * 4 + 1] = 1;
-										colorMultiplier[dataPerVertex16 + i * 4 + 2] = 1;
-										colorMultiplier[dataPerVertex16 + i * 4 + 3] = 1;
-										colorOffset[dataPerVertex16 + i * 4] = 0;
-										colorOffset[dataPerVertex16 + i * 4 + 1] = 0;
-										colorOffset[dataPerVertex16 + i * 4 + 2] = 0;
-										colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
-									} else {
-										colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
-									}
+									colorMultiplier[dataPerVertex16 + i * 4] = 1;
+									colorMultiplier[dataPerVertex16 + i * 4 + 1] = 1;
+									colorMultiplier[dataPerVertex16 + i * 4 + 2] = 1;
+									colorMultiplier[dataPerVertex16 + i * 4 + 3] = 1;
+									colorOffset[dataPerVertex16 + i * 4] = 0;
+									colorOffset[dataPerVertex16 + i * 4 + 1] = 0;
+									colorOffset[dataPerVertex16 + i * 4 + 2] = 0;
+									colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
 								}
 								if (graphic.colorTransform != null) {
 									hasColorTransform[dataPerVertex4 + i] = 1;
@@ -368,6 +364,13 @@ class ImageBufferData {
 					colorOffset[dataPerVertex16 + i * 4 + 3] = image.__colorTransform.alphaOffset;
 				} else {
 					hasColorTransform[dataPerVertex4 + i] = 0;
+					colorMultiplier[dataPerVertex16 + i * 4] = 1;
+					colorMultiplier[dataPerVertex16 + i * 4 + 1] = 1;
+					colorMultiplier[dataPerVertex16 + i * 4 + 2] = 1;
+					colorMultiplier[dataPerVertex16 + i * 4 + 3] = 1;
+					colorOffset[dataPerVertex16 + i * 4] = 0;
+					colorOffset[dataPerVertex16 + i * 4 + 1] = 0;
+					colorOffset[dataPerVertex16 + i * 4 + 2] = 0;
 					colorOffset[dataPerVertex16 + i * 4 + 3] = 0;
 				}
 			}
