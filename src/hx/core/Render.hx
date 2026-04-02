@@ -178,7 +178,7 @@ class Render implements IRender {
 				if (!data.smoothing) {
 					currentShader = defaultUnSmoothingShader;
 				}
-				currentShader.useDrawElements();
+				// currentShader.useDrawElements();
 			}
 			var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
 			var openfl_Alpha:ShaderParameter<Float> = currentShader.data.openfl_Alpha_multi;
