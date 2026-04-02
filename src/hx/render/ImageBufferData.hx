@@ -137,12 +137,12 @@ class ImageBufferData {
 		dataPerVertex = 0;
 		indicesOffset = 0;
 
-		colorMultiplier.resize(0);
-		colorOffset.resize(0);
-		hasColorTransform.resize(0);
-		alphas.resize(0);
-		addBlendModes.resize(0);
-		ids.resize(0);
+		// colorMultiplier.resize(0);
+		// colorOffset.resize(0);
+		// hasColorTransform.resize(0);
+		// alphas.resize(0);
+		// addBlendModes.resize(0);
+		// ids.resize(0);
 
 		bitmapDatas.resize(0);
 		mapIds.clear();
@@ -154,6 +154,13 @@ class ImageBufferData {
 		vertices.length = dataPerVertex;
 		indices.length = dataPerVertex6;
 		uvtData.length = dataPerVertex;
+
+		colorMultiplier.resize(dataPerVertex16);
+		colorOffset.resize(dataPerVertex16);
+		hasColorTransform.resize(dataPerVertex4);
+		alphas.resize(dataPerVertex4);
+		addBlendModes.resize(dataPerVertex4);
+		ids.resize(dataPerVertex4);
 	}
 
 	/**
