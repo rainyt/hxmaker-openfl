@@ -110,11 +110,7 @@ class MultiTextureShader extends GraphicsShader {
 
 			color = readColor(openfl_TextureCoordv);
 
-			if (color.a == 0.0) {
-
-				gl_FragColor = vec4 (0.0, 0.0, 0.0, 0.0);
-
-			} else if (openfl_HasColorTransform_mutiv > 0.5) {
+			if (openfl_HasColorTransform_mutiv > 0.5) {
 
 				color = vec4 (color.rgb / color.a, color.a);
 
