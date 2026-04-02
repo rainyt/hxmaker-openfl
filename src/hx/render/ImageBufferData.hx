@@ -36,6 +36,7 @@ class ImageBufferData {
 
 	/**
 	 * 是否启用颜色转换
+	 * TODO 这里需要优化，它的判断逻辑比较复杂，目前看起来不稳定
 	 */
 	public var enabledColorTransform:Bool = false;
 
@@ -136,12 +137,12 @@ class ImageBufferData {
 		dataPerVertex = 0;
 		indicesOffset = 0;
 
-		// colorMultiplier.resize(0);
-		// colorOffset.resize(0);
-		// hasColorTransform.resize(0);
-		// alphas.resize(0);
-		// addBlendModes.resize(0);
-		// ids.resize(0);
+		colorMultiplier.resize(0);
+		colorOffset.resize(0);
+		hasColorTransform.resize(0);
+		alphas.resize(0);
+		addBlendModes.resize(0);
+		ids.resize(0);
 
 		bitmapDatas.resize(0);
 		mapIds.clear();
@@ -190,9 +191,8 @@ class ImageBufferData {
 						if (index == 0) {
 							smoothing = data.smoothing;
 							blendMode = graphic.blendMode;
-							enabledColorTransform = colorTransform != null
-								|| graphic.colorTransform != null
-								|| render.currentShader is MultiTextureShader;
+							// enabledColorTransform = colorTransform != null || graphic.colorTransform != null;
+							enabledColorTransform = true;
 						} else if (blendMode != graphic.blendMode) {
 							if (blendMode == ADD || blendMode == NORMAL) {
 								if (graphic.blendMode != ADD && graphic.blendMode != NORMAL) {
@@ -307,7 +307,8 @@ class ImageBufferData {
 		if (index == 0) {
 			smoothing = image.smoothing;
 			blendMode = image.blendMode;
-			enabledColorTransform = image.__colorTransform != null || render.currentShader is MultiTextureShader;
+			// enabledColorTransform = image.__colorTransform != null;
+			enabledColorTransform = true;
 		} else if (blendMode != image.blendMode) {
 			if (blendMode == ADD || blendMode == NORMAL) {
 				if (image.blendMode != ADD && image.blendMode != NORMAL) {
