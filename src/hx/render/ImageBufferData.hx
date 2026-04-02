@@ -218,6 +218,8 @@ class ImageBufferData {
 						}
 						// 根据顶点设置数据
 						var len = Std.int(vertices.length / 2);
+						// 顶点坐标
+						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
 						for (i in 0...len) {
 							ids[dataPerVertex4 + i] = id;
 							alphas[dataPerVertex4 + i] = graphic.__worldAlpha * alpha;
@@ -260,13 +262,6 @@ class ImageBufferData {
 									colorOffset[dataPerVertex16 + i * 4 + 3] += graphic.colorTransform.alphaOffset;
 								}
 							}
-						}
-						for (i in 0...indices.length) {
-							this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
-						}
-						// 顶点坐标
-						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
-						for (i in 0...len) {
 							var x = vertices[i * 2];
 							var y = vertices[i * 2 + 1];
 							this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
@@ -274,7 +269,9 @@ class ImageBufferData {
 							this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
 							this.uvtData[dataPerVertex + i * 2 + 1] = uvs[i * 2 + 1];
 						}
-
+						for (i in 0...indices.length) {
+							this.indices[dataPerVertex6 + i] = indicesOffset + indices[i];
+						}
 						dataPerVertex4 += len;
 						dataPerVertex6 += indices.length;
 						dataPerVertex16 += len * 4;
