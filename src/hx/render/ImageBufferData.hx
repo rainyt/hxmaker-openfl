@@ -200,6 +200,10 @@ class ImageBufferData {
 							blendMode = graphic.blendMode;
 							// enabledColorTransform = colorTransform != null || graphic.colorTransform != null;
 							enabledColorTransform = true;
+						} else if (!enabledColorTransform && (graphic.colorTransform != null || colorTransform != null)) {
+							return false;
+						} else if (smoothing != data.smoothing) {
+							return false;
 						} else if (blendMode != graphic.blendMode) {
 							if (blendMode == ADD || blendMode == NORMAL) {
 								if (graphic.blendMode != ADD && graphic.blendMode != NORMAL) {
@@ -208,10 +212,6 @@ class ImageBufferData {
 							} else {
 								return false;
 							}
-						} else if (!enabledColorTransform && (graphic.colorTransform != null || colorTransform != null)) {
-							return false;
-						} else if (smoothing != data.smoothing) {
-							return false;
 						}
 						if (!applyBlendAddMode && graphic.blendMode == ADD) {
 							applyBlendAddMode = true;
@@ -316,6 +316,10 @@ class ImageBufferData {
 			blendMode = image.blendMode;
 			// enabledColorTransform = image.__colorTransform != null;
 			enabledColorTransform = true;
+		} else if (!enabledColorTransform && (image.__colorTransform != null)) {
+			return false;
+		} else if (smoothing != image.smoothing) {
+			return false;
 		} else if (blendMode != image.blendMode) {
 			if (blendMode == ADD || blendMode == NORMAL) {
 				if (image.blendMode != ADD && image.blendMode != NORMAL) {
@@ -324,10 +328,6 @@ class ImageBufferData {
 			} else {
 				return false;
 			}
-		} else if (!enabledColorTransform && (image.__colorTransform != null)) {
-			return false;
-		} else if (smoothing != image.smoothing) {
-			return false;
 		}
 		// 可以绘制，记录纹理ID
 		if (id == null) {
