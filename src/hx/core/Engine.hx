@@ -326,6 +326,7 @@ class Engine extends EventDispatcher implements IEngine {
 		var now = Timer.stamp();
 		dt = now - __lastTime;
 		hx.utils.Timer.run(dt);
+		hx.procedure.ProcedureManager.instance.update(dt);
 		__lastTime = now;
 		var __dirty = false;
 		for (stage in stages) {
