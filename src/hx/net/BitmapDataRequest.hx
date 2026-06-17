@@ -24,7 +24,8 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 			trace("[Assets] Loading bitmap data from assets bundle: " + this.url);
 			#end
 			future.onComplete((data) -> {
-				this.callback(data, null);
+				var bmd = data.data;
+				this.callback(bmd, null);
 				RequestQueue.loadComplete();
 			}).onError((err) -> {
 				this.callback(null, err);
