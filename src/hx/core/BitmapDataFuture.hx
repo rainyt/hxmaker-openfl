@@ -17,7 +17,7 @@ class BitmapDataFuture extends Future<BitmapData, String> {
 			if (err != null) {
 				this.errorValue(err);
 			} else {
-				this.completeValue(data);
+				this.completeValue(data, this.path);
 			}
 		});
 	}

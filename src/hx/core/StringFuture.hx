@@ -11,7 +11,7 @@ class StringFuture extends Future<String, String> {
 			if (error != null) {
 				this.errorValue(error);
 			} else {
-				this.completeValue(data);
+				this.completeValue(data, this.path);
 			}
 		});
 	}

@@ -13,7 +13,7 @@ class BytesFuture extends Future<Bytes, String> {
 				this.errorValue(error);
 				RequestQueue.loadComplete();
 			} else {
-				this.completeValue(data);
+				this.completeValue(data, this.path);
 				RequestQueue.loadComplete();
 			}
 		});

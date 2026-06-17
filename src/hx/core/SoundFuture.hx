@@ -18,7 +18,7 @@ class SoundFuture extends Future<Sound, String> {
 				this.errorValue(error);
 				RequestQueue.loadComplete();
 			} else {
-				this.completeValue(data);
+				this.completeValue(data, this.path);
 				RequestQueue.loadComplete();
 			}
 		}, isMusic);

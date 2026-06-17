@@ -221,6 +221,9 @@ class RequestQueue {
 	 * @return 当前引用计数，归零后返回0
 	 */
 	public static function release(url:String):Int {
+		if (url == null) {
+			return 0;
+		}
 		var entry = __cache.get(url);
 		if (entry == null)
 			return 0;
@@ -250,8 +253,18 @@ class RequestQueue {
 	 * 在 assets_debug 模式下自动 trace 输出
 	 * @return 包含 {url:String, refCount:Int, pendingRelease:Bool, remainSeconds:Float} 的数组
 	 */
-	public static function dumpRefCounts():Array<{url:String, refCount:Int, pendingRelease:Bool, remainSeconds:Float}> {
-		var result:Array<{url:String, refCount:Int, pendingRelease:Bool, remainSeconds:Float}> = [];
+	public static function dumpRefCounts():Array<{
+		url:String,
+		refCount:Int,
+		pendingRelease:Bool,
+		remainSeconds:Float
+	}> {
+		var result:Array<{
+			url:String,
+			refCount:Int,
+			pendingRelease:Bool,
+			remainSeconds:Float
+		}> = [];
 		var now = Timer.stamp();
 		for (url => entry in __cache) {
 			var pending = entry.releaseTimestamp > 0 && entry.refCount <= 0;
