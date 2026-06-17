@@ -194,7 +194,7 @@ class ImageBufferData {
 					data.smoothing = smoothing;
 				case DRAW_TRIANGLE(vertices, indices, uvs, alpha, colorTransform, applyBlendAddMode):
 					// 开始绘制三角形
-					if (data.currentBitmapData != null) {
+					if (data.currentBitmapData != null && data.currentBitmapData.data != null) {
 						var texture = data.currentBitmapData.data.getTexture();
 						if (index == 0 || !mapIds.exists(texture)) {
 							if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {

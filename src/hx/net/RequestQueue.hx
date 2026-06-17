@@ -5,6 +5,7 @@ import haxe.Timer;
 import hx.display.BitmapData;
 import hx.assets.Sound;
 import hx.events.FutureErrorEvent;
+import hx.utils.ContextStats;
 
 /**
  * 请求队列
@@ -209,6 +210,10 @@ class RequestQueue {
 		if (entry == null)
 			return 0;
 		entry.refCount++;
+		syncContextStats();
+		#if assets_debug
+		trace("[RequestQueue] Retain resource: " + url + ", new refCount: " + entry.refCount);
+		#end
 		return entry.refCount;
 	}
 
@@ -228,11 +233,19 @@ class RequestQueue {
 		if (entry == null)
 			return 0;
 		entry.refCount--;
+		if (url.indexOf("postman") != -1) {
+			trace("why");
+		}
+		#if assets_debug
+		trace("[RequestQueue] Release resource: " + url + ", new refCount: " + entry.refCount);
+		#end
 		if (entry.refCount <= 0) {
 			entry.refCount = 0;
 			entry.releaseTimestamp = Timer.stamp() + RELEASE_DELAY;
+			syncContextStats();
 			return 0;
 		}
+		syncContextStats();
 		return entry.refCount;
 	}
 
@@ -246,6 +259,20 @@ class RequestQueue {
 		if (entry == null)
 			return -1;
 		return entry.refCount;
+	}
+
+	/**
+	 * 获取所有缓存资源的总引用计数
+	 * 供调试显示使用（如 FPS 面板）
+	 * @return 总引用计数
+	 */
+	public static function getTotalRefCount():Int {
+		var total = 0;
+		for (entry in __cache) {
+			if (entry.refCount > 0)
+				total += entry.refCount;
+		}
+		return total;
 	}
 
 	/**
@@ -319,6 +346,8 @@ class RequestQueue {
 				count++;
 			}
 		}
+		if (count > 0)
+			syncContextStats();
 		return count;
 	}
 
@@ -331,6 +360,7 @@ class RequestQueue {
 		if (entry != null) {
 			disposeResource(entry.data);
 			__cache.remove(url);
+			syncContextStats();
 		}
 	}
 
@@ -342,6 +372,7 @@ class RequestQueue {
 			disposeResource(entry.data);
 		}
 		__cache = [];
+		syncContextStats();
 	}
 
 	// ---------------------------------------------------------------------------
@@ -362,6 +393,24 @@ class RequestQueue {
 	}
 
 	/**
+	 * 同步总引用计数到 ContextStats，供 FPS 等调试面板使用
+	 */
+	private static function syncContextStats():Void {
+		var totalRef = 0;
+		var totalCache = 0;
+		for (entry in __cache) {
+			if (entry.data != null) {
+				totalCache++;
+			}
+			if (entry.refCount > 0) {
+				totalRef += entry.refCount;
+			}
+		}
+		ContextStats.totalRefCount = totalRef;
+		ContextStats.totalCacheCount = totalCache;
+	}
+
+	/**
 	 * 确保缓存条目存在并处理缓存命中/去重逻辑
 	 * 返回非null表示需要发起新请求，返回null表示已处理（缓存命中或加入等待）
 	 */
@@ -371,16 +420,18 @@ class RequestQueue {
 		if (entry != null) {
 			// 缓存命中：数据已就绪，直接回调
 			if (entry.data != null) {
-				entry.refCount++;
+				// entry.refCount++;
 				// 如果在延迟释放期间被重新请求，取消延迟释放
 				entry.releaseTimestamp = 0;
+				syncContextStats();
 				cb(entry.data, null);
 				return null;
 			}
 
 			// 正在加载中：加入等待列表，不重复发起请求
 			if (entry.isLoading) {
-				entry.refCount++;
+				// entry.refCount++;
+				syncContextStats();
 				entry.pendingCallbacks.push(cb);
 				return null;
 			}
@@ -404,12 +455,14 @@ class RequestQueue {
 
 		if (err == null && data != null) {
 			entry.data = data;
+			syncContextStats();
 		} else {
 			// 加载失败：清理缓存条目，后续请求将重新加载
 			entry.refCount--;
 			if (entry.refCount <= 0 && entry.pendingCallbacks.length == 0) {
 				__cache.remove(url);
 			}
+			syncContextStats();
 		}
 
 		// 通知所有等待中的回调
@@ -422,6 +475,7 @@ class RequestQueue {
 		// 如果加载失败且还有等待者，清空缓存让后续请求重新加载
 		if (err != null && entry.data == null) {
 			__cache.remove(url);
+			syncContextStats();
 		}
 	}
 
