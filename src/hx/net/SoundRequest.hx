@@ -49,9 +49,11 @@ class SoundRequest extends BaseRequest<Sound> {
 			var data = new Sound();
 			data.root = new OpenFLSound(sound);
 			this.callback(data, null);
+			RequestQueue.loadComplete();
 		});
 		sound.addEventListener(IOErrorEvent.IO_ERROR, (e) -> {
 			this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url, this.url));
+			RequestQueue.loadComplete();
 		});
 		sound.load(url);
 	}

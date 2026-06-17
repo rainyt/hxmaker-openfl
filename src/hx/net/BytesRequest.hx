@@ -49,7 +49,7 @@ class BytesRequest extends BaseRequest<Bytes> {
 			RequestQueue.loadComplete();
 		});
 		urlLoader.addEventListener(IOErrorEvent.IO_ERROR, (e) -> {
-			this.callback(null, new FutureErrorEvent(FutureErrorEvent.LOAD_ERROR, false, false));
+			this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "load fail:" + this.url, this.url));
 			RequestQueue.loadComplete();
 		});
 		urlLoader.load(new URLRequest(path ?? hx.assets.Assets.getDefaultNativePath(this.url)));
