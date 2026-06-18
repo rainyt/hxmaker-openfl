@@ -443,7 +443,7 @@ class RequestQueue {
 			__cache.set(url, entry);
 		}
 		entry.isLoading = true;
-		entry.refCount = 1;
+		entry.refCount = 0;
 		return entry;
 	}
 
