@@ -206,6 +206,8 @@ class RequestQueue {
 	 * @return 当前引用计数，若资源不存在则返回0
 	 */
 	public static function retain(url:String):Int {
+		if(url == "" || url == null)
+			return 0;
 		var entry = __cache.get(url);
 		if (entry == null)
 			return 0;
@@ -226,9 +228,8 @@ class RequestQueue {
 	 * @return 当前引用计数，归零后返回0
 	 */
 	public static function release(url:String):Int {
-		if (url == null) {
+		if(url == "" || url == null)
 			return 0;
-		}
 		var entry = __cache.get(url);
 		if (entry == null)
 			return 0;

@@ -23,8 +23,8 @@ class StringRequest extends BaseRequest<String> {
 		#if wechat_zygame_dom
 		// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
 		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url]);
-		hx.utils.System.existFile(localFile).onComplete(function(exist) {
-			if (exist) {
+		hx.utils.System.existFile(localFile).onComplete(function(data) {
+			if (data.data) {
 				#if assets_debug
 				trace("[Assets] Loading string data from local file: " + localFile);
 				#end
