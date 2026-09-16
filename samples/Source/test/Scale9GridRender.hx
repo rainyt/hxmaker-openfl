@@ -1,5 +1,6 @@
 package test;
 
+import hx.assets.AssetObject;
 import hx.display.DisplayObjectContainer;
 import hx.geom.Rectangle;
 import hx.display.Image;
@@ -20,8 +21,10 @@ class Scale9GridRender extends Scene {
 		assets.start();
 	}
 
-	private function onLoaded(assets:Assets):Void {
+	private function onLoaded(assetObject:AssetObject<Assets>):Void {
 		trace("加载完成");
+
+		var assets = assetObject.data;
 
 		var box = new DisplayObjectContainer();
 		this.addChild(box);

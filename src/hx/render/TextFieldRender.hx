@@ -10,6 +10,7 @@ import hx.providers.ITextFieldDataProvider;
 import openfl.text.TextField;
 import hx.core.Render;
 import hx.display.Label;
+import hx.text.TextFieldQueue;
 
 /**
  * 文本渲染器，需要支持纹理渲染
@@ -25,8 +26,11 @@ class TextFieldRender {
 	 * @return TextFieldContextBitmapData
 	 */
 	public static function getTextFieldContextBitmapData(cacheId:Int):TextFieldContextBitmapData {
-		if (!__contextBitmapDataCache.exists(cacheId))
-			__contextBitmapDataCache[cacheId] = new TextFieldContextBitmapData(50, 2048, 2048, 5, 5);
+		if (!__contextBitmapDataCache.exists(cacheId)) {
+			var context = new TextFieldContextBitmapData(50, 2048, 2048, 5, 5);
+			context.cacheId = cacheId;
+			__contextBitmapDataCache[cacheId] = context;
+		}
 		return __contextBitmapDataCache[cacheId];
 	}
 
@@ -45,25 +49,44 @@ class TextFieldRender {
 	 * @param context 文本渲染纹理
 	 */
 	public static function setTextFieldContextBitmapData(cacheId:Int = 0, context:TextFieldContextBitmapData):Void {
+		context.cacheId = cacheId;
 		__contextBitmapDataCache[cacheId] = context;
+	}
+
+	/**
+	 * 预写文本，由`TextFieldQueue`在正式渲染之前调用。
+	 * 与`render`的区别是只重建渲染数据，不提交绘制，这样图集的写入（包括写满后的整张重排）
+	 * 都会发生在渲染遍历之前，不会污染本帧已经入队的顶点。
+	 * @param label 文本对象
+	 */
+	public static function prepareLabel(label:Label):Void {
+		if (label.data == null)
+			return;
+		var textField = getText(label);
+		if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
+			var context = getTextFieldContextBitmapData(label.textCacheId);
+			rebuildText(textField, label, context);
+			textField.drawText(context, null, true);
+		}
 	}
 
 	public inline static function render(label:Label, render:Render):Void {
 		if (label.data == null)
 			return;
-		if (label.root == null) {
-			label.root = new Text(label);
-		}
-		var textField:Text = cast label.root;
+		var textField = getText(label);
 		if (label.data != null) {
 			var context = getTextFieldContextBitmapData(label.textCacheId);
 			if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
-				textField.text = label.data;
-				@:privateAccess label.__textFormatDirty = false;
-				if (label.charFilterEnabled && Label.onGlobalCharFilter != null)
-					context.drawText(Label.onGlobalCharFilter(textField.text));
-				else
-					context.drawText(textField.text);
+				if (TextFieldQueue.isRendering()) {
+					// 渲染遍历中禁止写图集：写入可能撑满图集并触发整张重排，
+					// 从而让本帧已经入队的顶点读到错误的内容。
+					// 这里只重建渲染数据，字形留给下一次`prepare`补写；
+					// 脏标记刻意不清除，保证`prepareLabel`下一帧仍会处理它。
+					textField.text = label.data;
+					TextFieldQueue.invalidate(label);
+				} else {
+					rebuildText(textField, label, context);
+				}
 				// 进行渲染，使用多个image组成
 				textField.drawText(context, render, true);
 			} else {
@@ -71,6 +94,33 @@ class TextFieldRender {
 				textField.drawText(context, render);
 			}
 		}
+	}
+
+	/**
+	 * 获得文本对象的渲染数据，不存在时创建
+	 * @param label 文本对象
+	 * @return Text
+	 */
+	private static function getText(label:Label):Text {
+		if (label.root == null) {
+			label.root = new Text(label);
+		}
+		return cast label.root;
+	}
+
+	/**
+	 * 把文本写入图集，并标记为不再是脏数据
+	 * @param textField 文本渲染数据
+	 * @param label 文本对象
+	 * @param context 文本图集
+	 */
+	private static function rebuildText(textField:Text, label:Label, context:TextFieldContextBitmapData):Void {
+		textField.text = label.data;
+		@:privateAccess label.__textFormatDirty = false;
+		if (label.charFilterEnabled && Label.onGlobalCharFilter != null)
+			context.drawText(Label.onGlobalCharFilter(textField.text));
+		else
+			context.drawText(textField.text);
 	}
 }
 

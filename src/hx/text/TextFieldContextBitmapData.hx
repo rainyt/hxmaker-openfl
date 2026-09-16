@@ -1,7 +1,6 @@
 package hx.text;
 
 import hx.display.Label;
-import hx.core.Hxmaker;
 import hx.text.MaxRectsBinPack.FreeRectangleChoiceHeuristic;
 import lime.text.Font;
 import openfl.geom.Matrix;
@@ -37,6 +36,11 @@ class TextFieldContextBitmapData {
 	 * 缓存版本号
 	 */
 	public var version:Int = 0;
+
+	/**
+	 * 当前缓存器对应的`textCacheId`，由`TextFieldRender`赋值，用于定位驻留在该图集上的文本
+	 */
+	public var cacheId:Int = 0;
 
 	/**
 	 * 图集
@@ -246,16 +250,12 @@ class TextFieldContextBitmapData {
 		 */
 	public function redraw():Void {
 		this.clear();
-		// 这里需要遍历并且重绘支持
-		for (stage in Hxmaker.engine.stages) {
-			hx.utils.DisplayTools.map(stage, (display) -> {
-				if (display is Label) {
-					var label:Label = cast display;
-					label.setTextFormatDirty();
-					drawText(label.data);
-				}
-				return true;
-			});
+		// 重建名单来自文本队列，这样离屏渲染、cacheAsBitmap 等不在舞台树上的文本也不会漏掉
+		var labels = TextFieldQueue.getResident(this.cacheId);
+		for (index in 0...labels.length) {
+			var label:Label = labels[index];
+			label.setTextFormatDirty();
+			drawText(label.data);
 		}
 	}
 

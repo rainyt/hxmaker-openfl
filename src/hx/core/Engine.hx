@@ -8,6 +8,7 @@ import hx.events.UncaughtErrorEvent;
 import hx.display.EventDispatcher;
 import openfl.geom.Point;
 import hx.filters.StageBitmapData;
+import hx.text.TextFieldQueue;
 import hx.utils.DisplayTools;
 import hx.utils.KeyboardTools;
 import hx.display.MakerDisplay;
@@ -339,12 +340,21 @@ class Engine extends EventDispatcher implements IEngine {
 		}
 		ContextStats.reset();
 		ContextStats.statsFps();
+		// 先把本帧变动的文本统一预写进图集，这样图集的写入（包括写满后的整张重排）
+		// 不会发生在渲染遍历之中。该调用必须无条件执行：
+		// 1. `customRender`的舞台（如`MakerDisplay`）不走下面的渲染块，但它的文本同样需要预写；
+		// 2. 该帧的渲染发生在`ENTER_FRAME`广播之后（引擎的渲染事件监听早于`__enterFrame`），
+		//    所以这里一定早于所有渲染器的清屏，没有已经入队的顶点。
+		TextFieldQueue.prepare();
 		if (__dirty) {
 			renderer.clear();
+			// 渲染遍历期间禁止写文本图集，写入全部由上面的`prepare`在渲染前完成
+			TextFieldQueue.beginRender();
 			for (stage in stages) {
 				if (!stage.customRender)
 					this.render(stage);
 			}
+			TextFieldQueue.endRender();
 			renderer.endFill();
 		}
 		ContextStats.statsCpu();
@@ -553,6 +563,8 @@ class Engine extends EventDispatcher implements IEngine {
 	public function dispose():Void {
 		// 删除所有跟stage有关的事件
 		__removeStageEvent();
+		// 清空文本渲染队列，避免静态队列继续持有已销毁的文本对象
+		TextFieldQueue.reset();
 	}
 
 	/**

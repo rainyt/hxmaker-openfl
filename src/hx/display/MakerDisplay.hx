@@ -7,6 +7,7 @@ import openfl.events.Event;
 import openfl.geom.Rectangle;
 import hx.core.Render;
 import hx.core.Engine;
+import hx.text.TextFieldQueue;
 
 /**
  * hxmaker渲染器
@@ -57,10 +58,16 @@ class MakerDisplay extends openfl.display.Sprite {
 		var currentDeltaTime:Float = now - __time;
 		__time = now;
 		container.onUpdate(currentDeltaTime);
+		// 该舞台是`customRender`，它的更新和渲染都发生在引擎的帧回调之后（OpenFL先广播`ENTER_FRAME`
+		// 再调`__enterFrame`），所以引擎里的那次`prepare`覆盖不到它，必须在这里、渲染开始之前补一次。
+		TextFieldQueue.prepare();
 		if (container.__dirty) {
 			renderer.clear();
+			// 渲染遍历期间禁止写文本图集，写入全部由上面的`prepare`在渲染前完成
+			TextFieldQueue.beginRender();
 			container.__updateTransform(container);
 			renderer.renderDisplayObject(container);
+			TextFieldQueue.endRender();
 			container.__dirty = false;
 			renderer.endFill();
 		}
