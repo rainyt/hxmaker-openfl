@@ -1,6 +1,7 @@
 import test.ParticleRender2;
 import test.ParticleRender;
 import test.MoreLabelRender;
+import test.TextAtlasOverflowRender;
 import test.ScrollRender;
 import test.ListViewRender;
 import test.BitmapLabelRender;
@@ -65,7 +66,8 @@ class Game extends Stage {
 		SpineRender,
 		ImageRender,
 		LabelRender,
-		MoreLabelRender
+		MoreLabelRender,
+		TextAtlasOverflowRender
 	];
 
 	var title = new Label("Samples Name");
