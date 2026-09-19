@@ -50,9 +50,8 @@ class TextFieldRender {
 
 	/**
 	 * 释放文本渲染纹理，缓存器会在下一次取用时重建
-	 * @param cacheId 缓存id
 	 */
-	public static function disposeTextFieldContextBitmapData(cacheId:Int = 0):Void {
+	public static function disposeTextFieldContextBitmapData():Void {
 		if (__contextBitmapData == null)
 			return;
 		__contextBitmapData.dispose();

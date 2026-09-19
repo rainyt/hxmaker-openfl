@@ -128,7 +128,7 @@ class TextAtlasOverflowRender extends Scene {
 		// C 键：释放整个文本图集，验证释放后驻留文本能否重新写入新图集
 		if (e.keyCode == 67) {
 			trace("释放文本图集，释放前图集数量：" + __context.atlasCount);
-			Label.disposeTextFieldContextBitmapData(0);
+			Label.disposeTextFieldContextBitmapData();
 		}
 	}
 }
