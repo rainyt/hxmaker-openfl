@@ -27,7 +27,8 @@ class TextFieldRender {
 	 */
 	public static function getTextFieldContextBitmapData(cacheId:Int):TextFieldContextBitmapData {
 		if (!__contextBitmapDataCache.exists(cacheId)) {
-			var context = new TextFieldContextBitmapData(50, 2048, 2048, 5, 5);
+			// 页尺寸取 1024：分页粒度更细、浪费更少，4 页合计 16MB，与改动前的单张 2048² 持平
+			var context = new TextFieldContextBitmapData(50, 1024, 1024, 5, 5);
 			context.cacheId = cacheId;
 			__contextBitmapDataCache[cacheId] = context;
 		}
@@ -39,8 +40,51 @@ class TextFieldRender {
 	 * @param cacheId 缓存id
 	 */
 	public static function disposeTextFieldContextBitmapData(cacheId:Int = 0):Void {
-		__contextBitmapDataCache[cacheId].bitmapData.dispose();
-		__contextBitmapDataCache[cacheId] = null;
+		var context = __contextBitmapDataCache[cacheId];
+		if (context == null)
+			return;
+		context.dispose();
+		// 必须移除而不是置空：置空之后`getTextFieldContextBitmapData`会因为`exists`为真而返回 null
+		__contextBitmapDataCache.remove(cacheId);
+	}
+
+	/**
+	 * 渲染遍历期间被请求、需要推迟到下一次预写执行的清理
+	 */
+	private static var __pendingClear:Array<Int> = [];
+
+	/**
+	 * 清空指定文本缓存器的图集，由客户端在安全时机（例如切场景）调用。
+	 *
+	 * 分页图集写满时只会新开一页、不会再原地重排，所以通常不需要调用，
+	 * 只在需要回收显存（页数接近`maxPages`）时才用得上。
+	 * 若在渲染遍历中调用，会推迟到下一次预写执行，不会破坏本帧已经入队的顶点。
+	 * @param cacheId 缓存id
+	 */
+	public static function clearTextFieldContextBitmapData(cacheId:Int = 0):Void {
+		if (TextFieldQueue.isRendering()) {
+			if (!__pendingClear.contains(cacheId))
+				__pendingClear.push(cacheId);
+			return;
+		}
+		var context = __contextBitmapDataCache[cacheId];
+		if (context != null)
+			context.reset();
+	}
+
+	/**
+	 * 执行渲染期被推迟的清理，由`TextFieldQueue.prepare`在帧首的安全点调用
+	 */
+	public static function applyPendingClear():Void {
+		if (__pendingClear.length == 0)
+			return;
+		var list = __pendingClear;
+		__pendingClear = [];
+		for (cacheId in list) {
+			var context = __contextBitmapDataCache[cacheId];
+			if (context != null)
+				context.reset();
+		}
 	}
 
 	/**
@@ -55,18 +99,22 @@ class TextFieldRender {
 
 	/**
 	 * 预写文本，由`TextFieldQueue`在正式渲染之前调用。
-	 * 与`render`的区别是只重建渲染数据，不提交绘制，这样图集的写入（包括写满后的整张重排）
-	 * 都会发生在渲染遍历之前，不会污染本帧已经入队的顶点。
+	 * 与`render`的区别是只重建渲染数据，不提交绘制，这样图集的写入都会发生在渲染遍历之前。
+	 *
+	 * 图集版本失配也必须重新写入：图集被重置后，文本的渲染数据指向的是已经不存在的字形。
+	 * 这一条不能省——被强制入队的离屏文本只会走这个入口，
+	 * 少了它字形就永远写不进新图集，表现为永久缺字。
 	 * @param label 文本对象
 	 */
 	public static function prepareLabel(label:Label):Void {
 		if (label.data == null)
 			return;
 		var textField = getText(label);
-		if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
-			var context = getTextFieldContextBitmapData(label.textCacheId);
+		var context = getTextFieldContextBitmapData(label.textCacheId);
+		if (textField.text != label.data || @:privateAccess label.__textFormatDirty || textField.isAtlasChanged(context)) {
 			rebuildText(textField, label, context);
 			textField.drawText(context, null, true);
+			textField.markAtlasVersion(context);
 		}
 	}
 
@@ -76,16 +124,19 @@ class TextFieldRender {
 		var textField = getText(label);
 		if (label.data != null) {
 			var context = getTextFieldContextBitmapData(label.textCacheId);
-			if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
+			if (textField.text != label.data || @:privateAccess label.__textFormatDirty || textField.isAtlasChanged(context)) {
 				if (TextFieldQueue.isRendering()) {
-					// 渲染遍历中禁止写图集：写入可能撑满图集并触发整张重排，
-					// 从而让本帧已经入队的顶点读到错误的内容。
-					// 这里只重建渲染数据，字形留给下一次`prepare`补写；
-					// 脏标记刻意不清除，保证`prepareLabel`下一帧仍会处理它。
+					// 渲染遍历中不写图集：分页之后写入空闲矩形或新开一页都不会覆盖已用区域，
+					// 但把写入统一收敛到`prepare`，可以让"图集只在一处被改写"成为一条无需推理的约束，
+					// 也给将来可能出现的页回收留出安全边界。
+					// 这里只重建渲染数据（重建只读图集），字形留给下一次`prepare`补写；
+					// 版本标记刻意不更新，保证下一帧`prepareLabel`仍会重新写入。
 					textField.text = label.data;
-					TextFieldQueue.invalidate(label);
+					// 强制入队：离屏、cacheAsBitmap等不在舞台树上的文本也要能补上字形
+					TextFieldQueue.invalidate(label, true);
 				} else {
 					rebuildText(textField, label, context);
+					textField.markAtlasVersion(context);
 				}
 				// 进行渲染，使用多个image组成
 				textField.drawText(context, render, true);
@@ -151,8 +202,34 @@ class Text implements ITextFieldDataProvider {
 	 */
 	public var label:Label;
 
+	/**
+	 * 构建当前渲染数据时所依据的图集版本。
+	 *
+	 * `-1`表示还没写过图集；与`context.version`不一致就说明图集被重置过，
+	 * 现有的`images`指向的是已经不存在的字形，必须重建。
+	 */
+	private var __atlasVersion:Int = -1;
+
 	public function new(label:Label) {
 		this.label = label;
+	}
+
+	/**
+	 * 图集是否在本次渲染数据构建之后被重置过
+	 * @param context 文本图集
+	 * @return Bool
+	 */
+	public function isAtlasChanged(context:TextFieldContextBitmapData):Bool {
+		return __atlasVersion != context.version;
+	}
+
+	/**
+	 * 记录本次字形写入所依据的图集版本。
+	 * 只能在真正把字形写进图集之后调用：提前调用会让缺失的字形被永久判定为有效。
+	 * @param context 文本图集
+	 */
+	public function markAtlasVersion(context:TextFieldContextBitmapData):Void {
+		__atlasVersion = context.version;
 	}
 
 	/**

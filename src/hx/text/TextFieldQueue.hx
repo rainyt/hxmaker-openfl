@@ -7,12 +7,14 @@ import hx.render.TextFieldRender;
  * 文本渲染队列处理，每次文本添加到、或者移除舞台时，都会更新此队列。
  * 该队列提供给正式渲染之前，将文本动态渲染正确处理。
  *
- * 动态纹理字渲染的图集是一张会被原地改写的共享纹理，而渲染遍历只负责构建顶点/UV，
- * 真正的采样会推迟到后端自己的渲染 pass 中。因此在渲染遍历途中改写图集（尤其是图集写满
- * 后触发的整张重排），会让本帧所有已经入队的顶点读到错误的内容。
+ * 动态纹理字渲染的图集是若干张共享纹理，而渲染遍历只负责构建顶点/UV，
+ * 真正的采样会推迟到后端自己的渲染 pass 中。
  *
- * 该队列把本帧所有文本变动收集起来，在`prepare`阶段（引擎清理画面前）统一写入图集，
- * 使渲染阶段不再需要写图集，从而让图集重排永远只发生在安全区内。
+ * 图集的不变量是：**写入只会落在新页或页内空闲矩形上，永不覆盖已经使用过的矩形**，
+ * 所以渲染遍历途中写入本身已经不会破坏已入队的顶点（最坏只会缺字，不会串字）。
+ * 该队列仍然把本帧所有文本变动收集起来，在`prepare`阶段（引擎清理画面前）统一写入图集，
+ * 让"图集只在一处被改写"成为一条无需推理的约束；
+ * 唯一会重置已有页的操作（`reset`）也被推迟到`prepare`执行，见`applyPendingClear`。
  */
 class TextFieldQueue {
 	/**
@@ -127,13 +129,14 @@ class TextFieldQueue {
 	}
 
 	/**
-	 * 文本内容或者文本格式发生变动时调用，仅对舞台上驻留的文本生效
+	 * 文本内容或者文本格式发生变动时调用，默认仅对舞台上驻留的文本生效
 	 * @param label 文本对象
+	 * @param force 为 true 时，未登记的文本（离屏、cacheAsBitmap、混合宿主）也强制入队
 	 */
-	public static function invalidate(label:Label):Void {
+	public static function invalidate(label:Label, force:Bool = false):Void {
 		if (label == null)
 			return;
-		if (!__residentMap.exists(label))
+		if (!force && !__residentMap.exists(label))
 			return;
 		if (__pendingMap.exists(label))
 			return;
@@ -167,6 +170,9 @@ class TextFieldQueue {
 		// 复位渲染标记：渲染器若在渲染途中抛异常，可能来不及调用`endRender`，
 		// 这里每帧兜底一次，避免标记残留导致后续所有写入都被推迟
 		__rendering = false;
+		// 执行渲染期被推迟的图集清理。清理会即时弄脏所有驻留文本，
+		// 这些文本紧接着就会被下面的循环重新写进新图集，同一帧内闭环，不会出现空白帧
+		TextFieldRender.applyPendingClear();
 		var loop = 0;
 		// `Map.keys()`返回的迭代器在调用`next()`前`hasNext()`是有效的，这里用它判断是否还有待写文本
 		while (__pendingMap.keys().hasNext() && loop < __maxPrepareLoop) {
