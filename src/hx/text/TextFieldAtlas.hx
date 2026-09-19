@@ -10,12 +10,23 @@ import openfl.geom.Rectangle;
  * 文本纹理
  */
 class TextFieldAtlas {
+	/**
+	 * 纹理数据
+	 */
 	public var bitmapData:hx.display.BitmapData;
+	
+	/**
+	 * 打包器
+	 */
+	 public var rects:MaxRectsBinPack;
 
 	public var chars:Map<String, FntFrame> = [];
 	public var emojs:Map<String, FntFrame> = [];
 
-	public function new(bitmapData:BitmapData) {
+	public function new(width:Int, height:Int) {
+		var bitmapData = new BitmapData(width, height, true, 0x0);
+		rects = new MaxRectsBinPack(width, height, false);
+		bitmapData.disposeImage();
 		this.bitmapData = hx.display.BitmapData.formData(new OpenFlBitmapData(bitmapData));
 	}
 

@@ -6,7 +6,6 @@ import lime.text.Font;
 import openfl.geom.Matrix;
 import openfl.geom.Rectangle;
 import openfl.display.Sprite;
-// import zygame.utils.load.Atlas;
 import openfl.text.TextField;
 import openfl.text.TextFormat;
 import openfl.display.BitmapData;
@@ -20,17 +19,10 @@ class TextFieldContextBitmapData {
 	 */
 	public var bitmapData:BitmapData;
 
-	private var __renderTestBitmapData:BitmapData;
-
 	/**
 	 * 是否清理纹理时，直接重构整个纹理
 	 */
 	public var cleanBitmapData:Bool = false;
-
-	/**
-	 * 打包器
-	 */
-	public var rects:MaxRectsBinPack;
 
 	/**
 	 * 缓存版本号
@@ -38,14 +30,14 @@ class TextFieldContextBitmapData {
 	public var version:Int = 0;
 
 	/**
-	 * 当前缓存器对应的`textCacheId`，由`TextFieldRender`赋值，用于定位驻留在该图集上的文本
+	 * 图集，使用列表储存，如果满了图集后，则自动追加
 	 */
-	public var cacheId:Int = 0;
+	private var __atlasList:Array<TextFieldAtlas> = [];
 
 	/**
-	 * 图集
+	 * 图集字形管理
 	 */
-	private var __atlas:TextFieldAtlas;
+	private var __charsMap:Map<String, Int> = [];
 
 	private var __textFormat:TextFormat;
 
@@ -77,17 +69,20 @@ class TextFieldContextBitmapData {
 		this.__textureHeight = textureHeight;
 		this.__offestX = offestX;
 		this.__offestY = offestY;
-		__renderTestBitmapData = new BitmapData(1, 1, true, 0x0);
-		__renderTestBitmapData.disposeImage();
-		bitmapData = new BitmapData(textureWidth, textureHeight, true, 0x0);
-		rects = new MaxRectsBinPack(textureWidth, textureHeight, false);
-		bitmapData.disposeImage();
 		var fontPath = #if ios "assets/" + hx.display.TextFormat.defaultFont #else hx.display.TextFormat.defaultFont #end;
 		__textFormat = new TextFormat(fontPath, size, 0xffffff);
 		__textFormat.leading = Std.int(size / 2);
 		__textField = new TextField();
-		__atlas = new TextFieldAtlas(bitmapData);
-		__atlas.fontSize = size + offestY / 2;
+		createNewAtlas();
+	}
+
+	/**
+	 * 创建新的精灵图集
+	 */
+	private function createNewAtlas() {
+		var atlas = new TextFieldAtlas(__textureWidth, __textureHeight);
+		atlas.fontSize = fontSize + __offestY / 2;
+		__atlasList.push(atlas);
 	}
 
 	/**
@@ -97,6 +92,8 @@ class TextFieldContextBitmapData {
 	public function drawText(text:String):Void {
 		if (text == null)
 			return;
+
+		var __atlas = __atlasList[__atlasList.length - 1];
 
 		#if (text_debug && stack_printf)
 		var list = haxe.CallStack.callStack();
@@ -156,6 +153,8 @@ class TextFieldContextBitmapData {
 		// __textField = new TextField();
 		if (text == null)
 			return;
+		var id = __atlasList.length - 1;
+		var __atlas = __atlasList[id];
 		__textField.wordWrap = true;
 		__textField.text = text;
 		__textField.width = 2048;
@@ -163,17 +162,11 @@ class TextFieldContextBitmapData {
 		var pakWidth = Std.int(__textField.textWidth + __offestX * 3);
 		var pakHeight = Std.int(__textField.textHeight + __offestY * 3);
 		__textField.height = pakHeight;
-		var pakRect = rects.insert(pakWidth, pakHeight, FreeRectangleChoiceHeuristic.BestShortSideFit);
+		var pakRect = __atlas.rects.insert(pakWidth, pakHeight, FreeRectangleChoiceHeuristic.BestShortSideFit);
 		if (pakRect == null || pakRect.width == 0 || pakRect.height == 0) {
-			// 当缓冲区满了之后，应该清空所有文字，重新渲染
-			// trace("溢出了", pakRect, pakWidth, pakHeight, text);
-			if (__redrawing) {
-				trace("TextFieldContextBitmapData: 缓冲区满了，停止渲染");
-				return;
-			}
-			__redrawing = true;
-			this.redraw();
-			__redrawing = false;
+			// 当缓冲区满了，则创建下一张
+			createNewAtlas();
+			__cacheText(text);
 			return;
 		}
 
@@ -186,7 +179,6 @@ class TextFieldContextBitmapData {
 		if (untyped __textField.__graphics.__context != null)
 			untyped __textField.__graphics.__context.clearRect(0, 0, __textField.__graphics.__canvas.width, __textField.__graphics.__canvas.height);
 		#end
-		__renderTestBitmapData.draw(__textField);
 		bitmapData.draw(__textField, m, null, null, null, true);
 		#if !cpp
 		emoj = "";
@@ -217,7 +209,8 @@ class TextFieldContextBitmapData {
 			rect.width += __offestX * 2;
 			rect.y -= __offestY;
 			rect.height += __offestY * 2;
-			this.__atlas.pushChar(char, rect, Std.int(rect.width - __offestX * 2));
+			__atlas.pushChar(char, rect, Std.int(rect.width - __offestX * 2));
+			__charsMap[char] = id;
 
 			// 测试
 			#if text_debug
@@ -231,39 +224,51 @@ class TextFieldContextBitmapData {
 	}
 
 	/**
-		 * 清空文字纹理渲染
-		 */
-	public function clear():Void {
-		version++;
-		if (cleanBitmapData) {
-			bitmapData = new BitmapData(bitmapData.width, bitmapData.height, true, 0x0);
-			bitmapData.disposeImage();
+	 * 清理纹理数据
+	 */
+	public function dispose():Void {
+		for (atlas in __atlasList) {
+			atlas.bitmapData.dispose();
 		}
-		__textField = new TextField();
-		bitmapData.fillRect(bitmapData.rect, 0x0);
-		__atlas.clear();
-		rects = new MaxRectsBinPack(__textureWidth, __textureHeight, false);
+		__atlasList = [];
 	}
 
+	/**
+		 * 清空文字纹理渲染
+		 */
+	// public function clear():Void {
+	// 	version++;
+	// 	if (cleanBitmapData) {
+	// 		bitmapData = new BitmapData(bitmapData.width, bitmapData.height, true, 0x0);
+	// 		bitmapData.disposeImage();
+	// 	}
+	// 	__textField = new TextField();
+	// 	bitmapData.fillRect(bitmapData.rect, 0x0);
+	// 	__atlas.clear();
+	// 	rects = new MaxRectsBinPack(__textureWidth, __textureHeight, false);
+	// }
 	/**
 		 * 对当前显示对象进行重绘
 		 */
-	public function redraw():Void {
-		this.clear();
-		// 重建名单来自文本队列，这样离屏渲染、cacheAsBitmap 等不在舞台树上的文本也不会漏掉
-		var labels = TextFieldQueue.getResident(this.cacheId);
-		for (index in 0...labels.length) {
-			var label:Label = labels[index];
-			label.setTextFormatDirty();
-			drawText(label.data);
-		}
-	}
+	// public function redraw():Void {
+	// 	this.clear();
+	// 	// 重建名单来自文本队列，这样离屏渲染、cacheAsBitmap 等不在舞台树上的文本也不会漏掉
+	// 	var labels = TextFieldQFueue.getResident(this.cacheId);
+	// 	for (index in 0...labels.length) {
+	// 		var label:Label = labels[index];
+	// 		label.setTextFormatDirty();
+	// 		drawText(label.data);
+	// 	}
+	// }
 
 	/**
-		 * 获得纹理
-		 * @return Atlas
-		 */
-	public function getAtlas():TextFieldAtlas {
-		return __atlas;
+	 * 获得纹理
+	 * @return Atlas
+	 */
+	public function getAtlas(char:String):TextFieldAtlas {
+		if (__charsMap.exists(char)) {
+			return __atlasList[__charsMap.get(char)];
+		}
+		return null;
 	}
 }

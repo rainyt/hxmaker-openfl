@@ -19,19 +19,18 @@ class TextFieldRender {
 	/**
 	 * 文本渲染纹理缓存
 	 */
-	private static var __contextBitmapDataCache:Map<Int, TextFieldContextBitmapData> = [];
+	private static var __contextBitmapData:TextFieldContextBitmapData;
 
 	/**
 	 * 获得文本渲染纹理
 	 * @return TextFieldContextBitmapData
 	 */
-	public static function getTextFieldContextBitmapData(cacheId:Int):TextFieldContextBitmapData {
-		if (!__contextBitmapDataCache.exists(cacheId)) {
+	public static function getTextFieldContextBitmapData():TextFieldContextBitmapData {
+		if (__contextBitmapData == null) {
 			var context = new TextFieldContextBitmapData(50, 2048, 2048, 5, 5);
-			context.cacheId = cacheId;
-			__contextBitmapDataCache[cacheId] = context;
+			__contextBitmapData = context;
 		}
-		return __contextBitmapDataCache[cacheId];
+		return __contextBitmapData;
 	}
 
 	/**
@@ -39,18 +38,8 @@ class TextFieldRender {
 	 * @param cacheId 缓存id
 	 */
 	public static function disposeTextFieldContextBitmapData(cacheId:Int = 0):Void {
-		__contextBitmapDataCache[cacheId].bitmapData.dispose();
-		__contextBitmapDataCache[cacheId] = null;
-	}
-
-	/**
-	 * 设置文本渲染纹理
-	 * @param cacheId 缓存id
-	 * @param context 文本渲染纹理
-	 */
-	public static function setTextFieldContextBitmapData(cacheId:Int = 0, context:TextFieldContextBitmapData):Void {
-		context.cacheId = cacheId;
-		__contextBitmapDataCache[cacheId] = context;
+		__contextBitmapData.dispose();
+		__contextBitmapData = null;
 	}
 
 	/**
@@ -64,7 +53,7 @@ class TextFieldRender {
 			return;
 		var textField = getText(label);
 		if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
-			var context = getTextFieldContextBitmapData(label.textCacheId);
+			var context = getTextFieldContextBitmapData();
 			rebuildText(textField, label, context);
 			textField.drawText(context, null, true);
 		}
@@ -75,7 +64,7 @@ class TextFieldRender {
 			return;
 		var textField = getText(label);
 		if (label.data != null) {
-			var context = getTextFieldContextBitmapData(label.textCacheId);
+			var context = getTextFieldContextBitmapData();
 			if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
 				if (TextFieldQueue.isRendering()) {
 					// 渲染遍历中禁止写图集：写入可能撑满图集并触发整张重排，
@@ -172,14 +161,14 @@ class Text implements ITextFieldDataProvider {
 
 	public function getTextWidth():Float {
 		if (this.textWidth == null) {
-			this.drawText(TextFieldRender.getTextFieldContextBitmapData(label.textCacheId), null, true);
+			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
 		}
 		return this.textWidth;
 	}
 
 	public function getTextHeight():Float {
 		if (this.textWidth == null) {
-			this.drawText(TextFieldRender.getTextFieldContextBitmapData(label.textCacheId), null, true);
+			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
 		}
 		return this.textHeight;
 	}
@@ -213,7 +202,7 @@ class Text implements ITextFieldDataProvider {
 			textHeight = 0;
 			charBounds = [];
 			for (index => char in chars) {
-				var fntFrame = context.getAtlas().getCharFntFrame(char);
+				var fntFrame = context.getAtlas(char).getCharFntFrame(char);
 				var textFormat = label.getCharTextFormatAt(index);
 				var scale = textFormat.size / context.fontSize;
 				if (fntFrame != null) {
