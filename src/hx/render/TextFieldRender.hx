@@ -34,55 +34,78 @@ class TextFieldRender {
 	}
 
 	/**
-	 * 释放文本渲染纹理
+	 * 设置文本渲染纹理。
+	 *
+	 * 当前只有一个全局缓存器，`cacheId`仅用于兼容旧调用，不做区分。
+	 * @param cacheId 缓存id
+	 * @param context 文本缓存器
+	 */
+	public static function setTextFieldContextBitmapData(cacheId:Int = 0, context:TextFieldContextBitmapData):Void {
+		if (context == null)
+			return;
+		__contextBitmapData = context;
+		// 旧图集上的字形已经失效，让所有驻留文本重新写入
+		TextFieldQueue.invalidateAll();
+	}
+
+	/**
+	 * 释放文本渲染纹理，缓存器会在下一次取用时重建
 	 * @param cacheId 缓存id
 	 */
 	public static function disposeTextFieldContextBitmapData(cacheId:Int = 0):Void {
+		if (__contextBitmapData == null)
+			return;
 		__contextBitmapData.dispose();
+		// 必须置为`null`而不是保留：`getTextFieldContextBitmapData`靠它判断是否需要重建
 		__contextBitmapData = null;
+		// 纹理已经释放，让它上面驻留的文本重新写入新图集
+		TextFieldQueue.invalidateAll();
 	}
 
 	/**
 	 * 预写文本，由`TextFieldQueue`在正式渲染之前调用。
-	 * 与`render`的区别是只重建渲染数据，不提交绘制，这样图集的写入（包括写满后的整张重排）
-	 * 都会发生在渲染遍历之前，不会污染本帧已经入队的顶点。
+	 * 与`render`的区别是只重建渲染数据，不提交绘制，这样字形写入只会发生在渲染遍历之前，
+	 * 不会污染本帧已经入队的顶点。
+	 *
+	 * 队列传来的都是本帧真正发生变动的文本，所以这里不做"内容是否变化"的比对：
+	 * 图集被替换之后文本内容没变、字形却已经失效，同样需要重写。
 	 * @param label 文本对象
 	 */
 	public static function prepareLabel(label:Label):Void {
 		if (label.data == null)
 			return;
 		var textField = getText(label);
-		if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
-			var context = getTextFieldContextBitmapData();
-			rebuildText(textField, label, context);
-			textField.drawText(context, null, true);
-		}
+		// 构建布局时会走回`Label.getTextWidth/Height`做对齐，而它们的脏标记会再次走到这里，
+		// 用标记挡住重入
+		if (@:privateAccess textField.__building)
+			return;
+		@:privateAccess textField.__building = true;
+		var context = getTextFieldContextBitmapData();
+		rebuildText(textField, label, context);
+		textField.drawText(context, null, true);
+		@:privateAccess textField.__building = false;
 	}
 
 	public inline static function render(label:Label, render:Render):Void {
 		if (label.data == null)
 			return;
 		var textField = getText(label);
-		if (label.data != null) {
-			var context = getTextFieldContextBitmapData();
-			if (textField.text != label.data || @:privateAccess label.__textFormatDirty) {
-				if (TextFieldQueue.isRendering()) {
-					// 渲染遍历中禁止写图集：写入可能撑满图集并触发整张重排，
-					// 从而让本帧已经入队的顶点读到错误的内容。
-					// 这里只重建渲染数据，字形留给下一次`prepare`补写；
-					// 脏标记刻意不清除，保证`prepareLabel`下一帧仍会处理它。
-					textField.text = label.data;
-					TextFieldQueue.invalidate(label);
-				} else {
-					rebuildText(textField, label, context);
-				}
-				// 进行渲染，使用多个image组成
-				textField.drawText(context, render, true);
+		var context = getTextFieldContextBitmapData();
+		if (!@:privateAccess textField.__building && (!textField.prepared || TextFieldQueue.isPending(label))) {
+			if (TextFieldQueue.isRendering()) {
+				// 渲染遍历中禁止写图集：本帧只构建布局，缺字形的地方退化成空格，
+				// 字形留给下一帧的`prepare`补写
+				@:privateAccess textField.__building = true;
+				textField.text = label.data;
+				textField.drawText(context, null, true);
+				@:privateAccess textField.__building = false;
 			} else {
-				// 没有变化，则使用已有的数据进行渲染
-				textField.drawText(context, render);
+				// 不在渲染遍历中（离屏测量、把文本树绘制到位图的场景），就地写入图集
+				prepareLabel(label);
 			}
 		}
+		// 渲染遍历只提交绘制，不写图集；字形一律由`prepare`在遍历之前写好
+		textField.drawText(context, render);
 	}
 
 	/**
@@ -110,6 +133,7 @@ class TextFieldRender {
 			context.drawText(Label.onGlobalCharFilter(textField.text));
 		else
 			context.drawText(textField.text);
+		textField.prepared = true;
 	}
 }
 
@@ -150,6 +174,16 @@ class Text implements ITextFieldDataProvider {
 	public var text:String = null;
 
 	/**
+	 * 字形是否已经写入图集。为`false`时只能先构建布局，绘制会缺失字形
+	 */
+	public var prepared:Bool = false;
+
+	/**
+	 * 是否正在构建渲染数据，用于阻止构建过程中的重入
+	 */
+	@:privateAccess private var __building:Bool = false;
+
+	/**
 	 * 文本宽度
 	 */
 	public var textWidth:Null<Float> = null;
@@ -161,14 +195,15 @@ class Text implements ITextFieldDataProvider {
 
 	public function getTextWidth():Float {
 		if (this.textWidth == null) {
-			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
+			// 兜底：正常情况下布局已经在`prepare`阶段构建好了
+			TextFieldRender.render(this.label, null);
 		}
 		return this.textWidth;
 	}
 
 	public function getTextHeight():Float {
 		if (this.textWidth == null) {
-			this.drawText(TextFieldRender.getTextFieldContextBitmapData(), null, true);
+			TextFieldRender.render(this.label, null);
 		}
 		return this.textHeight;
 	}
@@ -202,7 +237,9 @@ class Text implements ITextFieldDataProvider {
 			textHeight = 0;
 			charBounds = [];
 			for (index => char in chars) {
-				var fntFrame = context.getAtlas(char).getCharFntFrame(char);
+				var atlas = context.getAtlas(char);
+				// 图集里没有这个字符：可能是它本身就无法渲染（拿不到字形边界），按空格处理
+				var fntFrame = atlas == null ? null : atlas.getCharFntFrame(char);
 				var textFormat = label.getCharTextFormatAt(index);
 				var scale = textFormat.size / context.fontSize;
 				if (fntFrame != null) {

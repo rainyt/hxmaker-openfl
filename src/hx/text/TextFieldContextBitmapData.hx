@@ -15,11 +15,6 @@ import openfl.display.BitmapData;
  */
 class TextFieldContextBitmapData {
 	/**
-	 * 纹理
-	 */
-	public var bitmapData:BitmapData;
-
-	/**
 	 * 是否清理纹理时，直接重构整个纹理
 	 */
 	public var cleanBitmapData:Bool = false;
@@ -92,8 +87,8 @@ class TextFieldContextBitmapData {
 	public function drawText(text:String):Void {
 		if (text == null)
 			return;
-
-		var __atlas = __atlasList[__atlasList.length - 1];
+		if (__atlasList.length == 0)
+			createNewAtlas();
 
 		#if (text_debug && stack_printf)
 		var list = haxe.CallStack.callStack();
@@ -105,7 +100,8 @@ class TextFieldContextBitmapData {
 		}
 		#end
 
-		// 过滤重复的文本
+		// 过滤重复的文本。字形可能落在任意一张图集上，所以要用全局的字符索引判重，
+		// 不能只看最新那张图集：否则已经缓存过的字符会被反复写进新图集，白白撑大显存
 		var caches:Array<String> = [];
 		var chars = text.split("");
 		emoj = "";
@@ -116,7 +112,7 @@ class TextFieldContextBitmapData {
 			if (req.match(char)) {
 				emoj += char;
 				if (emoj.length == 2) {
-					if (__atlas.getCharFntFrameByEmoj(emoj) == null)
+					if (getAtlas(emoj) == null)
 						if (!caches.contains(emoj)) {
 							caches.push(emoj);
 						}
@@ -124,7 +120,7 @@ class TextFieldContextBitmapData {
 				}
 			} else {
 			#end
-				if (__atlas.getCharFntFrame(char) == null)
+				if (getAtlas(char) == null)
 					if (!caches.contains(char)) {
 						caches.push(char);
 					}
@@ -157,7 +153,8 @@ class TextFieldContextBitmapData {
 		var __atlas = __atlasList[id];
 		__textField.wordWrap = true;
 		__textField.text = text;
-		__textField.width = 2048;
+		// 换行宽度不能超出图集宽度，否则文本会横向撑出图集、永远放不进去
+		__textField.width = __textureWidth;
 		__textField.setTextFormat(__textFormat);
 		var pakWidth = Std.int(__textField.textWidth + __offestX * 3);
 		var pakHeight = Std.int(__textField.textHeight + __offestY * 3);
@@ -165,6 +162,11 @@ class TextFieldContextBitmapData {
 		var pakRect = __atlas.rects.insert(pakWidth, pakHeight, FreeRectangleChoiceHeuristic.BestShortSideFit);
 		if (pakRect == null || pakRect.width == 0 || pakRect.height == 0) {
 			// 当缓冲区满了，则创建下一张
+			if (__atlas.rects.usedRectangles.length == 0) {
+				// 空图集都放不下，说明这段文本本身就大于一张图集，再追加只会一直分配纹理
+				trace("TextFieldContextBitmapData: 文本超出图集尺寸，已丢弃 " + pakWidth + "x" + pakHeight);
+				return;
+			}
 			createNewAtlas();
 			__cacheText(text);
 			return;
@@ -179,7 +181,7 @@ class TextFieldContextBitmapData {
 		if (untyped __textField.__graphics.__context != null)
 			untyped __textField.__graphics.__context.clearRect(0, 0, __textField.__graphics.__canvas.width, __textField.__graphics.__canvas.height);
 		#end
-		bitmapData.draw(__textField, m, null, null, null, true);
+		__atlas.texture.draw(__textField, m, null, null, null, true);
 		#if !cpp
 		emoj = "";
 		#end
@@ -218,7 +220,7 @@ class TextFieldContextBitmapData {
 			spr.graphics.beginFill(0xff0000, 0.5);
 			spr.graphics.drawRect(rect.x, rect.y, rect.width, rect.height);
 			spr.graphics.endFill();
-			bitmapData.draw(spr);
+			__atlas.texture.draw(spr);
 			#end
 		}
 	}
@@ -231,6 +233,7 @@ class TextFieldContextBitmapData {
 			atlas.bitmapData.dispose();
 		}
 		__atlasList = [];
+		__charsMap = [];
 	}
 
 	/**
@@ -262,13 +265,38 @@ class TextFieldContextBitmapData {
 	// }
 
 	/**
-	 * 获得纹理
-	 * @return Atlas
+	 * 获得字符所在的图集
+	 * @param char 字符
+	 * @return 该字符所在的图集，未缓存时返回`null`
 	 */
 	public function getAtlas(char:String):TextFieldAtlas {
 		if (__charsMap.exists(char)) {
 			return __atlasList[__charsMap.get(char)];
 		}
 		return null;
+	}
+
+	/**
+	 * 当前图集数量（一张图集就是一张纹理），用于显存观测
+	 */
+	public var atlasCount(get, never):Int;
+
+	private function get_atlasCount():Int {
+		return __atlasList.length;
+	}
+
+	/**
+	 * 当前已缓存的唯一字形数量，用于调试
+	 */
+	public var glyphCount(get, never):Int;
+
+	private function get_glyphCount():Int {
+		var count = 0;
+		var keys = __charsMap.keys();
+		while (keys.hasNext()) {
+			keys.next();
+			count++;
+		}
+		return count;
 	}
 }

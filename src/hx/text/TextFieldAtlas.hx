@@ -11,10 +11,15 @@ import openfl.geom.Rectangle;
  */
 class TextFieldAtlas {
 	/**
+	 * 底层纹理，文本图像直接绘制到这张位图上
+	 */
+	public var texture:BitmapData;
+
+	/**
 	 * 纹理数据
 	 */
 	public var bitmapData:hx.display.BitmapData;
-	
+
 	/**
 	 * 打包器
 	 */
@@ -27,6 +32,7 @@ class TextFieldAtlas {
 		var bitmapData = new BitmapData(width, height, true, 0x0);
 		rects = new MaxRectsBinPack(width, height, false);
 		bitmapData.disposeImage();
+		this.texture = bitmapData;
 		this.bitmapData = hx.display.BitmapData.formData(new OpenFlBitmapData(bitmapData));
 	}
 
