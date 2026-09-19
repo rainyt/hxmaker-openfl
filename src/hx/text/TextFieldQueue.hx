@@ -7,43 +7,38 @@ import hx.render.TextFieldRender;
  * 文本渲染队列处理，每次文本添加到、或者移除舞台时，都会更新此队列。
  * 该队列提供给正式渲染之前，将文本动态渲染正确处理。
  *
- * 动态纹理字渲染的图集是一张会被原地改写的共享纹理，而渲染遍历只负责构建顶点/UV，
- * 真正的采样会推迟到后端自己的渲染 pass 中。因此在渲染遍历途中改写图集（尤其是图集写满
- * 后触发的整张重排），会让本帧所有已经入队的顶点读到错误的内容。
+ * 动态纹理字渲染的图集是一组共享纹理，而渲染遍历只负责构建顶点/UV，
+ * 真正的采样会推迟到后端自己的渲染 pass 中。因此在渲染遍历途中改写图集，
+ * 会让本帧所有已经入队的顶点读到错误的内容。
  *
- * 该队列把本帧所有文本变动收集起来，在`prepare`阶段（引擎清理画面前）统一写入图集，
- * 使渲染阶段不再需要写图集，从而让图集重排永远只发生在安全区内。
+ * 该队列把本帧所有文本变动收集起来，在`prepare`阶段（引擎清屏之前）统一写入图集，
+ * 使渲染阶段不再需要写图集。图集写满时只会追加一张新的纹理，**永远不会改写已经写好的字形**，
+ * 所以渲染阶段唯一要做的事情就是提交绘制。
+ *
+ * 由此，队列也是"文本是否需要重写"的唯一权威来源：文本内容相同不代表字形还有效
+ * （图集可能已经被替换、释放），`TextFieldRender.render`依赖`isPending`与
+ * `Text.prepared`判断某个文本本帧能不能直接绘制，所以文本变动之后必须入队。
  */
 class TextFieldQueue {
 	/**
-	 * 舞台上驻留的文本对象，按`textCacheId`分组
+	 * 舞台上驻留的文本对象
 	 */
-	private static var __resident:Map<Int, Array<Label>> = [];
+	private static var __resident:Array<Label> = [];
 
 	/**
-	 * 驻留登记表，记录文本对象使用的`textCacheId`，用于保证`add`/`remove`的幂等性
+	 * 驻留登记表，保证`add`/`remove`的幂等性
 	 */
-	private static var __residentMap:Map<Label, Int> = new haxe.ds.ObjectMap();
+	private static var __residentMap:Map<Label, Bool> = new haxe.ds.ObjectMap();
 
 	/**
-	 * 本帧文本发生变动的文本对象，按`textCacheId`分组
+	 * 本帧文本发生变动的文本对象，等待`prepare`写入图集
 	 */
-	private static var __pending:Map<Int, Array<Label>> = [];
+	private static var __pending:Array<Label> = [];
 
 	/**
-	 * 待写登记表，用于避免同一个文本对象重复入队
+	 * 待写登记表，保证同一个文本对象在同一帧内只入队一次
 	 */
-	private static var __pendingMap:Map<Label, Int> = new haxe.ds.ObjectMap();
-
-	/**
-	 * 空的驻留列表，避免`getResident`每次都创建新数组
-	 */
-	private static var __emptyResident:Array<Label> = [];
-
-	/**
-	 * 单次`prepare`最多迭代的次数，用于兜底防止图集重排反复触发导致死循环
-	 */
-	private static var __maxPrepareLoop:Int = 4;
+	private static var __pendingMap:Map<Label, Bool> = new haxe.ds.ObjectMap();
 
 	/**
 	 * 当前是否处于渲染遍历中
@@ -68,8 +63,8 @@ class TextFieldQueue {
 	 * 是否处于渲染遍历中。
 	 *
 	 * 渲染遍历只负责构建顶点与 UV，纹理采样推迟到后端自己的渲染 pass，
-	 * 所以遍历途中写图集（尤其是写满后触发的整张重排）会让本帧已经入队的顶点全部失效。
-	 * 渲染器在开始渲染前调用`beginRender`，渲染期间所有图集写入都会推迟到下一次`prepare`。
+	 * 所以遍历途中写图集会让本帧已经入队的顶点全部失效。
+	 * 渲染器在开始渲染前调用`beginRender`，写入统一由`prepare`在渲染前完成。
 	 */
 	public static function isRendering():Bool {
 		return __rendering;
@@ -82,23 +77,13 @@ class TextFieldQueue {
 	public static function add(label:Label):Void {
 		if (label == null)
 			return;
-		var cacheId = label.textCacheId;
 		if (__residentMap.exists(label)) {
-			if (__residentMap.get(label) == cacheId) {
-				// 已经在队列中，只需要确保它会被重新写入
-				invalidate(label);
-				return;
-			}
-			// 切换过缓存器，先摘掉旧的登记
-			remove(label);
+			// 已经在队列中，只需要确保它会被重新写入
+			invalidate(label);
+			return;
 		}
-		__residentMap.set(label, cacheId);
-		var list = __resident[cacheId];
-		if (list == null) {
-			list = [];
-			__resident[cacheId] = list;
-		}
-		list.push(label);
+		__residentMap.set(label, true);
+		__resident.push(label);
 		// 首次上舞台时，它的字符可能还没有写入图集
 		invalidate(label);
 	}
@@ -112,22 +97,17 @@ class TextFieldQueue {
 			return;
 		if (!__residentMap.exists(label))
 			return;
-		var cacheId = __residentMap.get(label);
 		__residentMap.remove(label);
-		var list = __resident[cacheId];
-		if (list != null)
-			list.remove(label);
+		__resident.remove(label);
 		// 离场后不再需要预写
-		if (__pendingMap.exists(label)) {
-			__pendingMap.remove(label);
-			var pending = __pending[cacheId];
-			if (pending != null)
-				pending.remove(label);
-		}
+		drop(label);
 	}
 
 	/**
-	 * 文本内容或者文本格式发生变动时调用，仅对舞台上驻留的文本生效
+	 * 文本内容或者文本格式发生变动时调用，仅对舞台上驻留的文本生效。
+	 *
+	 * 离屏文本（只在测量宽度、或者由`renderLabel`单独绘制的文本）不入队，
+	 * 它会在需要时由`TextFieldRender.render`就地构建布局。
 	 * @param label 文本对象
 	 */
 	public static function invalidate(label:Label):Void {
@@ -135,55 +115,75 @@ class TextFieldQueue {
 			return;
 		if (!__residentMap.exists(label))
 			return;
-		if (__pendingMap.exists(label))
-			return;
-		var cacheId = label.textCacheId;
-		__pendingMap.set(label, cacheId);
-		var list = __pending[cacheId];
-		if (list == null) {
-			list = [];
-			__pending[cacheId] = list;
-		}
-		list.push(label);
+		push(label);
 	}
 
 	/**
-	 * 获得指定缓存器上驻留的文本对象列表，用于图集重排时的重建名单
-	 * @param cacheId 文本缓存id
-	 * @return Array<Label>
+	 * 让所有驻留的文本重新写入图集。
+	 *
+	 * 图集被替换或者释放之后必须调用：此时文本内容没有变、字形却已经失效，
+	 * 只靠内容比对是察觉不到的，文本会一直渲染成空白。
 	 */
-	public static function getResident(cacheId:Int):Array<Label> {
-		var list = __resident[cacheId];
-		return list == null ? __emptyResident : list;
+	public static function invalidateAll():Void {
+		for (label in __resident) {
+			push(label);
+		}
+	}
+
+	/**
+	 * 该文本是否需要重新写入图集
+	 * @param label 文本对象
+	 */
+	public static function isPending(label:Label):Bool {
+		return label != null && __pendingMap.exists(label);
+	}
+
+	/**
+	 * 获得舞台上驻留的文本对象列表
+	 */
+	public static function getResident():Array<Label> {
+		return __resident;
 	}
 
 	/**
 	 * 正式渲染之前调用，把本帧所有变动的文本预写进图集。
 	 *
-	 * 预写过程中图集可能写满并触发整张重排，重排会把所有驻留文本重新标记为待写，
-	 * 因此这里需要循环处理，直到没有新的待写文本为止。
+	 * 预写只做两件事：把字形写进图集、构建文本布局。图集写满时追加新纹理，
+	 * 不会让其他文本重新变脏，所以这里一轮迭代就够了。
 	 */
 	public static function prepare():Void {
 		// 复位渲染标记：渲染器若在渲染途中抛异常，可能来不及调用`endRender`，
 		// 这里每帧兜底一次，避免标记残留导致后续所有写入都被推迟
 		__rendering = false;
-		var loop = 0;
-		// `Map.keys()`返回的迭代器在调用`next()`前`hasNext()`是有效的，这里用它判断是否还有待写文本
-		while (__pendingMap.keys().hasNext() && loop < __maxPrepareLoop) {
-			loop++;
-			// 先快照并清空，避免预写过程中产生的入队被本轮重复处理
-			var list = __pending;
-			__pending = [];
-			__pendingMap = new haxe.ds.ObjectMap();
-			for (cacheId in list.keys()) {
-				var labels = list[cacheId];
-				if (labels == null)
-					continue;
-				for (label in labels) {
-					TextFieldRender.prepareLabel(label);
-				}
-			}
+		if (__pending.length == 0)
+			return;
+		// 先快照再清空，避免预写过程中产生的入队被本轮重复处理
+		var list = __pending;
+		__pending = [];
+		__pendingMap = new haxe.ds.ObjectMap();
+		for (label in list) {
+			TextFieldRender.prepareLabel(label);
 		}
+	}
+
+	/**
+	 * 入队
+	 */
+	private static function push(label:Label):Void {
+		if (__pendingMap.exists(label))
+			return;
+		__pendingMap.set(label, true);
+		__pending.push(label);
+	}
+
+	/**
+	 * 出队
+	 */
+	private static function drop(label:Label):Void {
+		if (!__pendingMap.exists(label))
+			return;
+		__pendingMap.remove(label);
+		__pending.remove(label);
 	}
 
 	/**
@@ -192,13 +192,7 @@ class TextFieldQueue {
 	public static var pendingCount(get, never):Int;
 
 	private static function get_pendingCount():Int {
-		var count = 0;
-		for (cacheId in __pending.keys()) {
-			var labels = __pending[cacheId];
-			if (labels != null)
-				count += labels.length;
-		}
-		return count;
+		return __pending.length;
 	}
 
 	/**
@@ -207,13 +201,7 @@ class TextFieldQueue {
 	public static var residentCount(get, never):Int;
 
 	private static function get_residentCount():Int {
-		var count = 0;
-		var keys = __residentMap.keys();
-		while (keys.hasNext()) {
-			keys.next();
-			count++;
-		}
-		return count;
+		return __resident.length;
 	}
 
 	/**
