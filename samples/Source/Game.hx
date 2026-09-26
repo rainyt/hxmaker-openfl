@@ -1,3 +1,4 @@
+import test.VIrtualFlowListViewRender.VirtualFlowListViewRender;
 import test.VIrtualListViewRender.VirtualListViewRender;
 import test.ParticleRender2;
 import test.ParticleRender;
@@ -52,6 +53,7 @@ class Game extends Stage {
 		ScrollRender,
 		ListViewRender,
 		VirtualListViewRender,
+		VirtualFlowListViewRender,
 		BitmapLabelRender,
 		GraphicRender,
 		XmlRender,
