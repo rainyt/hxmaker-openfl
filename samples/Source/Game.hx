@@ -1,3 +1,4 @@
+import test.TreeViewDemoRender;
 import test.VIrtualFlowListViewRender.VirtualFlowListViewRender;
 import test.VIrtualListViewRender.VirtualListViewRender;
 import test.ParticleRender2;
@@ -71,7 +72,8 @@ class Game extends Stage {
 		ImageRender,
 		LabelRender,
 		MoreLabelRender,
-		TextAtlasOverflowRender
+		TextAtlasOverflowRender,
+		TreeViewDemoRender
 	];
 
 	var title = new Label("Samples Name");
