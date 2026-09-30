@@ -1,5 +1,6 @@
 package ui;
 
+import hx.display.Scroll;
 import hx.layout.AnchorLayoutData;
 import hx.layout.AnchorLayout;
 import hx.events.Event;
@@ -25,10 +26,15 @@ class Menus extends Box {
 		var bg = new Quad(this.width, this.height, 0x282828);
 		bg.layoutData = AnchorLayoutData.fill();
 		this.addChild(bg);
+
+		var scroll = new Scroll();
+		this.addChild(scroll);
+		scroll.scrollXEnable = false;
+		scroll.layoutData = AnchorLayoutData.fill();
+
 		var box = new Box();
-		this.addChild(box);
+		scroll.addChild(box);
 		box.width = this.width;
-		box.height = this.height;
 		box.layout = new VerticalLayout().setGap(5);
 		for (c in Game.tests) {
 			var button = new MenuButton(c);
