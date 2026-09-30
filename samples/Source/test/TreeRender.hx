@@ -16,8 +16,8 @@ class TreeRender extends Scene {
 		tree.width = 400;
 		tree.height = 600;
         tree.itemRendererRecycler = DisplayObjectRecycler.withClass(TreeItemRenderer);
-		this.addChild(tree);
 		var src = new TreeItem("src", [new TreeItem("Main.hx"), new TreeItem("Player.hx")], true);
 		tree.data = [src, new TreeItem("assets"), new TreeItem("project.hxml")];
+        this.addChild(tree);
 	}
 }
