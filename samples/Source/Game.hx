@@ -1,3 +1,4 @@
+import test.TreeRender;
 import test.VIrtualFlowListViewRender.VirtualFlowListViewRender;
 import test.VIrtualListViewRender.VirtualListViewRender;
 import test.ParticleRender2;
@@ -71,6 +72,7 @@ class Game extends Stage {
 		ImageRender,
 		LabelRender,
 		MoreLabelRender,
+		TreeRender,
 		TextAtlasOverflowRender
 	];
 
