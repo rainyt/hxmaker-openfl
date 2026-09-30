@@ -1,5 +1,7 @@
 package test;
 
+import hx.layout.AnchorLayout;
+import hx.layout.AnchorLayoutData;
 import hx.display.TreeItemRenderer;
 import hx.display.DisplayObjectRecycler;
 import hx.display.TreeItem;
@@ -19,5 +21,7 @@ class TreeRender extends Scene {
 		var src = new TreeItem("src", [new TreeItem("Main.hx"), new TreeItem("Player.hx")], true);
 		tree.data = [src, new TreeItem("assets"), new TreeItem("project.hxml")];
         this.addChild(tree);
+        tree.layoutData = AnchorLayoutData.center();
+		this.layout = new AnchorLayout();
 	}
 }
