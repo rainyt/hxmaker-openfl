@@ -26,6 +26,8 @@ import hx.display.Scene;
  *
  * 使用A/D切换到该用例后，滚轮/拖拽滚动、点击行选择、点击文件夹展开、点击箭头热区折叠，底部按钮提供展开全部、
  * 折叠全部、定位到最深的文件（自动展开祖先）与虚拟/普通布局切换（用于对比性能）。
+ * 多选与VSCode资源管理器一致：Ctrl/Cmd+点击切换单个选中，Shift+点击选择区间（Ctrl+Shift追加区间），
+ * 右键已选中的节点会保留多选。
  */
 class TreeRender extends Scene {
 	/**
@@ -65,7 +67,7 @@ class TreeRender extends Scene {
 		tree.itemRendererRecycler = DisplayObjectRecycler.withClass(TreeItemRenderer);
 		tree.data = buildData();
 		tree.addEventListener(Event.CHANGE, function(_) {
-			trace("选中：" + (tree.selectedItem != null ? tree.selectedItem.label : "无"));
+			trace('选中 ${tree.selectedItems.length} 项：' + (tree.selectedItem != null ? tree.selectedItem.label : "无"));
 		});
 		this.addChild(tree);
 		tree.layoutData = AnchorLayoutData.center();
@@ -109,7 +111,7 @@ class TreeRender extends Scene {
 			}
 			// 虚拟模式下children中会额外包含一个占位对象，渲染器数量需要排除它
 			var rendererCount = tree.children.length - (tree.virtual ? 1 : 0);
-			status.data = '模式: ${tree.virtual ? "虚拟列表" : "普通布局"}\n节点总数: ${nodeCount}\n可见行数: ${tree.rowCount}\n渲染器数量: ${rendererCount}\n选中: ${tree.selectedItem != null ? tree.selectedItem.label : "无"}';
+			status.data = '模式: ${tree.virtual ? "虚拟列表" : "普通布局"}\n节点总数: ${nodeCount}\n可见行数: ${tree.rowCount}\n渲染器数量: ${rendererCount}\n选中: ${tree.selectedItem != null ? tree.selectedItem.label : "无"}${tree.selectedItems.length > 1 ? ' (${tree.selectedItems.length}项)' : ""}';
 		});
 	}
 

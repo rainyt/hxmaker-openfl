@@ -1,3 +1,4 @@
+import test.FinderRender;
 import test.TreeRender;
 import test.VIrtualFlowListViewRender.VirtualFlowListViewRender;
 import test.VIrtualListViewRender.VirtualListViewRender;
@@ -73,6 +74,7 @@ class Game extends Stage {
 		LabelRender,
 		MoreLabelRender,
 		TreeRender,
+		FinderRender,
 		TextAtlasOverflowRender
 	];
 
