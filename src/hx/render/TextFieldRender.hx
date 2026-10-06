@@ -83,6 +83,10 @@ class TextFieldRender {
 		rebuildText(textField, label, context);
 		textField.drawText(context, null, true);
 		@:privateAccess textField.__building = false;
+		// 预写完成后消费掉脏标记。叶子显示对象的`__dirty`在渲染遍历中不会被清除
+		// （渲染遍历只清除舞台与容器自身），不清掉的话`Label.getTextWidth/Height`
+		// 每次调用都会重新走一遍完整重建。任何内容/格式变更都会重新置脏，这里清除不会漏建
+		@:privateAccess label.setDirty(false);
 	}
 
 	public inline static function render(label:Label, render:Render):Void {
