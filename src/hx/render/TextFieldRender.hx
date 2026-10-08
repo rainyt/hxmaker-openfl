@@ -83,6 +83,10 @@ class TextFieldRender {
 		rebuildText(textField, label, context);
 		textField.drawText(context, null, true);
 		@:privateAccess textField.__building = false;
+		// 预写完成后消费掉脏标记。叶子显示对象的`__dirty`在渲染遍历中不会被清除
+		// （渲染遍历只清除舞台与容器自身），不清掉的话`Label.getTextWidth/Height`
+		// 每次调用都会重新走一遍完整重建。任何内容/格式变更都会重新置脏，这里清除不会漏建
+		@:privateAccess label.setDirty(false);
 	}
 
 	public inline static function render(label:Label, render:Render):Void {
@@ -142,10 +146,19 @@ class TextFieldRender {
 @:access(hx.display.DisplayObject)
 class Text implements ITextFieldDataProvider {
 	/**
-	 * 回收池
+	 * 字符图片回收池，所有`Text`实例共享，避免文本重建时反复分配
 	 */
 	private static var __images_pool:ObjectPool<Image> = new ObjectPool<Image>(() -> {
 		return new Image();
+	});
+
+	/**
+	 * 字符颜色变换回收池，所有`Text`实例共享。
+	 * `colorTransform`的setter是拷贝语义（`setTo`进`image`自己的实例，不保留传入对象），
+	 * 所以同一个实例配置完立即归还，可以反复使用
+	 */
+	private static var __colorTransformPool:ObjectPool<ColorTransform> = new ObjectPool<ColorTransform>(() -> {
+		return new ColorTransform();
 	});
 
 	/**
@@ -183,6 +196,28 @@ class Text implements ITextFieldDataProvider {
 	@:privateAccess private var __building:Bool = false;
 
 	/**
+	 * 字符世界矩阵是否与`label`当前的世界矩阵一致。
+	 * 文本重建会整体换掉字符对象，即使世界矩阵分量没有变化也必须重算一次，重建后置为`false`
+	 */
+	private var __worldSynced:Bool = false;
+
+	/**
+	 * 上次同步时`label`的世界矩阵分量
+	 */
+	private var __lastWorldA:Float = 0;
+	private var __lastWorldB:Float = 0;
+	private var __lastWorldC:Float = 0;
+	private var __lastWorldD:Float = 0;
+	private var __lastWorldTX:Float = 0;
+	private var __lastWorldTY:Float = 0;
+
+	/**
+	 * 上次同步时`label`的世界透明度与平滑设置
+	 */
+	private var __lastWorldAlpha:Float = -1;
+	private var __lastSmoothing:Bool = false;
+
+	/**
 	 * 文本宽度
 	 */
 	public var textWidth:Null<Float> = null;
@@ -208,18 +243,20 @@ class Text implements ITextFieldDataProvider {
 	}
 
 	public function getChatBounds(index:Int):Rectangle {
-		if (index < 0 || index > images.length) {
+		if (index < 0 || index >= charBounds.length) {
 			return null;
 		}
 		return charBounds[index];
 	}
 
 	public function release():Void {
-		// for (image in images) {
-		// __images_pool.release(image);
-		// }
-		// trace("__images_pool", __images_pool.activeObjects);
-		images = [];
+		for (image in images) {
+			image.data = null;
+			__images_pool.release(image);
+		}
+		// 复用数组本身，减少重建时的分配
+		images.resize(0);
+		charBounds.resize(0);
 	}
 
 	public function drawText(context:TextFieldContextBitmapData, render:Render, isReset:Bool = false):Void {
@@ -234,7 +271,6 @@ class Text implements ITextFieldDataProvider {
 			var offestY = 0.;
 			textWidth = 0;
 			textHeight = 0;
-			charBounds = [];
 			for (index => char in chars) {
 				var atlas = context.getAtlas(char);
 				// 图集里没有这个字符：可能是它本身就无法渲染（拿不到字形边界），按空格处理
@@ -242,14 +278,20 @@ class Text implements ITextFieldDataProvider {
 				var textFormat = label.getCharTextFormatAt(index);
 				var scale = textFormat.size / context.fontSize;
 				if (fntFrame != null) {
-					// var image = __images_pool.get();
-					var image = new Image();
+					var image = __images_pool.get();
 					image.data = fntFrame.data;
 					image.smoothing = label.smoothing;
 					images.push(image);
 					// 追加到渲染区域
 					var color = ColorUtils.toShaderColor(textFormat.color);
-					image.colorTransform = new ColorTransform(color.r, color.g, color.b, 1);
+					// setter是拷贝语义，配置共享池实例后立即归还
+					var colorTransform = __colorTransformPool.get();
+					colorTransform.redMultiplier = color.r;
+					colorTransform.greenMultiplier = color.g;
+					colorTransform.blueMultiplier = color.b;
+					colorTransform.alphaMultiplier = 1;
+					image.colorTransform = colorTransform;
+					__colorTransformPool.release(colorTransform);
 					image.x = offestX;
 					image.y = offestY;
 					offestX += fntFrame.xadvance * scale;
@@ -279,25 +321,63 @@ class Text implements ITextFieldDataProvider {
 			}
 			label.updateAlignTranform();
 			label.__updateTransform(label.parent);
+			// 字符对象已全部换新，即使`label`的世界矩阵分量与上次完全相同，
+			// 也必须在下一次绘制前重算一遍字符的世界矩阵
+			__worldSynced = false;
 		}
 		if (render != null) {
-			for (index => image in images) {
-				if (label.__transformDirty) {
-					var textFormat = label.getCharTextFormatAt(index);
-					var scale = textFormat.size / context.fontSize;
-					var __worldTransform = image.__worldTransform;
-					image.smoothing = label.smoothing;
-					image.__worldAlpha = label.__worldAlpha * image.__alpha;
-					image.setTransformDirty(true);
-					// 世界矩阵
-					__worldTransform.identity();
-					__worldTransform.scale(scale, scale);
-					__worldTransform.concat(image.__transform);
-					// var scale = 0.5;
-					__worldTransform.concat(label.__worldTransform);
-				}
+			// 不能用`label.__transformDirty`做判断：它在祖先节点上永不清除，一旦场景动过
+			// 所有后代文本每帧都会被重新标脏；而`updateAlignTranform`改原点时又不会打脏标记。
+			// 这里改为比对世界矩阵分量，静止的文本直接跳过重算
+			if (__needWorldSync()) {
+				__syncWorldTransform(context);
+			}
+			for (image in images) {
 				ImageRender.render(image, render);
 			}
 		}
+	}
+
+	/**
+	 * 判断字符的世界矩阵是否需要重新同步：
+	 * 刚重建过渲染数据、或`label`的世界矩阵任一分量、世界透明度、平滑设置发生变化
+	 */
+	private function __needWorldSync():Bool {
+		if (!__worldSynced) {
+			return true;
+		}
+		var worldTransform = label.__worldTransform;
+		return __lastWorldA != worldTransform.a || __lastWorldB != worldTransform.b || __lastWorldC != worldTransform.c
+			|| __lastWorldD != worldTransform.d || __lastWorldTX != worldTransform.tx || __lastWorldTY != worldTransform.ty
+			|| __lastWorldAlpha != label.__worldAlpha || __lastSmoothing != label.smoothing;
+	}
+
+	/**
+	 * 把每个字符的世界矩阵、世界透明度同步到`label`的当前值
+	 */
+	private function __syncWorldTransform(context:TextFieldContextBitmapData):Void {
+		var worldTransform = label.__worldTransform;
+		__lastWorldA = worldTransform.a;
+		__lastWorldB = worldTransform.b;
+		__lastWorldC = worldTransform.c;
+		__lastWorldD = worldTransform.d;
+		__lastWorldTX = worldTransform.tx;
+		__lastWorldTY = worldTransform.ty;
+		__lastWorldAlpha = label.__worldAlpha;
+		__lastSmoothing = label.smoothing;
+		for (index => image in images) {
+			var textFormat = label.getCharTextFormatAt(index);
+			var scale = textFormat.size / context.fontSize;
+			var world = image.__worldTransform;
+			image.smoothing = label.smoothing;
+			image.__worldAlpha = label.__worldAlpha * image.__alpha;
+			image.setTransformDirty(true);
+			// 世界矩阵
+			world.identity();
+			world.scale(scale, scale);
+			world.concat(image.__transform);
+			world.concat(worldTransform);
+		}
+		__worldSynced = true;
 	}
 }

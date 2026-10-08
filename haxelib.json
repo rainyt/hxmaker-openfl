@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": [],
   "description": "A unified game engine written in Haxe that can run on any game engine.",
-  "version": "0.1.0",
-  "releasenote": "",
-  "contributors": ["rainyt"],
+  "version": "1.0.0",
+  "releasenote": "首个正式版本：OpenFL 渲染后端，支持多纹理渲染、15 种混合模式、滤镜与多平台发布。",
+  "contributors": ["rainy"],
   "classPath": "src",
   "dependencies": {
 
