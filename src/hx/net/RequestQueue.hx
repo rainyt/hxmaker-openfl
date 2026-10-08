@@ -234,9 +234,6 @@ class RequestQueue {
 		if (entry == null)
 			return 0;
 		entry.refCount--;
-		if (url.indexOf("postman") != -1) {
-			trace("why");
-		}
 		#if assets_debug
 		trace("[RequestQueue] Release resource: " + url + ", new refCount: " + entry.refCount);
 		#end
