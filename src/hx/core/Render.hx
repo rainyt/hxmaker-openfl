@@ -274,6 +274,9 @@ class Render implements IRender {
 
 	@:noCompletion private var __maskSprite:EngineSprite;
 
+	/** 当前正在绘制的遮罩栈，内层结束后恢复外层。 */
+	private var __maskStack:Array<EngineSprite> = [];
+
 	@:noCompletion private var __cacheSprite:Sprite = new Sprite();
 
 	/**
@@ -282,28 +285,39 @@ class Render implements IRender {
 	 */
 	public function setMask(isMask:Bool):Void {
 		if (isMask) {
-			__maskSprite = new EngineSprite();
-			__maskSprite.isPool = false;
-			if (!cacheAsBitmap)
-				this.__stage.addChild(__maskSprite);
+			var sprite = __pool.get();
+			sprite.graphics.clear();
+			if (__maskSprite != null)
+				__maskSprite.addChild(sprite);
+			else if (!cacheAsBitmap)
+				__stage.addChild(sprite);
+			__maskStack.push(sprite);
+			__maskSprite = sprite;
 		} else {
-			if (cacheAsBitmap && __maskSprite != null) {
-				this.__cacheSprite.addChild(__maskSprite);
+			var sprite = __maskStack.pop();
+			__maskSprite = __maskStack.length == 0 ? null : __maskStack[__maskStack.length - 1];
+			// 位图模式只在最外层遮罩结束后绘制，保留内层裁剪与外层裁剪的交集。
+			if (cacheAsBitmap && sprite != null && __maskSprite == null) {
+				this.__cacheSprite.addChild(sprite);
 				__drawMatrix.identity();
 				if (highDpi)
 					__drawMatrix.scale(2, 2);
-				__cacheBitmap.bitmapData.draw(__cacheSprite, __drawMatrix, true);
-				this.__cacheSprite.removeChild(__maskSprite);
-				for (i in 0...__maskSprite.numChildren) {
-					var child:openfl.display.DisplayObject = __maskSprite.getChildAt(i);
-					if (child is EngineSprite) {
-						__pool.release(cast child);
-					}
-				}
-				__maskSprite.removeChildren();
+				__cacheBitmap.bitmapData.draw(__cacheSprite, __drawMatrix, null, null, null, true);
+				this.__cacheSprite.removeChild(sprite);
+				releaseSprite(sprite);
 			}
-			__maskSprite = null;
 		}
+	}
+
+	/** 递归归还绘制容器和嵌套遮罩，避免残留子对象或重复归还。 */
+	private function releaseSprite(sprite:EngineSprite):Void {
+		while (sprite.numChildren > 0) {
+			var child = sprite.removeChildAt(sprite.numChildren - 1);
+			if (child is EngineSprite)
+				releaseSprite(cast child);
+		}
+		if (sprite.isPool)
+			__pool.release(sprite);
 	}
 
 	public var stage(get, never):Sprite;
@@ -347,24 +361,14 @@ class Render implements IRender {
 	}
 
 	public function clear():Void {
-		// 清理舞台
+		// 清理所有层级的绘制容器，嵌套遮罩也归还对象池。
 		for (i in 0...__stage.numChildren) {
 			var display = __stage.getChildAt(i);
-			if (display is EngineSprite) {
-				var sprite:EngineSprite = cast display;
-				if (!sprite.isPool && sprite.numChildren > 0) {
-					for (i in 0...sprite.numChildren) {
-						var child:openfl.display.DisplayObject = sprite.getChildAt(i);
-						if (child is EngineSprite) {
-							__pool.release(cast child);
-						}
-					}
-					sprite.removeChildren();
-				} else if (sprite.isPool) {
-					__pool.release(cast display);
-				}
-			}
+			if (display is EngineSprite)
+				releaseSprite(cast display);
 		}
+		__maskStack.resize(0);
+		__maskSprite = null;
 		__drawCallCount = 0;
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);

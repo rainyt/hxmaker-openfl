@@ -38,6 +38,46 @@ class Engine extends EventDispatcher implements IEngine {
 
 	@:noCompletion private var __stageHeight:Float = 0;
 
+	#if (js && html5)
+	private var __contextMenuElement:js.html.Element;
+	private var __rightMenuHandled:Bool = false;
+	private var __rightMenuTime:Float = 0;
+	private var __rightMenuX:Float = 0;
+	private var __rightMenuY:Float = 0;
+
+	/** 原生事件仅查询接管状态，不重复派发 RIGHT_CLICK；坐标沿用 Lime 的 CSS 缩放及高清转换。 */
+	private function __onNativeContextMenu(event:js.html.MouseEvent):Void {
+		if (__contextMenuElement == null || !__contextMenuElement.contains(cast event.target))
+			return;
+		var surface = __contextMenuElement.querySelector("canvas");
+		if (surface == null)
+			surface = __contextMenuElement;
+		var rect = surface.getBoundingClientRect();
+		if (rect.width <= 0 || rect.height <= 0)
+			return;
+		var x = (event.clientX - rect.left) * stage.window.width / rect.width;
+		var y = (event.clientY - rect.top) * stage.window.height / rect.height;
+		var point = cast(renderer, Render).stage.globalToLocal(new Point(x * stage.window.scale, y * stage.window.scale));
+		var handled = __rightMenuHandled && Timer.stamp() - __rightMenuTime < 1
+			&& Math.abs(point.x - __rightMenuX) < 2 && Math.abs(point.y - __rightMenuY) < 2;
+		var index = stages.length;
+		while (!handled && index-- > 0) {
+			var current = stages[index];
+			var path:Array<hx.display.DisplayObject> = [];
+			if (current.__hitTest(point.x, point.y, path)) {
+				handled = current.hasContextMenuAt(point.x, point.y);
+				break;
+			}
+			if (current.contextMenu != null && current.hasContextMenuAt(point.x, point.y)) {
+				handled = true;
+				break;
+			}
+		}
+		if (handled && event.cancelable)
+			event.preventDefault();
+	}
+	#end
+
 	/**
 	 * 是否锁定横屏
 	 */
@@ -81,6 +121,8 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param stage 
 	 */
 	public function removeToStage(stage:Stage):Void {
+		if (stage.openedContextMenu != null)
+			stage.openedContextMenu.close();
 		stages.remove(stage);
 	}
 
@@ -383,6 +425,11 @@ class Engine extends EventDispatcher implements IEngine {
 		this.stage.addEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN, __onMouseEvent);
 		this.stage.addEventListener(MouseEvent.RIGHT_MOUSE_UP, __onMouseEvent);
+		#if (js && html5)
+		__contextMenuElement = this.stage.window.element;
+		if (__contextMenuElement != null)
+			__contextMenuElement.addEventListener("contextmenu", __onNativeContextMenu, true);
+		#end
 		this.stage.addEventListener(TouchEvent.TOUCH_BEGIN, __onTouchEvent);
 		this.stage.addEventListener(TouchEvent.TOUCH_END, __onTouchEvent);
 		this.stage.addEventListener(TouchEvent.TOUCH_MOVE, __onTouchEvent);
@@ -397,6 +444,14 @@ class Engine extends EventDispatcher implements IEngine {
 		this.stage.removeEventListener(MouseEvent.MOUSE_UP, __onMouseEvent);
 		this.stage.removeEventListener(MouseEvent.MOUSE_WHEEL, __onMouseEvent);
 		this.stage.removeEventListener(MouseEvent.MOUSE_MOVE, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.RIGHT_MOUSE_DOWN, __onMouseEvent);
+		this.stage.removeEventListener(MouseEvent.RIGHT_MOUSE_UP, __onMouseEvent);
+		#if (js && html5)
+		if (__contextMenuElement != null)
+			__contextMenuElement.removeEventListener("contextmenu", __onNativeContextMenu, true);
+		__contextMenuElement = null;
+		__rightMenuHandled = false;
+		#end
 		this.stage.removeEventListener(KeyboardEvent.KEY_DOWN, __onKeyboardEvent);
 		this.stage.removeEventListener(KeyboardEvent.KEY_UP, __onKeyboardEvent);
 	}
@@ -447,6 +502,10 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onMouseEventImpl(e:MouseEvent):Void {
+		#if (js && html5)
+		if (e.type == MouseEvent.MOUSE_DOWN || e.type == MouseEvent.RIGHT_MOUSE_DOWN)
+			__rightMenuHandled = false;
+		#end
 		if (e.target == stage || e.target is hx.display.MakerDisplay) {
 			touchX = e.stageX / scaleFactor;
 			touchY = e.stageY / scaleFactor;
@@ -500,6 +559,14 @@ class Engine extends EventDispatcher implements IEngine {
 					needHitTest = false;
 				}
 			}
+			#if (js && html5)
+			if (type == hx.events.MouseEvent.RIGHT_CLICK) {
+				__rightMenuHandled = engineEvent.contextMenuHandled;
+				__rightMenuTime = Timer.stamp();
+				__rightMenuX = mouseX;
+				__rightMenuY = mouseY;
+			}
+			#end
 		}
 	}
 
@@ -561,6 +628,9 @@ class Engine extends EventDispatcher implements IEngine {
 	 * 释放引擎
 	 */
 	public function dispose():Void {
+		for (current in stages)
+			if (current.openedContextMenu != null)
+				current.openedContextMenu.close();
 		// 删除所有跟stage有关的事件
 		__removeStageEvent();
 		// 清空文本渲染队列，避免静态队列继续持有已销毁的文本对象

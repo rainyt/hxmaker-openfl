@@ -7,6 +7,7 @@ import openfl.utils.ObjectPool;
 import hx.display.Image;
 import hx.text.TextFieldContextBitmapData;
 import hx.providers.ITextFieldDataProvider;
+import hx.providers.ITextFieldLayoutProvider;
 import openfl.text.TextField;
 import hx.core.Render;
 import hx.display.Label;
@@ -144,7 +145,7 @@ class TextFieldRender {
  * 文本渲染显示对象
  */
 @:access(hx.display.DisplayObject)
-class Text implements ITextFieldDataProvider {
+class Text implements ITextFieldLayoutProvider {
 	/**
 	 * 字符图片回收池，所有`Text`实例共享，避免文本重建时反复分配
 	 */
@@ -170,6 +171,20 @@ class Text implements ITextFieldDataProvider {
 	 * 每个字符的边界
 	 */
 	public var charBounds:Array<Rectangle> = [];
+
+	/** 插入位置独立于字形边界，包含尾部空格和文本末尾。 */
+	private var __caretBounds:Array<Rectangle> = [];
+	private var __textBounds:Rectangle = new Rectangle();
+	private var __imageIndices:Array<Int> = [];
+	public var layoutVersion(default, null):Int = 0;
+
+	public function getTextBounds():Rectangle {
+		return __textBounds;
+	}
+
+	public function getCaretBounds(index:Int):Rectangle {
+		return index < 0 || index >= __caretBounds.length ? null : __caretBounds[index];
+	}
 
 	/**
 	 * 应用的显示对象
@@ -236,7 +251,7 @@ class Text implements ITextFieldDataProvider {
 	}
 
 	public function getTextHeight():Float {
-		if (this.textWidth == null) {
+		if (this.textHeight == null) {
 			TextFieldRender.render(this.label, null);
 		}
 		return this.textHeight;
@@ -257,6 +272,8 @@ class Text implements ITextFieldDataProvider {
 		// 复用数组本身，减少重建时的分配
 		images.resize(0);
 		charBounds.resize(0);
+		__caretBounds.resize(0);
+		__imageIndices.resize(0);
 	}
 
 	public function drawText(context:TextFieldContextBitmapData, render:Render, isReset:Bool = false):Void {
@@ -267,58 +284,81 @@ class Text implements ITextFieldDataProvider {
 				allText = Label.onGlobalCharFilter(allText);
 			}
 			var chars = allText.split("");
-			var offestX = 0.;
-			var offestY = 0.;
+			var offsetX = 0.;
+			var offsetY = 0.;
+			var lineAdvance = 0.;
+			var caretHeight:Float = label.fontSize + 2;
+			__textBounds.setTo(0, 0, 0, 0);
 			textWidth = 0;
 			textHeight = 0;
 			for (index => char in chars) {
-				var atlas = context.getAtlas(char);
-				// 图集里没有这个字符：可能是它本身就无法渲染（拿不到字形边界），按空格处理
-				var fntFrame = atlas == null ? null : atlas.getCharFntFrame(char);
 				var textFormat = label.getCharTextFormatAt(index);
 				var scale = textFormat.size / context.fontSize;
-				if (fntFrame != null) {
-					var image = __images_pool.get();
-					image.data = fntFrame.data;
-					image.smoothing = label.smoothing;
-					images.push(image);
-					// 追加到渲染区域
-					var color = ColorUtils.toShaderColor(textFormat.color);
-					// setter是拷贝语义，配置共享池实例后立即归还
-					var colorTransform = __colorTransformPool.get();
-					colorTransform.redMultiplier = color.r;
-					colorTransform.greenMultiplier = color.g;
-					colorTransform.blueMultiplier = color.b;
-					colorTransform.alphaMultiplier = 1;
-					image.colorTransform = colorTransform;
-					__colorTransformPool.release(colorTransform);
-					image.x = offestX;
-					image.y = offestY;
-					offestX += fntFrame.xadvance * scale;
-					if (label.wordWrap && label.__width != null && offestX > label.width) {
-						offestX = fntFrame.xadvance * scale;
-						offestY += 60 * scale;
-						image.x = 0;
-						image.y = offestY;
-					}
-					if (offestX > textWidth)
-						textWidth = offestX;
-					if (offestY + fntFrame.data.rect.height * scale > textHeight) {
-						textHeight = offestY + fntFrame.data.rect.height * scale;
-					}
-					charBounds.push(new Rectangle(offestX - fntFrame.xadvance * scale, offestY, fntFrame.data.rect.width * scale,
-						fntFrame.data.rect.height * scale));
-				} else if (char == "\n") {
-					// 换行处理
+				var atlas = context.getAtlas(char);
+				var frame = atlas == null ? null : atlas.getCharFntFrame(char);
+				var isNewline = char == "\n" || char == "\r";
+				var advance = frame == null ? 30 * scale * 0.8 : frame.xadvance * scale;
+				caretHeight = Math.max(textFormat.size + 2, frame == null ? 0 : frame.data.rect.height * scale);
+				// 空白字符与普通字形遵循同一换行逻辑；过宽的首字符保留在当前行并交给视口裁剪。
+				if (!isNewline && label.wordWrap && label.__width != null && offsetX > 0 && offsetX + advance > label.width) {
+					offsetX = 0;
+					offsetY += lineAdvance;
+					lineAdvance = 0;
+				}
+				lineAdvance = Math.max(lineAdvance, 60 * scale);
+				__caretBounds.push(new Rectangle(offsetX, offsetY, 1, caretHeight));
+				if (isNewline) {
 					charBounds.push(null);
-					offestX = 0;
-					offestY += 60 * scale;
+					textWidth = Math.max(textWidth, offsetX);
+					offsetX = 0;
+					// CRLF 只换行一次，同时保留两个字符索引。
+					if (char != "\n" || index == 0 || chars[index - 1] != "\r")
+						offsetY += lineAdvance;
+					lineAdvance = 0;
 				} else {
-					// 当空格处理
-					charBounds.push(new Rectangle(offestX, offestY, 30 * scale * 0.8, 60 * scale));
-					offestX += 30 * scale * 0.8;
+					var width = frame == null ? advance : frame.data.rect.width * scale;
+					var height = frame == null ? caretHeight : frame.data.rect.height * scale;
+					charBounds.push(new Rectangle(offsetX, offsetY, width, height));
+					if (frame != null) {
+						var image = __images_pool.get();
+						image.data = frame.data;
+						image.smoothing = label.smoothing;
+						image.x = offsetX;
+						image.y = offsetY;
+						images.push(image);
+						__imageIndices.push(index);
+						var color = ColorUtils.toShaderColor(textFormat.color);
+						var colorTransform = __colorTransformPool.get();
+						colorTransform.redMultiplier = color.r;
+						colorTransform.greenMultiplier = color.g;
+						colorTransform.blueMultiplier = color.b;
+						colorTransform.alphaMultiplier = 1;
+						image.colorTransform = colorTransform;
+						__colorTransformPool.release(colorTransform);
+					}
+					textWidth = Math.max(textWidth, offsetX + Math.max(width, advance));
+					offsetX += advance;
+					textHeight = Math.max(textHeight, offsetY + height);
 				}
 			}
+			__caretBounds.push(new Rectangle(offsetX, offsetY, 1, caretHeight));
+			// 同一行的插入位置使用统一高度，字符字形的高低不会影响点击定位。
+			var lineStart = 0;
+			var lineHeight = 0.;
+			for (i in 0...__caretBounds.length) {
+				if (i > lineStart && __caretBounds[i].y != __caretBounds[lineStart].y) {
+					for (j in lineStart...i) __caretBounds[j].height = lineHeight;
+					lineStart = i;
+					lineHeight = 0;
+				}
+				lineHeight = Math.max(lineHeight, __caretBounds[i].height);
+			}
+			for (j in lineStart...__caretBounds.length) __caretBounds[j].height = lineHeight;
+			// 普通文字仍以字形高度测量；末尾换行需要保留空行的布局高度。
+			if (chars.length > 0 && (chars[chars.length - 1] == "\n" || chars[chars.length - 1] == "\r"))
+				textHeight = Math.max(textHeight, offsetY + caretHeight);
+			__textBounds.setTo(0, 0, textWidth, textHeight);
+			layoutVersion++;
 			label.updateAlignTranform();
 			label.__updateTransform(label.parent);
 			// 字符对象已全部换新，即使`label`的世界矩阵分量与上次完全相同，
@@ -366,7 +406,7 @@ class Text implements ITextFieldDataProvider {
 		__lastWorldAlpha = label.__worldAlpha;
 		__lastSmoothing = label.smoothing;
 		for (index => image in images) {
-			var textFormat = label.getCharTextFormatAt(index);
+			var textFormat = label.getCharTextFormatAt(__imageIndices[index]);
 			var scale = textFormat.size / context.fontSize;
 			var world = image.__worldTransform;
 			image.smoothing = label.smoothing;
