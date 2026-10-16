@@ -43,6 +43,24 @@ using Reflect;
 @:access(openfl.geom.Matrix)
 class Render implements IRender implements IScene3DRenderer {
 	private var __scene3DDisplays:ObjectMap<Scene3D, Scene3DDisplay> = new ObjectMap();
+	private var __contextGeneration:Int = 0;
+	/** 离屏与 MakerDisplay 渲染器也按需追随引擎设备代次，不用全局强引用登记表。 */
+	private function prepareContext():Void {
+		if (Hxmaker.engine is Engine) {
+			var generation = cast(Hxmaker.engine, Engine).contextGeneration;
+			if (generation != __contextGeneration) onContextRestored(generation);
+		}
+	}
+	public function onContextRestored(generation:Int):Void {
+		__contextGeneration = generation;
+		currentShader = null; imageBufferData = []; drawImageBuffDataIndex = 0;
+		if (__cacheBitmap != null) {
+			if (__cacheBitmap.bitmapData != null) __cacheBitmap.bitmapData.dispose();
+			__cacheBitmap.bitmapData = null;
+			this.cacheAsBitmap = __cacheAsBitmap;
+		}
+	}
+
 	/**
 	 * 启动多纹理渲染，默认为`true`，但如果后端平台不支持时，那么这个属性会为`false`，同时即使设置成`true`也不会起作用。
 	 */
@@ -366,6 +384,7 @@ class Render implements IRender implements IScene3DRenderer {
 	}
 
 	public function clear():Void {
+		prepareContext();
 		// 清理所有层级的绘制容器，嵌套遮罩也归还对象池。
 		for (i in 0...__stage.numChildren) {
 			var display = __stage.getChildAt(i);
@@ -409,6 +428,7 @@ class Render implements IRender implements IScene3DRenderer {
 	public var enableRenderFilterDisplayObject:DisplayObject = null;
 
 	public function renderDisplayObject(object:DisplayObject):Void {
+		prepareContext();
 		if (object is Scene3D) {
 			var ancestor = object;
 			while (ancestor != null) {

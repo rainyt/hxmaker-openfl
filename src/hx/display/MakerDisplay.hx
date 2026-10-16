@@ -54,6 +54,9 @@ class MakerDisplay extends openfl.display.Sprite {
 	private var __time:Float = 0;
 
 	override private function __enterFrame(deltaTime:Int):Void {
+		if (Hxmaker.engine is Engine && !cast(Hxmaker.engine, Engine).prepareRenderContext()) {
+			__time = Timer.stamp(); return;
+		}
 		var now:Float = Timer.stamp();
 		var currentDeltaTime:Float = now - __time;
 		__time = now;

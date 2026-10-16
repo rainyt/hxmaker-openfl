@@ -9,6 +9,9 @@ import hx.display.EventDispatcher;
 import openfl.geom.Point;
 import hx.filters.StageBitmapData;
 import hx.text.TextFieldQueue;
+import hx.render.TextFieldRender;
+import lime.graphics.RenderContext;
+import lime.ui.Window;
 import hx.utils.DisplayTools;
 import hx.utils.KeyboardTools;
 import hx.display.MakerDisplay;
@@ -33,10 +36,63 @@ import openfl.display.Sprite;
  */
 @:access(hx.display.DisplayObjectContainer)
 @:access(hx.display.Stage)
+@:access(hx.display.DisplayObject)
 class Engine extends EventDispatcher implements IEngine {
 	@:noCompletion private var __stageWidth:Float = 0;
 
 	@:noCompletion private var __stageHeight:Float = 0;
+
+	/** 每次恢复事件产生新的设备代次；同一个原始 GL 对象也不能复用旧句柄。 */
+	public var contextGeneration(default, null):Int = 0;
+	public var contextLost(default, null):Bool = false;
+	public var contextRecoveryPending(default, null):Bool = false;
+	public var contextRecoveryCount(default, null):Int = 0;
+	private var __contextWindow:Window;
+
+	private function __onRenderContextLost():Void {
+		contextLost = true; contextRecoveryPending = false;
+		TextFieldQueue.endRender();
+	}
+
+	private function __onRenderContextRestored(context:RenderContext):Void {
+		contextLost = false; contextRecoveryPending = true; contextGeneration++;
+	}
+
+	/** 在正常帧入口恢复共享资源，事件处理期间不向半初始化设备提交绘制。 */
+	public function prepareRenderContext():Bool {
+		if (contextLost) return false;
+		if (!contextRecoveryPending) return true;
+		if (stage == null || stage.context3D == null || stage.window.context == null) return false;
+		TextFieldRender.onContextRestored();
+		StageBitmapData.onContextRestored();
+		cast(renderer, Render).onContextRestored(contextGeneration);
+		for (current in stages) __invalidateContextTree(current);
+		contextRecoveryPending = false; contextRecoveryCount++;
+		__lastTime = Timer.stamp();
+		return true;
+	}
+
+	private function __invalidateContextTree(object:hx.display.DisplayObject):Void {
+		object.invalidate(); object.setFilterDirty();
+		if (object.__blendFilter != null) object.__blendFilter.invalidate();
+		if (object is hx.display.Scene3D) cast(object, hx.display.Scene3D).requestRender();
+		if (object is DisplayObjectContainer)
+			for (child in cast(object, DisplayObjectContainer).children) __invalidateContextTree(child);
+	}
+
+	private function __initContextEvents():Void {
+		if (__contextWindow == stage.window) return;
+		__removeContextEvents(); __contextWindow = stage.window;
+		__contextWindow.onRenderContextLost.add(__onRenderContextLost);
+		__contextWindow.onRenderContextRestored.add(__onRenderContextRestored);
+	}
+
+	private function __removeContextEvents():Void {
+		if (__contextWindow == null) return;
+		__contextWindow.onRenderContextLost.remove(__onRenderContextLost);
+		__contextWindow.onRenderContextRestored.remove(__onRenderContextRestored);
+		__contextWindow = null;
+	}
 
 	#if (js && html5)
 	private var __contextMenuElement:js.html.Element;
@@ -363,7 +419,7 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onRenderEnterFrameImpl(e:Event):Void {
-		if (render == null)
+		if (render == null || !prepareRenderContext())
 			return;
 		ContextStats.statsCpuStart();
 		var now = Timer.stamp();
@@ -409,6 +465,7 @@ class Engine extends EventDispatcher implements IEngine {
 	}
 
 	private function __initStageEvent():Void {
+		__initContextEvents();
 		#if cpp
 		this.stage.frameRate = 61;
 		#else
@@ -438,6 +495,7 @@ class Engine extends EventDispatcher implements IEngine {
 	}
 
 	private function __removeStageEvent():Void {
+		__removeContextEvents();
 		this.stage.removeEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
 		this.stage.removeEventListener(Event.RESIZE, __onStageSizeEvent);
 		this.stage.removeEventListener(MouseEvent.MOUSE_DOWN, __onMouseEvent);

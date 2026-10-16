@@ -28,10 +28,11 @@ class TextFieldAtlas {
 	public var chars:Map<String, FntFrame> = [];
 	public var emojs:Map<String, FntFrame> = [];
 
-	public function new(width:Int, height:Int) {
+	public function new(width:Int, height:Int, cpuPixels:Bool = false) {
 		var bitmapData = new BitmapData(width, height, true, 0x0);
 		rects = new MaxRectsBinPack(width, height, false);
-		bitmapData.disposeImage();
+		// 恢复后的浏览器图集保留 CPU 像素，draw 使用 Canvas，设备重建时可直接上传。
+		if (!cpuPixels) bitmapData.disposeImage();
 		this.texture = bitmapData;
 		this.bitmapData = hx.display.BitmapData.formData(new OpenFlBitmapData(bitmapData));
 	}
