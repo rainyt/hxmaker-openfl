@@ -1,9 +1,9 @@
 package hx.render3d.openfl;
 
 import lime.graphics.WebGLRenderContext;
-import lime.graphics.opengl.GLTexture;
 import openfl.display.OpenGLRenderer;
 import openfl.display3D.Context3D;
+import openfl.display3D.textures.TextureBase;
 
 /** 原始 GL 绘制完全恢复实际状态，纹理上传涉及的 OpenFL 缓存也一并还原。 */
 @:access(openfl.display.OpenGLRenderer)
@@ -45,12 +45,18 @@ class RenderStateGuard3D {
 			offset:gl.getVertexAttribOffset(index, gl.VERTEX_ATTRIB_ARRAY_POINTER)
 		});
 	}
-	/** 调用时纹理已绑定；同一资源的采样参数只保存一次。 */
-	public function rememberTexture(texture:GLTexture):Void {
+	/** 共享纹理每次从 OpenFL 当前缓存取快照，不永久缓存首次读取的参数。 */
+	public function rememberTexture(texture:TextureBase):Void {
 		for (entry in parameters) if (entry.texture == texture) return;
-		parameters.push({texture:texture, min:gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER),
+		#if hxmaker_3d_full_state_queries
+		// 外部原始 GL 代码绕过 OpenFL 缓存时，可显式启用完整查询兼容路径。
+		parameters.push({texture:texture, sampler:TextureBridge3D.samplerSnapshot(texture), min:gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER),
 			mag:gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER),
-			s:gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S), t:gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T)});
+			s:gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S), t:gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T),
+			anisotropy:Context3D.__glMaxTextureMaxAnisotropy > 0 ? gl.getTexParameter(gl.TEXTURE_2D, Context3D.__glTextureMaxAnisotropy) : 0});
+		#else
+		parameters.push({texture:texture, sampler:TextureBridge3D.samplerSnapshot(texture)});
+		#end
 	}
 	private function toggle(key:Int, value:Bool):Void { if (value) gl.enable(key); else gl.disable(key); }
 	public function restoreTarget():Void {
@@ -63,9 +69,15 @@ class RenderStateGuard3D {
 	public function restore():Void {
 		gl.activeTexture(gl.TEXTURE0);
 		for (entry in parameters) {
-			gl.bindTexture(gl.TEXTURE_2D, entry.texture);
+			#if hxmaker_3d_full_state_queries
+			TextureBridge3D.restoreSampler(entry.texture, entry.sampler);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, entry.min); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, entry.mag);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, entry.s); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, entry.t);
+			if (entry.anisotropy > 0) gl.texParameterf(gl.TEXTURE_2D, Context3D.__glTextureMaxAnisotropy, entry.anisotropy);
+			TextureBridge3D.restoreSamplerCache(entry.texture, entry.sampler);
+			#else
+			TextureBridge3D.restoreSampler(entry.texture, entry.sampler);
+			#end
 		}
 		for (slot in 0...textures.length) { gl.activeTexture(gl.TEXTURE0 + slot); gl.bindTexture(gl.TEXTURE_2D, textures[slot]); }
 		gl.activeTexture(values.get(gl.ACTIVE_TEXTURE));

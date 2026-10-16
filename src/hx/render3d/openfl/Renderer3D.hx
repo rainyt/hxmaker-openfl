@@ -12,14 +12,12 @@ import hx.render3d.Math3D;
 import hx.utils.ContextStats;
 import lime.graphics.WebGLRenderContext;
 import lime.graphics.opengl.GLProgram;
-import lime.graphics.opengl.GL;
 import lime.graphics.opengl.GLBuffer;
 import lime.utils.Float32Array;
 import lime.utils.UInt16Array;
 import openfl.display.OpenGLRenderer;
 import openfl.events.RenderEvent;
 
-private typedef ProgramInfo3D = { var program:GLProgram; var slots:Int; }
 private typedef DrawItem3D = { var mesh:MeshObject; var depth:Float; var order:Int; var key:String; var mirrored:Bool; }
 
 /** 专用三维渲染器，保留二维路径的多纹理设计，但独立提交真实三维顶点。 */
@@ -30,36 +28,46 @@ class Renderer3D {
 	private var gl:WebGLRenderContext;
 	private var vertexBuffer:GLBuffer;
 	private var indexBuffer:GLBuffer;
-	private var composite:GLProgram;
+	private var composite:Program3DInfo;
+	private var capabilitiesReady:Bool = false;
+	private var maxTargetWidth:Int = 1;
+	private var maxTargetHeight:Int = 1;
+	#if (js && html5)
+	private var contextCanvas:js.html.CanvasElement;
+	#end
 	private var target:Scene3DRenderTarget;
 	private var white:openfl.display.BitmapData;
-	private var programs:Map<String, ProgramInfo3D> = [];
+	private var programs:Map<String, Program3DInfo> = [];
 	private var supportedSlots:Int = 1;
 	private var lastVersion:Int = -1;
 	private var lastSettings:String;
+	#if hxmaker_3d_profile
+	private var profileWarmup:Int = 120;
+	private var profileSamples:Array<Float> = [];
+	private var profileMulti:Bool = true;
+	#end
 	public function new() {}
 
 	public function render(scene:Scene3D, display:Scene3DDisplay, event:RenderEvent):Void {
 		if (scene.isDisposed || scene.width <= 0 || scene.height <= 0) return;
 		var renderer:OpenGLRenderer = cast event.renderer;
 		if (renderer.gl == null || renderer.gl.isContextLost()) return;
-		// 同一个 WebGL 对象在上下文恢复后仍可能保留身份，用缓冲有效性辅助识别。
-		if (gl != renderer.gl || (vertexBuffer != null && !renderer.gl.isBuffer(vertexBuffer))) abandonContext();
+		#if hxmaker_3d_profile
+		var profileStart = profileClock();
+		#end
+		// 恢复事件会使设备代次失效，正常帧不再同步探测缓冲句柄。
+		if (gl != renderer.gl) abandonContext();
 		gl = renderer.gl;
-		var count:Int = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
-		count = Std.int(Math.min(16, Math.min(count, gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS))));
-		if (count < 1 || gl.getParameter(gl.MAX_VERTEX_ATTRIBS) < 4) throw "当前设备不支持基础三维顶点或纹理输入";
-		var guard = new RenderStateGuard3D(renderer, count);
+		if (!capabilitiesReady) readCapabilities();
+		var guard = new RenderStateGuard3D(renderer, supportedSlots);
 		try {
-			if (vertexBuffer == null) initialize(count);
+			if (vertexBuffer == null) initialize();
 			if (!Math3D.finite(scene.renderScale) || scene.renderScale <= 0 || !Math3D.finite(scene.backgroundAlpha)
 				|| scene.backgroundAlpha < 0 || scene.backgroundAlpha > 1) throw "三维分辨率或背景透明度无效";
 			var ratio:Float = renderer.__pixelRatio;
 			if (!Math3D.finite(ratio) || ratio <= 0) ratio = 1;
-			var maxSize = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
 			var w = scene.width * ratio * scene.renderScale, h = scene.height * ratio * scene.renderScale;
-			var viewport:Dynamic = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
-			var reduction = Math.min(1, Math.min(Math.min(maxSize, viewport[0]) / w, Math.min(maxSize, viewport[1]) / h));
+			var reduction = Math.min(1, Math.min(maxTargetWidth / w, maxTargetHeight / h));
 			var width = Std.int(Math.max(1, Math.floor(w * reduction))), height = Std.int(Math.max(1, Math.floor(h * reduction)));
 			if (target == null || target.width != width || target.height != height) {
 				if (target != null) target.dispose();
@@ -81,34 +89,80 @@ class Renderer3D {
 			guard.restoreTarget(); drawComposite(scene, display, event, renderer);
 		} catch (error:Dynamic) { guard.restore(); throw error; }
 		guard.restore();
+		#if hxmaker_3d_profile
+		recordProfile(profileClock() - profileStart, scene.multiTextureEnabled);
+		#end
 	}
 
-	private function initialize(count:Int):Void {
-		supportedSlots = count;
-		composite = MultiTextureShader3D.compile(gl,
+	#if hxmaker_3d_profile
+	/** 仅诊断构建计时：先预热，再分组输出完整三维回调的墙钟耗时。 */
+	private static function profileClock():Float {
+		#if (js && html5)
+		return js.Browser.window.performance.now();
+		#else
+		return haxe.Timer.stamp() * 1000;
+		#end
+	}
+	private function recordProfile(elapsed:Float, multi:Bool):Void {
+		if (multi != profileMulti) { profileMulti = multi; profileWarmup = 120; profileSamples = []; }
+		if (profileWarmup > 0) { profileWarmup--; return; }
+		profileSamples.push(elapsed);
+		if (profileSamples.length == 240) {
+			profileSamples.sort(Reflect.compare);
+			var sum = 0.; for (value in profileSamples) sum += value;
+			trace("HXMAKER_3D_PROFILE mode=" + (multi ? "multi" : "single") + " samples=240 meanMs=" + (sum / 240)
+				+ " p50Ms=" + profileSamples[119] + " p95Ms=" + profileSamples[227] + " maxMs=" + profileSamples[239]);
+			profileSamples = [];
+		}
+	}
+	#end
+
+	private function readCapabilities():Void {
+		var count:Int = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+		supportedSlots = Std.int(Math.min(16, Math.min(count, gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS))));
+		if (supportedSlots < 1 || gl.getParameter(gl.MAX_VERTEX_ATTRIBS) < 4) throw "当前设备不支持基础三维顶点或纹理输入";
+		var size = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+		var viewport:Dynamic = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+		maxTargetWidth = Std.int(Math.min(size, viewport[0])); maxTargetHeight = Std.int(Math.min(size, viewport[1]));
+		capabilitiesReady = true;
+		#if (js && html5)
+		var raw:js.html.webgl.RenderingContext = cast gl;
+		var canvas:js.html.CanvasElement = cast raw.canvas;
+		if (canvas != contextCanvas) {
+			removeContextListeners(); contextCanvas = canvas;
+			if (contextCanvas != null) {
+				contextCanvas.addEventListener("webglcontextlost", onContextChange);
+				contextCanvas.addEventListener("webglcontextrestored", onContextChange);
+			}
+		}
+		#end
+	}
+
+	private function initialize():Void {
+		composite = new Program3DInfo(gl, MultiTextureShader3D.compile(gl,
 			"attribute vec3 aPosition;attribute vec2 aUV;uniform mat4 uMatrix;varying mediump vec2 vUV;void main(){gl_Position=uMatrix*vec4(aPosition,1.0);vUV=aUV;}",
 			"precision mediump float;varying mediump vec2 vUV;uniform sampler2D uSampler0;uniform vec4 uColorMultiplier;uniform vec4 uColorOffset;uniform float uAlpha;"
 			+ "void main(){vec4 color=texture2D(uSampler0,vUV);if(color.a>0.0){color.rgb/=color.a;}else{color.rgb=vec3(0.0);}"
-			+ "color=clamp(color*uColorMultiplier+uColorOffset,0.0,1.0);color.a*=uAlpha;gl_FragColor=vec4(color.rgb*color.a,color.a);}");
+			+ "color=clamp(color*uColorMultiplier+uColorOffset,0.0,1.0);color.a*=uAlpha;gl_FragColor=vec4(color.rgb*color.a,color.a);}"), 1, false);
 		vertexBuffer = gl.createBuffer(); indexBuffer = gl.createBuffer();
 		white = new openfl.display.BitmapData(1, 1, true, 0xffffffff);
 	}
 
-	private function getProgram(material:Material3D, multi:Bool):ProgramInfo3D {
+	private function getProgram(material:Material3D, multi:Bool):Program3DInfo {
 		var key = Json.stringify([material.fragmentDeclarations, material.fragmentCode, multi ? Std.string(supportedSlots) : "1"]);
 		var info = programs.get(key);
 		if (info != null) return info;
 		var slots = multi ? supportedSlots : 1;
-		while (true) {
-			try {
-				info = {program:MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode), slots:slots};
-				programs.set(key, info); return info;
-			} catch (error:Dynamic) {
+		var program:GLProgram = null;
+		while (program == null) {
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode); }
+			catch (error:Dynamic) {
 				if (slots <= 1) throw error;
 				trace("三维多纹理 Shader 回退，当前槽位数：" + slots + "，原因：" + Std.string(error));
 				slots = Std.int(Math.max(1, Math.floor(slots / 2)));
 			}
 		}
+		info = new Program3DInfo(gl, program, slots); programs.set(key, info); return info;
 	}
 
 	private function drawScene(scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
@@ -175,27 +229,15 @@ class Renderer3D {
 		if (batch.indices.length == 0) return;
 		var key = Json.stringify([batch.declarations, batch.fragmentCode, scene.multiTextureEnabled ? Std.string(supportedSlots) : "1"]);
 		var info = programs.get(key);
-		gl.useProgram(info.program); gl.uniformMatrix4fv(gl.getUniformLocation(info.program, "uViewProjection"), false, floatData(projection.rawData));
-		gl.uniform1f(gl.getUniformLocation(info.program, "uAlphaMode"), batch.alphaMode);
-		gl.uniform1f(gl.getUniformLocation(info.program, "uAlphaCutoff"), batch.alphaCutoff);
-		// 每次提交重置所有活动自定义 uniform，缺省值不能继承上一份材质。
-		var uniformCount:Int = gl.getProgramParameter(info.program, gl.ACTIVE_UNIFORMS);
-		for (index in 0...uniformCount) {
-			var active = gl.getActiveUniform(info.program, index), name = active.name;
-			if (StringTools.startsWith(name, "uSampler") || name == "uViewProjection" || name == "uAlphaMode" || name == "uAlphaCutoff") continue;
-			if (active.size != 1) throw "自定义三维 uniform 首版不支持数组";
-			var length = switch (active.type) {
-				case GL.FLOAT: 1;
-				case GL.FLOAT_VEC2: 2;
-				case GL.FLOAT_VEC3: 3;
-				case GL.FLOAT_VEC4: 4;
-				case GL.FLOAT_MAT4: 16;
-				default: throw "自定义三维 uniform 首版只支持浮点标量、向量与四阶矩阵";
-			};
-			var values = batch.uniforms.get(name);
-			if (values == null) values = [for (_ in 0...length) 0.];
-			if (values.length != length) throw "自定义 uniform 数值长度与 Shader 声明不一致：" + name;
-			var location = gl.getUniformLocation(info.program, name);
+		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
+		gl.uniform1f(info.location("uAlphaMode"), batch.alphaMode);
+		gl.uniform1f(info.location("uAlphaCutoff"), batch.alphaCutoff);
+		// 描述与位置在链接后缓存，缺省值仍逐批重置，防止材质参数串用。
+		for (uniform in info.customUniforms) {
+			var values = batch.uniforms.get(uniform.name);
+			if (values == null) values = uniform.zero;
+			if (values.length != uniform.length) throw "自定义 uniform 数值长度与 Shader 声明不一致：" + uniform.name;
+			var location = uniform.location;
 			switch (values.length) {
 				case 1: gl.uniform1f(location, values[0]);
 				case 2: gl.uniform2f(location, values[0], values[1]);
@@ -207,11 +249,9 @@ class Renderer3D {
 		for (slot in 0...batch.textures.length) {
 			gl.activeTexture(gl.TEXTURE0 + slot);
 			var texture = TextureBridge3D.resolve(batch.textures[slot], renderer.__context3D);
-			gl.bindTexture(gl.TEXTURE_2D, texture); guard.rememberTexture(texture);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, batch.smoothing ? gl.LINEAR : gl.NEAREST);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, batch.smoothing ? gl.LINEAR : gl.NEAREST);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-			gl.uniform1i(gl.getUniformLocation(info.program, "uSampler" + slot), slot);
+			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
+			TextureBridge3D.applySampler(texture, batch.smoothing);
+			gl.uniform1i(info.location("uSampler" + slot), slot);
 		}
 		if (batch.depthTest) gl.enable(gl.DEPTH_TEST); else gl.disable(gl.DEPTH_TEST);
 		gl.depthFunc(gl.LEQUAL); gl.depthMask(batch.depthWrite);
@@ -234,16 +274,16 @@ class Renderer3D {
 
 	private function drawComposite(scene:Scene3D, display:Scene3DDisplay, event:RenderEvent, renderer:OpenGLRenderer):Void {
 		gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND);
-		gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.useProgram(composite);
+		gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.useProgram(composite.program);
 		gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, target.texture);
-		gl.uniform1i(gl.getUniformLocation(composite, "uSampler0"), 0);
+		gl.uniform1i(composite.location("uSampler0"), 0);
 		var matrix = renderer.getMatrix(event.objectMatrix), values = new Float32Array(16);
 		for (i in 0...16) values[i] = matrix[i];
-		gl.uniformMatrix4fv(gl.getUniformLocation(composite, "uMatrix"), false, values);
+		gl.uniformMatrix4fv(composite.location("uMatrix"), false, values);
 		var color = renderer.__getColorTransform(event.objectColorTransform);
-		gl.uniform4f(gl.getUniformLocation(composite, "uColorMultiplier"), color.redMultiplier, color.greenMultiplier, color.blueMultiplier, color.alphaMultiplier);
-		gl.uniform4f(gl.getUniformLocation(composite, "uColorOffset"), color.redOffset/255, color.greenOffset/255, color.blueOffset/255, color.alphaOffset/255);
-		gl.uniform1f(gl.getUniformLocation(composite, "uAlpha"), renderer.__getAlpha(display.__worldAlpha));
+		gl.uniform4f(composite.location("uColorMultiplier"), color.redMultiplier, color.greenMultiplier, color.blueMultiplier, color.alphaMultiplier);
+		gl.uniform4f(composite.location("uColorOffset"), color.redOffset/255, color.greenOffset/255, color.blueOffset/255, color.alphaOffset/255);
+		gl.uniform1f(composite.location("uAlpha"), renderer.__getAlpha(display.__worldAlpha));
 		var w = scene.width, h = scene.height;
 		var vertices:Array<Float> = [0,0,0,0,1, w,0,0,1,1, w,h,0,1,0, 0,0,0,0,1, w,h,0,1,0, 0,h,0,0,0];
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, floatData(vertices), gl.STREAM_DRAW);
@@ -266,15 +306,27 @@ class Renderer3D {
 
 	/** 上下文已失效时仅丢弃句柄，不能在新上下文删除旧句柄。 */
 	public function abandonContext():Void {
-		gl = null; vertexBuffer = null; indexBuffer = null; composite = null; target = null; programs.clear(); lastVersion = -1;
+		capabilitiesReady = false; gl = null; vertexBuffer = null; indexBuffer = null; composite = null; target = null; programs.clear(); lastVersion = -1;
 		if (white != null) white.dispose(); white = null;
 	}
+	#if (js && html5)
+	private function onContextChange(event:js.html.Event):Void { abandonContext(); }
+	private function removeContextListeners():Void {
+		if (contextCanvas == null) return;
+		contextCanvas.removeEventListener("webglcontextlost", onContextChange);
+		contextCanvas.removeEventListener("webglcontextrestored", onContextChange);
+		contextCanvas = null;
+	}
+	#end
 	public function dispose():Void {
+		#if (js && html5)
+		removeContextListeners();
+		#end
 		if (gl != null && !gl.isContextLost()) {
 			if (target != null) target.dispose();
 			if (vertexBuffer != null) gl.deleteBuffer(vertexBuffer);
 			if (indexBuffer != null) gl.deleteBuffer(indexBuffer);
-			if (composite != null) gl.deleteProgram(composite);
+			if (composite != null) gl.deleteProgram(composite.program);
 			for (info in programs) gl.deleteProgram(info.program);
 		}
 		abandonContext();
