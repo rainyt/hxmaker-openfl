@@ -59,8 +59,11 @@ class Renderer3D {
 		if (scene.isDisposed || scene.width <= 0 || scene.height <= 0) return;
 		var renderer:OpenGLRenderer = cast event.renderer;
 		if (renderer.gl == null || renderer.gl.isContextLost()) return;
+		var timed = scene.profilingEnabled, started = timed ? profileClock() : 0.;
+		var stateTime = 0., shadowTime = 0., mainTime = 0., compositeTime = 0., mark = 0.;
+		var redrawn = false;
 		#if hxmaker_3d_profile
-		var profileStart = profileClock();
+		var profileStart = timed ? started : profileClock();
 		#end
 		// 恢复事件会使设备代次失效，正常帧不再同步探测缓冲句柄。
 		if (gl != renderer.gl) abandonContext();
@@ -69,7 +72,9 @@ class Renderer3D {
 		var meshes = collectMeshes(scene.root);
 		frameNormals = false; for (mesh in meshes) if (mesh.material.lightingEnabled) { frameNormals = true; break; }
 		if (frameNormals && maxAttributes < 5) throw "当前设备不支持光照法线属性";
+		if (timed) mark = profileClock();
 		var guard = new RenderStateGuard3D(renderer, supportedSlots, frameNormals ? 5 : 4);
+		if (timed) stateTime = profileClock() - mark;
 		try {
 			if (vertexBuffer == null) initialize();
 			if (!Math3D.finite(scene.renderScale) || scene.renderScale <= 0 || !Math3D.finite(scene.backgroundAlpha)
@@ -83,12 +88,15 @@ class Renderer3D {
 				if (target != null) target.dispose();
 				target = null; target = new Scene3DRenderTarget(gl, width, height); lastVersion = -1;
 			}
+			scene.stats.targetWidth = width; scene.stats.targetHeight = height;
 			var settingValues:Array<Dynamic> = [scene.multiTextureEnabled ? 1 : 0, scene.backgroundColor, scene.backgroundAlpha,
 				scene.camera == null ? 0 : scene.camera.fieldOfView, scene.camera == null ? 0 : scene.camera.near, scene.camera == null ? 0 : scene.camera.far, scene.lightingKey()];
 			var settings = settingValues.join(":");
 			if (lastVersion != scene.contentVersion || settings != lastSettings) {
-				scene.stats.reset(); scene.stats.targetBytes = width * height * 6;
+				redrawn = true; scene.stats.reset(); scene.stats.targetBytes = width * height * 6;
+				if (timed) mark = profileClock();
 				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots);
+				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
 				frameSlots = supportedSlots - (frameShadow ? 1 : 0);
 				gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer); gl.viewport(0, 0, width, height);
 				gl.disable(gl.SCISSOR_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
@@ -97,18 +105,27 @@ class Renderer3D {
 				gl.clearColor(((scene.backgroundColor >> 16) & 255)/255.*alpha, ((scene.backgroundColor >> 8) & 255)/255.*alpha, (scene.backgroundColor & 255)/255.*alpha, alpha);
 				gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 				if (scene.camera != null) drawScene(scene, meshes, renderer, guard);
+				if (timed) mainTime = profileClock() - mark;
 				lastVersion = scene.contentVersion; lastSettings = settings;
 			}
+			if (timed) mark = profileClock();
 			guard.restoreTarget(); drawComposite(scene, display, event, renderer);
+			if (timed) compositeTime = profileClock() - mark;
 		} catch (error:Dynamic) { guard.restore(); throw error; }
+		if (timed) mark = profileClock();
 		guard.restore();
+		if (timed) stateTime += profileClock() - mark;
+		var stats = scene.stats; stats.renderId++; if (redrawn) stats.redrawId++;
+		stats.redrawThisFrame = redrawn; stats.profileReady = timed;
+		stats.renderCpuMs = timed ? profileClock() - started : 0;
+		stats.shadowCpuMs = shadowTime; stats.mainCpuMs = mainTime;
+		stats.compositeCpuMs = compositeTime; stats.stateCpuMs = stateTime;
 		#if hxmaker_3d_profile
 		recordProfile(profileClock() - profileStart, scene.multiTextureEnabled);
 		#end
 	}
 
-	#if hxmaker_3d_profile
-	/** 仅诊断构建计时：先预热，再分组输出完整三维回调的墙钟耗时。 */
+	/** 按场景显式开启或诊断构建开启时才调用，不在普通路径读取时钟。 */
 	private static function profileClock():Float {
 		#if (js && html5)
 		return js.Browser.window.performance.now();
@@ -116,6 +133,7 @@ class Renderer3D {
 		return haxe.Timer.stamp() * 1000;
 		#end
 	}
+	#if hxmaker_3d_profile
 	private function recordProfile(elapsed:Float, multi:Bool):Void {
 		if (multi != profileMulti) { profileMulti = multi; profileWarmup = 120; profileSamples = []; }
 		if (profileWarmup > 0) { profileWarmup--; return; }
