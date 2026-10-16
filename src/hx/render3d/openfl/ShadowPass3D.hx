@@ -36,7 +36,7 @@ class ShadowPass3D {
 	public function new(gl:WebGLRenderContext, available:Bool, sizedDepth:Bool, maximum:Int) {
 		this.gl = gl; this.available = available; this.sizedDepth = sizedDepth; this.maximum = maximum;
 	}
-	public function render(scene:Scene3D, meshes:Array<MeshObject>, textureUnits:Int):Bool {
+	public function render(scene:Scene3D, meshes:Array<MeshObject>, textureUnits:Int, guard:RenderStateGuard3D):Bool {
 		var light = scene.light;
 		if (light == null || !light.isWorldVisible() || !light.shadowEnabled || light.intensity <= 0) {
 			releaseTarget(); scene.stats.shadowStatus = "关闭"; return false;
@@ -74,6 +74,7 @@ class ShadowPass3D {
 		gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
 		gl.colorMask(false, false, false, false); gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.depthFunc(gl.LEQUAL); gl.depthRange(0, 1);
 		gl.clearDepth(1); gl.clear(gl.DEPTH_BUFFER_BIT); gl.useProgram(program); gl.uniformMatrix4fv(location, false, floats(matrix.rawData));
+		guard.bindVertexArray("shadow");
 		for (i in 1...4) gl.disableVertexAttribArray(i);
 		var positions:Array<Float> = [], elements:Array<Int> = [], key:String = null;
 		function flush():Void {
