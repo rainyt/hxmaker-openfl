@@ -7,28 +7,49 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = ""):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false):GLProgram {
+		shadow = shadow && lit;
 		var precision = "mediump";
 		var format = isDesktop(gl) ? null : gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
 		if (format != null && format.precision > 0) precision = "highp";
 		var vertex = "attribute vec3 aPosition; attribute vec2 aUV; attribute float aTextureId; attribute vec4 aColor;\n"
-			+ "uniform mat4 uViewProjection; varying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n"
-			+ "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;}";
+			+ "uniform mat4 uViewProjection; varying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n";
 		var fragment = "precision " + precision + " float;\nvarying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n"
 			+ "uniform float uAlphaMode; uniform float uAlphaCutoff;\n";
+		if (lit) {
+			vertex += "attribute vec3 aNormal;varying mediump vec3 vNormal;\n";
+			fragment += "varying mediump vec3 vNormal;uniform vec3 uAmbientColor;uniform vec3 uLightColor;uniform vec3 uLightDirection;\n"
+				+ "vec3 toLinear(vec3 c){c=clamp(c,0.0,1.0);return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,step(c,vec3(0.04045)));}\n"
+				+ "vec3 toDisplay(vec3 c){c=max(c,vec3(0.0));return clamp(mix(1.055*pow(c,vec3(1.0/2.4))-0.055,c*12.92,step(c,vec3(0.0031308))),0.0,1.0);}\n";
+		}
+		if (shadow) {
+			var varying = "varying " + precision + " vec4 vShadowPosition;\n";
+			vertex += "uniform mat4 uLightViewProjection;" + varying;
+			fragment += varying + "uniform " + precision + " sampler2D uShadowMap;uniform float uReceiveShadow;uniform float uShadowBias;uniform float uShadowSlopeBias;\n";
+		}
+		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
+			+ (lit ? "vNormal=aNormal;" : "") + (shadow ? "vShadowPosition=uLightViewProjection*vec4(aPosition,1.0);" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
 		fragment += declarations + "\nvoid main(){vec4 color;\n";
-		for (i in 0...slots) {
-			fragment += (i == 0 ? "if" : "else if") + "(vTextureId<" + (i + 0.5) + "){color=texture2D(uSampler" + i + ",vUV);}\n";
-		}
+		for (i in 0...slots) fragment += (i == 0 ? "if" : "else if") + "(vTextureId<" + (i + 0.5) + "){color=texture2D(uSampler" + i + ",vUV);}\n";
 		fragment += "else{color=vec4(1.0,0.0,1.0,1.0);}\n"
-			+ "float sourceAlpha=color.a; if(sourceAlpha>0.0){color.rgb/=sourceAlpha;}else{color.rgb=vec3(0.0);}\n"
-			+ "color*=vColor;\n" + fragmentCode + "\n"
-			+ "if(uAlphaMode<0.5){color.a=1.0;}else if(uAlphaMode<1.5){if(color.a<uAlphaCutoff)discard;color.a=1.0;}\n"
+			+ "float sourceAlpha=color.a;if(sourceAlpha>0.0){color.rgb/=sourceAlpha;}else{color.rgb=vec3(0.0);}\n";
+		fragment += lit ? "color.rgb=toLinear(color.rgb)*toLinear(vColor.rgb);color.a*=vColor.a;\n" : "color*=vColor;\n";
+		fragment += fragmentCode + "\n";
+		if (lit) {
+			fragment += "vec3 normal=vNormal/max(length(vNormal),0.000001);if(!gl_FrontFacing)normal=-normal;"
+				+ "float diffuse=max(dot(normal,-uLightDirection),0.0);float visibility=1.0;\n";
+			if (shadow) fragment += "if(uReceiveShadow>0.5&&vShadowPosition.w>0.0){vec3 p=vShadowPosition.xyz/vShadowPosition.w*0.5+0.5;"
+				+ "if(p.x>=0.0&&p.x<=1.0&&p.y>=0.0&&p.y<=1.0&&p.z>=0.0&&p.z<=1.0){"
+				+ "float bias=uShadowBias+uShadowSlopeBias*(1.0-diffuse);visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);}}\n";
+			fragment += "color.rgb=toDisplay(color.rgb*(uAmbientColor+uLightColor*diffuse*visibility));\n";
+		}
+		fragment += "if(uAlphaMode<0.5){color.a=1.0;}else if(uAlphaMode<1.5){if(color.a<uAlphaCutoff)discard;color.a=1.0;}\n"
 			+ "gl_FragColor=vec4(color.rgb*color.a,color.a);}";
 		return compile(gl, vertex, fragment);
 	}
-	/** 所有程序固定使用属性位置 0 到 3，便于完整恢复宿主属性状态。 */
+
+	/** 位置、UV、纹理编号、颜色固定为 0～3，光照法线为 4。 */
 	public static function compile(gl:WebGLRenderContext, vertex:String, fragment:String):GLProgram {
 		// 桌面兼容 GLSL 不接受 ES 精度声明，集中在程序适配层移除。
 		if (isDesktop(gl)) {
@@ -46,7 +67,9 @@ class MultiTextureShader3D {
 			}
 			program = gl.createProgram(); for (shader in shaders) gl.attachShader(program, shader);
 			gl.bindAttribLocation(program, 0, "aPosition"); gl.bindAttribLocation(program, 1, "aUV");
-			gl.bindAttribLocation(program, 2, "aTextureId"); gl.bindAttribLocation(program, 3, "aColor"); gl.linkProgram(program);
+			gl.bindAttribLocation(program, 2, "aTextureId"); gl.bindAttribLocation(program, 3, "aColor");
+			if (vertex.indexOf("attribute vec3 aNormal") >= 0) gl.bindAttribLocation(program, 4, "aNormal");
+			gl.linkProgram(program);
 			var linked:Dynamic = gl.getProgramParameter(program, gl.LINK_STATUS);
 			if (linked == false || linked == 0) throw "三维 Shader 链接失败：" + gl.getProgramInfoLog(program);
 		} catch (error:Dynamic) {

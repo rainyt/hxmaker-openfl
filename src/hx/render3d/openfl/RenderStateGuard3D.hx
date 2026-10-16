@@ -18,7 +18,7 @@ class RenderStateGuard3D {
 	private var textures:Array<Dynamic> = [];
 	private var attributes:Array<Dynamic> = [];
 	private var parameters:Array<Dynamic> = [];
-	public function new(renderer:OpenGLRenderer, slots:Int) {
+	public function new(renderer:OpenGLRenderer, slots:Int, attributeCount:Int = 4) {
 		gl = renderer.gl; context = renderer.__context3D;
 		// 蒙版可能刚更新待提交状态，先同步后才能保存真实的父级裁剪。
 		context.__flushGL(); cachedTexture = context.__contextState.__currentGLTexture2D;
@@ -35,7 +35,7 @@ class RenderStateGuard3D {
 			gl.activeTexture(gl.TEXTURE0 + slot); textures.push(gl.getParameter(gl.TEXTURE_BINDING_2D));
 		}
 		gl.activeTexture(values.get(gl.ACTIVE_TEXTURE));
-		for (index in 0...4) attributes.push({
+		for (index in 0...attributeCount) attributes.push({
 			buffer:gl.getVertexAttrib(index, gl.VERTEX_ATTRIB_ARRAY_BUFFER_BINDING),
 			enabled:gl.getVertexAttrib(index, gl.VERTEX_ATTRIB_ARRAY_ENABLED),
 			size:gl.getVertexAttrib(index, gl.VERTEX_ATTRIB_ARRAY_SIZE),
