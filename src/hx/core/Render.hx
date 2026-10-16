@@ -1,5 +1,9 @@
 package hx.core;
 
+import hx.display.Scene3D;
+import hx.render3d.IScene3DRenderer;
+import hx.render3d.openfl.Scene3DDisplay;
+import haxe.ds.ObjectMap;
 import hx.shader.MultiTextureFastShader;
 import hx.filters.StageBitmapData;
 import openfl.display.Bitmap;
@@ -37,7 +41,8 @@ using Reflect;
 @:keep
 @:access(hx.display.DisplayObject)
 @:access(openfl.geom.Matrix)
-class Render implements IRender {
+class Render implements IRender implements IScene3DRenderer {
+	private var __scene3DDisplays:ObjectMap<Scene3D, Scene3DDisplay> = new ObjectMap();
 	/**
 	 * 启动多纹理渲染，默认为`true`，但如果后端平台不支持时，那么这个属性会为`false`，同时即使设置成`true`也不会起作用。
 	 */
@@ -404,6 +409,14 @@ class Render implements IRender {
 	public var enableRenderFilterDisplayObject:DisplayObject = null;
 
 	public function renderDisplayObject(object:DisplayObject):Void {
+		if (object is Scene3D) {
+			var ancestor = object;
+			while (ancestor != null) {
+				if (cacheAsBitmap || ancestor.shader != null || ancestor.blendMode != NORMAL || (ancestor.filters != null && ancestor.filters.length > 0))
+					throw "Scene3D 及其祖先首版暂不支持位图缓存、二维 Shader、滤镜或特殊合成混合模式";
+				ancestor = ancestor.parent;
+			}
+		}
 		if (object.parent != null && object.parent.__transformDirty) {
 			object.setTransformDirty();
 		}
@@ -450,7 +463,9 @@ class Render implements IRender {
 			endFillImageDataBuffer();
 			this.setMask(true);
 		}
-		if (object is Image) {
+		if (object is Scene3D) {
+			renderScene3D(cast object);
+		} else if (object is Image) {
 			renderImage(cast object);
 		} else if (object is DisplayObjectContainer) {
 			renderDisplayObjectContainer(cast object);
@@ -478,6 +493,27 @@ class Render implements IRender {
 			endFillImageDataBuffer();
 			currentShader = renderShader;
 		}
+	}
+
+	/** 三维场景作为显示树叶节点接入，GPU 提交在 OpenFL 的对象绘制回调中执行。 */
+	public function renderScene3D(scene:Scene3D):Void {
+		endFillImageDataBuffer();
+		if (scene.isDisposed || scene.hide || !scene.visible || scene.width <= 0 || scene.height <= 0) return;
+		var display = __scene3DDisplays.get(scene);
+		if (display == null) {
+			display = new Scene3DDisplay(scene, function(_) { __scene3DDisplays.remove(scene); });
+			__scene3DDisplays.set(scene, display);
+		}
+		var matrix = scene.__worldTransform;
+		display.transform.matrix = new Matrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
+		var color = scene.__colorTransform;
+		display.transform.colorTransform = color == null ? new openfl.geom.ColorTransform() : new openfl.geom.ColorTransform(
+			color.redMultiplier, color.greenMultiplier, color.blueMultiplier, color.alphaMultiplier,
+			color.redOffset, color.greenOffset, color.blueOffset, color.alphaOffset);
+		display.alpha = scene.__worldAlpha;
+		if (__maskSprite != null) __maskSprite.addChild(display); else stage.addChild(display);
+		scene.__dirty = false;
+		ContextStats.statsVisibleDisplayCounts();
 	}
 
 	public function renderDisplayObjectContainer(container:DisplayObjectContainer) {
