@@ -228,6 +228,7 @@ class Renderer3D {
 			var source = TextureBridge3D.source(material.texture, white);
 			// 先上传纹理并确定实际尺寸，后续才计算图集 UV。
 			gl.activeTexture(gl.TEXTURE0); TextureBridge3D.resolve(source, renderer.__context3D);
+			TextureBridge3D.validateWrap(material, source);
 			if (batch != null && batch.key != item.key) { submit(batch, projection, scene, renderer, guard); scene.stats.split("material"); batch = null; }
 			if (batch == null) batch = new MeshBatch3D(material, item.mirrored, info.slots, mesh.receiveShadow);
 			var world = mesh.getWorldVertices(), normals = material.lightingEnabled ? mesh.getWorldNormals() : null;
@@ -261,6 +262,7 @@ class Renderer3D {
 		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
 		gl.uniform1f(info.location("uAlphaMode"), batch.alphaMode);
 		gl.uniform1f(info.location("uAlphaCutoff"), batch.alphaCutoff);
+		if (!batch.lit) gl.uniform1f(info.location("uLinearBaseColor"), batch.colorMultiplyLinear ? 1 : 0);
 		if (batch.lit) applyLighting(info, scene, batch.receiveShadow);
 		// 描述与位置在链接后缓存，缺省值仍逐批重置，防止材质参数串用。
 		for (uniform in info.customUniforms) {
@@ -280,7 +282,7 @@ class Renderer3D {
 			gl.activeTexture(gl.TEXTURE0 + slot);
 			var texture = TextureBridge3D.resolve(batch.textures[slot], renderer.__context3D);
 			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
-			TextureBridge3D.applySampler(texture, batch.smoothing);
+			TextureBridge3D.applySampler(texture, batch.smoothing, batch.wrapU, batch.wrapV, batch.minSmoothing);
 			gl.uniform1i(info.location("uSampler" + slot), slot);
 		}
 		if (batch.depthTest) gl.enable(gl.DEPTH_TEST); else gl.disable(gl.DEPTH_TEST);

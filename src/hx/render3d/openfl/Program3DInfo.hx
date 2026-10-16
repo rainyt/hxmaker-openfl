@@ -21,7 +21,7 @@ class Program3DInfo {
 	public function new(gl:WebGLRenderContext, program:GLProgram, slots:Int, reflectCustom:Bool = true) {
 		this.program = program; this.slots = slots;
 		try {
-			for (name in (reflectCustom ? ["uViewProjection", "uAlphaMode", "uAlphaCutoff", "uAmbientColor", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
+			for (name in (reflectCustom ? ["uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
 				locations.set(name, gl.getUniformLocation(program, name));
 			for (slot in 0...slots) {
 				var name = "uSampler" + slot;

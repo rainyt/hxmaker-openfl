@@ -1,6 +1,8 @@
 package hx.render3d.openfl;
 
 import hx.display.BitmapData;
+import hx.material.Material3D;
+import openfl.display3D.Context3DWrapMode;
 import openfl.display3D.Context3D;
 import lime.graphics.opengl.GLTexture;
 import openfl.display3D.textures.TextureBase;
@@ -30,8 +32,31 @@ class TextureBridge3D {
 	}
 	public static function handle(texture:TextureBase):GLTexture { return texture.__textureID; }
 	/** 使用 OpenFL 的采样状态缓存，临时切换与恢复都经过同一个协议。 */
-	public static function applySampler(texture:TextureBase, smoothing:Bool):Void {
-		texture.__setSamplerState(smoothing ? linearSampler : nearestSampler);
+	public static function applySampler(texture:TextureBase, smoothing:Bool, wrapU:Int = 33071, wrapV:Int = 33071, minSmoothing:Null<Bool> = null):Void {
+		var min = minSmoothing == null ? smoothing : minSmoothing;
+		if (wrapU != 33648 && wrapV != 33648 && min == smoothing) {
+			if (wrapU == 33071 && wrapV == 33071) texture.__setSamplerState(smoothing ? linearSampler : nearestSampler);
+			else {
+				var wrap:Context3DWrapMode = wrapU == 10497 ? (wrapV == 10497 ? REPEAT : REPEAT_U_CLAMP_V) : CLAMP_U_REPEAT_V;
+				texture.__setSamplerState(new SamplerState(wrap, smoothing ? LINEAR : NEAREST, MIPNONE));
+			}
+		} else {
+			// OpenFL 的采样枚举不能表达镜像或独立缩小过滤；修改后清空缓存，使恢复强制同步。
+			var gl = texture.__context.gl;
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min ? gl.LINEAR : gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, smoothing ? gl.LINEAR : gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapU);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapV);
+			texture.__samplerState = null;
+		}
+	}
+	/** 跨 WebGL 1 的重复采样只接受无填充的二次幂整图，避免不完整纹理产生黑色。 */
+	public static function validateWrap(material:Material3D, source:openfl.display.BitmapData):Void {
+		if (material.texture == null || (material.textureWrapU == 33071 && material.textureWrapV == 33071)) return;
+		var width = source.width, height = source.height;
+		if (material.texture.rect != null || (width & (width - 1)) != 0 || (height & (height - 1)) != 0
+			|| width != source.__textureWidth || height != source.__textureHeight)
+			throw "三维重复或镜像采样当前要求无图集、无填充的二次幂整图；非二次幂图片请使用 CLAMP";
 	}
 	public static function samplerSnapshot(texture:TextureBase):SamplerState {
 		return texture.__samplerState == null ? null : texture.__samplerState.clone();

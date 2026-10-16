@@ -15,12 +15,12 @@ class MultiTextureShader3D {
 		var vertex = "attribute vec3 aPosition; attribute vec2 aUV; attribute float aTextureId; attribute vec4 aColor;\n"
 			+ "uniform mat4 uViewProjection; varying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n";
 		var fragment = "precision " + precision + " float;\nvarying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n"
-			+ "uniform float uAlphaMode; uniform float uAlphaCutoff;\n";
+			+ "uniform float uAlphaMode; uniform float uAlphaCutoff; uniform float uLinearBaseColor;\n";
+		fragment += "vec3 toLinear(vec3 c){c=clamp(c,0.0,1.0);return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,step(c,vec3(0.04045)));}\n"
+			+ "vec3 toDisplay(vec3 c){c=max(c,vec3(0.0));return clamp(mix(1.055*pow(c,vec3(1.0/2.4))-0.055,c*12.92,step(c,vec3(0.0031308))),0.0,1.0);}\n";
 		if (lit) {
 			vertex += "attribute vec3 aNormal;varying mediump vec3 vNormal;\n";
-			fragment += "varying mediump vec3 vNormal;uniform vec3 uAmbientColor;uniform vec3 uLightColor;uniform vec3 uLightDirection;\n"
-				+ "vec3 toLinear(vec3 c){c=clamp(c,0.0,1.0);return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,step(c,vec3(0.04045)));}\n"
-				+ "vec3 toDisplay(vec3 c){c=max(c,vec3(0.0));return clamp(mix(1.055*pow(c,vec3(1.0/2.4))-0.055,c*12.92,step(c,vec3(0.0031308))),0.0,1.0);}\n";
+			fragment += "varying mediump vec3 vNormal;uniform vec3 uAmbientColor;uniform vec3 uLightColor;uniform vec3 uLightDirection;\n";
 		}
 		if (shadow) {
 			var varying = "varying " + precision + " vec4 vShadowPosition;\n";
@@ -34,7 +34,7 @@ class MultiTextureShader3D {
 		for (i in 0...slots) fragment += (i == 0 ? "if" : "else if") + "(vTextureId<" + (i + 0.5) + "){color=texture2D(uSampler" + i + ",vUV);}\n";
 		fragment += "else{color=vec4(1.0,0.0,1.0,1.0);}\n"
 			+ "float sourceAlpha=color.a;if(sourceAlpha>0.0){color.rgb/=sourceAlpha;}else{color.rgb=vec3(0.0);}\n";
-		fragment += lit ? "color.rgb=toLinear(color.rgb)*toLinear(vColor.rgb);color.a*=vColor.a;\n" : "color*=vColor;\n";
+		fragment += lit ? "color.rgb=toLinear(color.rgb)*toLinear(vColor.rgb);color.a*=vColor.a;\n" : "if(uLinearBaseColor>0.5){color.rgb=toDisplay(toLinear(color.rgb)*toLinear(vColor.rgb));color.a*=vColor.a;}else{color*=vColor;}\n";
 		fragment += fragmentCode + "\n";
 		if (lit) {
 			fragment += "vec3 normal=vNormal/max(length(vNormal),0.000001);if(!gl_FrontFacing)normal=-normal;"
