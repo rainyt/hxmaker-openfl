@@ -7,9 +7,10 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false, ibl:Bool = false):GLProgram {
 		shadow = shadow && lit;
 		pbr = pbr && lit;
+		ibl = ibl && pbr;
 		if (textureNames == null) textureNames = [];
 		var precision = isDesktop(gl) ? "highp" : "mediump";
 		var format = isDesktop(gl) ? null : gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
@@ -41,6 +42,25 @@ class MultiTextureShader3D {
 				+ "float visibility=0.5/max(gv+gl,0.0001);vec3 f=pbrFresnel(dot(v,h),mix(vec3(0.04),base,metal));"
 				+ "vec3 diffusePart=(vec3(1.0)-f)*(1.0-metal)*base/3.14159265;"
 				+ "return (diffusePart+f*(distribution*visibility))*nl;}\n";
+		}
+		if (ibl) {
+			// 所有预积分数据使用同一不透明线性图集，避免立方体采样与显式 LOD 扩展依赖。
+			fragment += "uniform sampler2D uIblAtlas;uniform vec2 uIblAtlasSize;uniform vec4 uIblLayout;uniform vec3 uIblTransform;\n"
+				+ "vec3 iblDirection(vec3 d){return vec3(uIblTransform.x*d.x-uIblTransform.y*d.z,d.y,uIblTransform.y*d.x+uIblTransform.x*d.z); }\n"
+				+ "vec3 iblLayer(vec3 direction,float layer){vec3 d=iblDirection(length(direction)>0.0001?normalize(direction):vec3(0.0,1.0,0.0));"
+				+ "float u=0.5;if(dot(d.xz,d.xz)>0.000001)u=fract(atan(d.z,d.x)/6.28318531+0.5);float v=acos(clamp(d.y,-1.0,1.0))/3.14159265;"
+				+ "vec2 pixel=vec2(1.0+u*uIblLayout.x,layer*(uIblLayout.y+2.0)+1.0+v*uIblLayout.y);"
+				+ "return texture2D(uIblAtlas,pixel/uIblAtlasSize).rgb*uIblLayout.w;}\n"
+				+ "vec3 pbrEnvironment(vec3 n,vec3 v,vec3 base,float metal,float rough){"
+				+ "float nv=clamp(dot(n,v),0.0,1.0);vec3 f0=mix(vec3(0.04),base,metal);"
+				+ "float level=rough*(uIblLayout.z-1.0);float lo=floor(level);vec3 reflected=reflect(-v,n);"
+				+ "vec3 reflection=mix(iblLayer(reflected,lo),iblLayer(reflected,min(lo+1.0,uIblLayout.z-1.0)),fract(level));"
+				+ "float lutY=(uIblLayout.y+2.0)*(uIblLayout.z+1.0);"
+				+ "vec2 lutPixel=vec2(1.5+nv*(uIblLayout.x-1.0),lutY+1.5+rough*(uIblLayout.x-1.0));"
+				+ "vec2 brdf=texture2D(uIblAtlas,lutPixel/uIblAtlasSize).rg;"
+				+ "float grazing=pow(1.0-nv,5.0);vec3 f=f0+(max(vec3(1.0-rough),f0)-f0)*grazing;"
+				+ "vec3 diffuse=iblLayer(n,uIblLayout.z)*base*(1.0-metal)*(vec3(1.0)-f);"
+				+ "return (diffuse+reflection*(f0*brdf.x+vec3(brdf.y)))*uIblTransform.z;}\n";
 		}
 		if (shadow) {
 			var varying = "varying " + precision + " vec4 vShadowPosition;\n";
@@ -90,6 +110,7 @@ class MultiTextureShader3D {
 					+ (pbr ? "radiance+=pbrDirect(normal,viewDirection,toLight,color.rgb,metal,rough)*lc.rgb*attenuation*mix(1.0,visibility,lc.a);"
 						: "illumination+=lc.rgb*max(dot(normal,toLight),0.0)*attenuation*mix(1.0,visibility,lc.a);") + "}}\n";
 			}
+			if (ibl) fragment += "radiance+=pbrEnvironment(normal,viewDirection,color.rgb,metal,rough);\n";
 			if (pbr) fragment += "radiance=max((radiance+uPbrEmissive)*uPbrExposure,vec3(0.0));"
 				+ "if(uPbrToneMapping>0.5)radiance=radiance/(vec3(1.0)+radiance);color.rgb=toDisplay(radiance);\n";
 			else fragment += "color.rgb=toDisplay(color.rgb*illumination);\n";

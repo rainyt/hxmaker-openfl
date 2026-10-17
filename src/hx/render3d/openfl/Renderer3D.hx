@@ -54,6 +54,9 @@ class Renderer3D {
 	private var frameNormals:Bool = false;
 	private var frameLights:Array<hx.light.Light3D> = [];
 	private var frameShadow:Bool = false;
+	private var frameIbl:Bool = false;
+	private var environmentSlot:Int = 0;
+	private var frameEnvironment:hx.light.Environment3D;
 	private var sceneShadowFilter:Int = 0;
 	private var maxAttributes:Int = 4;
 	private var depthTextures:Bool = false;
@@ -111,6 +114,7 @@ class Renderer3D {
 				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
 				sceneShadowFilter = frameShadow ? cast scene.light.shadowFilter : 0;
 				frameSlots = supportedSlots - (frameShadow ? 1 : 0);
+				prepareEnvironment(scene, meshes);
 				prepareSoftDepth(scene, meshes, renderer, guard, width, height);
 				gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer); gl.viewport(0, 0, width, height);
 				gl.disable(gl.SCISSOR_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
@@ -178,6 +182,45 @@ class Renderer3D {
 			}
 		}
 		#end
+	}
+
+	/** IBL 预留一个公共纹理槽；不增加绘制通道，也不拆分相同参数的 PBR 网格。 */
+	private function prepareEnvironment(scene:Scene3D, meshes:Array<MeshObject>):Void {
+		frameIbl = false; frameEnvironment = scene.environment;
+		if (frameEnvironment == null || !frameEnvironment.enabled || frameEnvironment.intensity == 0) return;
+		var needed = false, auxiliary = 0;
+		for (mesh in meshes) {
+			if (mesh.material.lightingEnabled && mesh.material.pbrEnabled) needed = true;
+			auxiliary = Std.int(Math.max(auxiliary, mesh.material.textureUniformNames().length));
+		}
+		if (!needed) { scene.stats.environmentStatus = "无 PBR 材质"; return; }
+		if (frameSlots - auxiliary < 2) { scene.stats.environmentStatus = "回退：纹理槽位不足"; return; }
+		var source = TextureBridge3D.source(frameEnvironment.atlas, white);
+		if (source.width > maxTargetWidth || source.height > maxTargetHeight) {
+			scene.stats.environmentStatus = "回退：环境图集超过设备尺寸限制"; return;
+		}
+		if (!fragmentDepthPrecision && frameEnvironment.radianceRange > 60000) {
+			scene.stats.environmentStatus = "回退：环境辐射范围超过片元精度"; return;
+		}
+		frameSlots--; environmentSlot = frameSlots; frameIbl = true;
+		scene.stats.environmentStatus = "启用";
+	}
+
+	/** 借用 Assets 的图集纹理；上下文恢复时沿用 OpenFL 的重新上传与采样状态恢复协议。 */
+	private function applyEnvironment(info:Program3DInfo, scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
+		guard.activateTexture(environmentSlot);
+		var source = TextureBridge3D.source(frameEnvironment.atlas, white);
+		var texture = TextureBridge3D.resolve(source, renderer.__context3D);
+		var size = TextureBridge3D.uvSize(source);
+		scene.stats.environmentTextureBytes = Std.int(size[0] * size[1] * 4);
+		gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
+		TextureBridge3D.applySampler(texture, true);
+		gl.uniform1i(info.location("uIblAtlas"), environmentSlot);
+		gl.uniform2f(info.location("uIblAtlasSize"), size[0], size[1]);
+		gl.uniform4f(info.location("uIblLayout"), frameEnvironment.layerWidth, frameEnvironment.layerHeight,
+			frameEnvironment.levels, frameEnvironment.radianceRange);
+		var angle = (frameEnvironment.rotation % 360) * Math.PI / 180;
+		gl.uniform3f(info.location("uIblTransform"), Math.cos(angle), Math.sin(angle), frameEnvironment.intensity);
 	}
 
 	/** 单独预绘制不透明和裁剪物体，主目标不会同时挂接被采样的深度纹理。 */
@@ -257,7 +300,7 @@ class Renderer3D {
 	}
 
 	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool, pbr:Bool):String {
-		return Json.stringify([pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
+		return Json.stringify([pbr && frameIbl ? 1 : 0, pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -282,7 +325,7 @@ class Renderer3D {
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null, lightSlots = material.lightingEnabled ? Scene3D.MAX_LIGHTS : 0;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1, lightSlots, material.pbrEnabled); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1, lightSlots, material.pbrEnabled, frameIbl); }
 			catch (error:Dynamic) {
 				if (slots <= 1) {
 					if (lightSlots <= 1) throw error;
@@ -362,6 +405,7 @@ class Renderer3D {
 		gl.uniform1f(info.location("uAlphaCutoff"), batch.alphaCutoff);
 		if (!batch.lit) gl.uniform1f(info.location("uLinearBaseColor"), batch.colorMultiplyLinear ? 1 : 0);
 		if (batch.lit) applyLighting(info, scene, batch.receiveShadow, guard);
+		if (batch.pbr && frameIbl) applyEnvironment(info, scene, renderer, guard);
 		if (batch.uvCode != "") {
 			var source = TextureBridge3D.source(batch.baseTexture, white);
 			guard.activateTexture(0); TextureBridge3D.resolve(source, renderer.__context3D);
@@ -377,6 +421,8 @@ class Renderer3D {
 			var texture = TextureBridge3D.resolve(source, renderer.__context3D);
 			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
 			// 辅助贴图只使用 CLAMP，重复由 Shader 在区域内部完成。
+			if (frameIbl && batch.pbr && source == TextureBridge3D.source(frameEnvironment.atlas, white))
+				throw "IBL 数据图集不能同时作为 PBR 辅助纹理";
 			if (batch.textures.indexOf(source) >= 0 && (batch.wrapU != 33071 || batch.wrapV != 33071))
 				throw "同一底层纹理同时作为主贴图和辅助贴图时，主贴图必须使用 CLAMP";
 			TextureBridge3D.applySampler(texture, batch.smoothing, 33071, 33071, batch.minSmoothing);
@@ -400,6 +446,8 @@ class Renderer3D {
 			}
 		}
 		for (slot in 0...batch.textures.length) {
+			if (frameIbl && batch.pbr && batch.textures[slot] == TextureBridge3D.source(frameEnvironment.atlas, white))
+				throw "IBL 数据图集不能同时作为 PBR 基础色纹理";
 			guard.activateTexture(slot);
 			var texture = TextureBridge3D.resolve(batch.textures[slot], renderer.__context3D);
 			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
@@ -436,7 +484,7 @@ class Renderer3D {
 		gl.drawElements(gl.TRIANGLES, batch.indices.length, gl.UNSIGNED_SHORT, 0);
 		scene.stats.drawCalls++; scene.stats.triangles += Std.int(batch.indices.length / 3);
 		scene.stats.uploadedBytes += batch.vertices.length * 4 + batch.indices.length * 2;
-		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length + (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0 ? 1 : 0)));
+		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length + (frameIbl && batch.pbr ? 1 : 0) + (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0 ? 1 : 0)));
 		ContextStats.statsDrawCall(); ContextStats.statsVertexCount(batch.indices.length);
 	}
 
@@ -549,7 +597,7 @@ class Renderer3D {
 		if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null;
 		frameLights = [];
 		if (shadowPass != null) shadowPass.abandonContext(); shadowPass = null;
-		frameShadow = false; frameSlots = 1; frameSoft = false;
+		frameShadow = false; frameSlots = 1; frameSoft = false; frameIbl = false; frameEnvironment = null;
 		softDepth = null; softFailure = ""; bloomPass = null; bloomReady = false; bloomFailure = "";
 		capabilitiesReady = false; gl = null; vertexBuffer = null; indexBuffer = null; composite = null; bloomComposite = null; target = null; programs.clear(); lastVersion = -1;
 		if (white != null) white.dispose(); white = null;
