@@ -14,7 +14,7 @@ class VertexArrayBridge3D {
 		#if (js && html5)
 		var raw:Dynamic = cast gl;
 		this.webgl2 = webgl2;
-		#if (!hxmaker_3d_legacy_state_guard && !hxmaker_3d_no_vao)
+		#if !hxmaker_3d_no_vao
 		if (webgl2 && Reflect.isFunction(Reflect.field(raw, "createVertexArray"))) { api = raw; available = true; }
 		else {
 			api = gl.getExtension("OES_vertex_array_object");

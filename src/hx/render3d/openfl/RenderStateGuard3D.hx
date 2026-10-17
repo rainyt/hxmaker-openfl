@@ -29,15 +29,10 @@ class RenderStateGuard3D {
 	private var vertexArrays:VertexArrayBridge3D;
 	private var previousVertexArray:Dynamic;
 	private var timed:Bool;
-	private var initialSnapshot:Bool = true;
-	public function new(renderer:OpenGLRenderer, slots:Int, attributeCount:Int = 4, compositeOnly:Bool = false,
+	public function new(renderer:OpenGLRenderer, attributeCount:Int = 4, compositeOnly:Bool = false,
 		vertexArrays:VertexArrayBridge3D = null, timed:Bool = false) {
 		this.timed = timed; this.vertexArrays = vertexArrays;
-		#if hxmaker_3d_legacy_state_guard
-		this.compositeOnly = false;
-		#else
 		this.compositeOnly = compositeOnly;
-		#end
 		isolatedVertexArray = vertexArrays != null && vertexArrays.available;
 		gl = renderer.gl; context = renderer.__context3D;
 		var mark = timed ? clock() : 0.;
@@ -69,11 +64,6 @@ class RenderStateGuard3D {
 					stride:gl.getVertexAttrib(index, gl.VERTEX_ATTRIB_ARRAY_STRIDE), offset:gl.getVertexAttribOffset(index, gl.VERTEX_ATTRIB_ARRAY_POINTER)});
 			}
 		}
-		#if hxmaker_3d_legacy_state_guard
-		for (slot in 0...slots) activateTexture(slot);
-		gl.activeTexture(values.get(gl.ACTIVE_TEXTURE));
-		#end
-		initialSnapshot = false;
 		if (timed) snapshotCpuMs = clock()-mark;
 	}
 	private static function clock():Float {
@@ -89,9 +79,9 @@ class RenderStateGuard3D {
 	/** 必须在首次绑定或上传之前调用；首次访问才查询原绑定，后续只切换槽位。 */
 	public function activateTexture(slot:Int):Void {
 		if (textures.exists(slot)) { gl.activeTexture(gl.TEXTURE0+slot); return; }
-		var mark = timed && !initialSnapshot ? clock() : 0.;
+		var mark = timed ? clock() : 0.;
 		gl.activeTexture(gl.TEXTURE0+slot); textures.set(slot, query(gl.TEXTURE_BINDING_2D)); textureSlotCount++;
-		if (timed && !initialSnapshot) snapshotCpuMs += clock()-mark;
+		if (timed) snapshotCpuMs += clock()-mark;
 	}
 	public function bindVertexArray(name:String):Void { if (isolatedVertexArray) vertexArrays.bind(name); }
 	/** 共享纹理每次从 OpenFL 当前缓存取快照，不永久缓存首次读取的参数。 */

@@ -62,11 +62,6 @@ class Renderer3D {
 	private var vertexArrays:VertexArrayBridge3D;
 	private var lastVersion:Int = -1;
 	private var lastSettings:String;
-	#if hxmaker_3d_profile
-	private var profileWarmup:Int = 120;
-	private var profileSamples:Array<Float> = [];
-	private var profileMulti:Bool = true;
-	#end
 	public function new() {}
 
 	public function render(scene:Scene3D, display:Scene3DDisplay, event:RenderEvent):Void {
@@ -76,9 +71,6 @@ class Renderer3D {
 		var timed = scene.profilingEnabled, started = timed ? profileClock() : 0.;
 		var shadowTime = 0., mainTime = 0., compositeTime = 0., postTime = 0., mark = 0.;
 		var redrawn = false;
-		#if hxmaker_3d_profile
-		var profileStart = timed ? started : profileClock();
-		#end
 		// 恢复事件会使设备代次失效，正常帧不再同步探测缓冲句柄。
 		if (gl != renderer.gl) abandonContext();
 		gl = renderer.gl;
@@ -102,7 +94,7 @@ class Renderer3D {
 			frameNormals = false; for (mesh in meshes) if (mesh.material.lightingEnabled) { frameNormals = true; break; }
 			if (frameNormals && maxAttributes < 5) throw "当前设备不支持光照法线属性";
 		}
-		var guard = new RenderStateGuard3D(renderer, supportedSlots, frameNormals ? 5 : 4, !needsRedraw, vertexArrays, timed);
+		var guard = new RenderStateGuard3D(renderer, frameNormals ? 5 : 4, !needsRedraw, vertexArrays, timed);
 		try {
 			// 首次目标创建、阴影目标创建、纹理上传和采样恢复都会使用槽位 0。
 			guard.activateTexture(0);
@@ -147,12 +139,9 @@ class Renderer3D {
 		stats.stateCpuMs = guard.flushCpuMs+guard.snapshotCpuMs+guard.restoreCpuMs+guard.samplerRestoreCpuMs;
 		stats.stateQueryCount = guard.queryCount; stats.stateTextureSlots = guard.textureSlotCount;
 		stats.stateCompositeOnly = guard.compositeOnly; stats.stateVao = guard.isolatedVertexArray;
-		#if hxmaker_3d_profile
-		recordProfile(profileClock() - profileStart, scene.multiTextureEnabled);
-		#end
 	}
 
-	/** 按场景显式开启或诊断构建开启时才调用，不在普通路径读取时钟。 */
+	/** 仅在场景显式开启性能统计时调用，不在普通路径读取时钟。 */
 	private static function profileClock():Float {
 		#if (js && html5)
 		return js.Browser.window.performance.now();
@@ -160,20 +149,6 @@ class Renderer3D {
 		return haxe.Timer.stamp() * 1000;
 		#end
 	}
-	#if hxmaker_3d_profile
-	private function recordProfile(elapsed:Float, multi:Bool):Void {
-		if (multi != profileMulti) { profileMulti = multi; profileWarmup = 120; profileSamples = []; }
-		if (profileWarmup > 0) { profileWarmup--; return; }
-		profileSamples.push(elapsed);
-		if (profileSamples.length == 240) {
-			profileSamples.sort(Reflect.compare);
-			var sum = 0.; for (value in profileSamples) sum += value;
-			trace("HXMAKER_3D_PROFILE mode=" + (multi ? "multi" : "single") + " samples=240 meanMs=" + (sum / 240)
-				+ " p50Ms=" + profileSamples[119] + " p95Ms=" + profileSamples[227] + " maxMs=" + profileSamples[239]);
-			profileSamples = [];
-		}
-	}
-	#end
 
 	private function readCapabilities():Void {
 		var count:Int = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
