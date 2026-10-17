@@ -23,6 +23,7 @@ class MeshBatch3D {
 	public var uniforms:Map<String, Array<Float>>;
 	public var alphaMode:AlphaMode3D;
 	public var blendMode:BlendMode3D;
+	public var softParticleDistance:Float;
 	public var alphaCutoff:Float;
 	public var cullMode:CullMode3D;
 	public var depthTest:Bool;
@@ -43,7 +44,7 @@ class MeshBatch3D {
 		textureUniforms = material.getTextureUniforms(); baseTexture = material.texture;
 		lit = material.lightingEnabled; colorMultiplyLinear = material.colorMultiplyLinear; this.receiveShadow = receiveShadow;
 		key = materialKey(material, mirrored, receiveShadow); declarations = material.fragmentDeclarations; fragmentCode = material.fragmentCode;
-		blendMode = material.blendMode;
+		softParticleDistance = material.softParticleDistance; blendMode = material.blendMode;
 		uniforms = material.getUniforms(); alphaMode = material.alphaMode; alphaCutoff = material.alphaCutoff;
 		cullMode = material.cullMode; depthTest = material.depthTest;
 		depthWrite = material.depthWrite && material.alphaMode != AlphaMode3D.BLEND;
@@ -52,7 +53,7 @@ class MeshBatch3D {
 	}
 	public static function materialKey(material:Material3D, mirrored:Bool, receiveShadow:Bool = true):String {
 		return Json.stringify([material.fragmentUVCode, material.textureBindingKey(), material.textureUniformNames().join(","), material.fragmentDeclarations, material.fragmentCode, material.uniformKey(), Std.string(material.alphaMode),
-			Std.string(material.blendMode), Std.string(material.alphaCutoff), Std.string(material.cullMode), Std.string(material.depthTest), Std.string(material.depthWrite),
+			Std.string(material.softParticleDistance), Std.string(material.blendMode), Std.string(material.alphaCutoff), Std.string(material.cullMode), Std.string(material.depthTest), Std.string(material.depthWrite),
 			Std.string(!material.lightingEnabled && material.colorMultiplyLinear), Std.string(material.smoothing), Std.string(material.textureMinSmoothing == null ? material.smoothing : material.textureMinSmoothing),
 			Std.string(material.textureWrapU), Std.string(material.textureWrapV), Std.string(mirrored), Std.string(material.lightingEnabled), Std.string(material.lightingEnabled && receiveShadow)]);
 	}

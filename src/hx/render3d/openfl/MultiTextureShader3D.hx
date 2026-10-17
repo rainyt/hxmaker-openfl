@@ -7,7 +7,7 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false):GLProgram {
 		shadow = shadow && lit;
 		if (textureNames == null) textureNames = [];
 		var precision = "mediump";
@@ -33,6 +33,8 @@ class MultiTextureShader3D {
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
 		for (name in textureNames) fragment += "uniform sampler2D " + name + ";uniform vec4 " + name + "Rect;uniform vec4 " + name + "Clamp;\n";
 		if (uvCode != "") fragment += "uniform vec4 uBaseUVRect;uniform vec4 uBaseUVClamp;\n";
+		if (soft) fragment += "uniform highp sampler2D uSceneDepth;uniform vec4 uSoftParams;uniform float uSoftDistance;"
+			+ "float softLinearDepth(float d){float n=uSoftParams.x,f=uSoftParams.y;return (2.0*n*f)/(f+n-(2.0*d-1.0)*(f-n));}\n";
 		fragment += declarations + "\nvoid main(){vec4 color;vec2 sampleUV=vUV;\n";
 		if (uvCode != "") fragment += "vec2 localUV=(vUV-uBaseUVRect.xy)/uBaseUVRect.zw;\n" + uvCode
 			+ "\nsampleUV=clamp(uBaseUVRect.xy+localUV*uBaseUVRect.zw,uBaseUVClamp.xy,uBaseUVClamp.zw);\n";
@@ -49,6 +51,9 @@ class MultiTextureShader3D {
 				+ "float bias=uShadowBias+uShadowSlopeBias*(1.0-diffuse);visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);}}\n";
 			fragment += "color.rgb=toDisplay(color.rgb*(uAmbientColor+uLightColor*diffuse*visibility));\n";
 		}
+		if (soft) fragment += "float depthSample=texture2D(uSceneDepth,gl_FragCoord.xy/uSoftParams.zw).r;"
+			+ "if(depthSample<1.0){float sceneZ=softLinearDepth(depthSample);float particleZ=softLinearDepth(gl_FragCoord.z);"
+			+ "color.a*=clamp((sceneZ-particleZ)/max(uSoftDistance,0.00001),0.0,1.0);}";
 		fragment += "if(uAlphaMode<0.5){color.a=1.0;}else if(uAlphaMode<1.5){if(color.a<uAlphaCutoff)discard;color.a=1.0;}\n"
 			+ "gl_FragColor=vec4(color.rgb*color.a,color.a);}";
 		return compile(gl, vertex, fragment);

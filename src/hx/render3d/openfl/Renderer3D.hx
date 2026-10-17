@@ -30,6 +30,7 @@ class Renderer3D {
 	private var vertexBuffer:GLBuffer;
 	private var indexBuffer:GLBuffer;
 	private var composite:Program3DInfo;
+	private var bloomComposite:Program3DInfo;
 	private var capabilitiesReady:Bool = false;
 	private var maxTargetWidth:Int = 1;
 	private var maxTargetHeight:Int = 1;
@@ -37,6 +38,13 @@ class Renderer3D {
 	private var contextCanvas:js.html.CanvasElement;
 	#end
 	private var target:Scene3DRenderTarget;
+	private var softDepth:Scene3DRenderTarget;
+	private var frameSoft:Bool = false;
+	private var softFailure:String = "";
+	private var fragmentDepthPrecision:Bool = true;
+	private var bloomPass:BloomPass3D;
+	private var bloomReady:Bool = false;
+	private var bloomFailure:String = "";
 	private var white:openfl.display.BitmapData;
 	private var programs:Map<String, Program3DInfo> = [];
 	private var supportedSlots:Int = 1;
@@ -62,7 +70,7 @@ class Renderer3D {
 		var renderer:OpenGLRenderer = cast event.renderer;
 		if (renderer.gl == null || renderer.gl.isContextLost()) return;
 		var timed = scene.profilingEnabled, started = timed ? profileClock() : 0.;
-		var shadowTime = 0., mainTime = 0., compositeTime = 0., mark = 0.;
+		var shadowTime = 0., mainTime = 0., compositeTime = 0., postTime = 0., mark = 0.;
 		var redrawn = false;
 		#if hxmaker_3d_profile
 		var profileStart = timed ? started : profileClock();
@@ -80,7 +88,7 @@ class Renderer3D {
 		var width = Std.int(Math.max(1, Math.floor(w * reduction))), height = Std.int(Math.max(1, Math.floor(h * reduction)));
 		var targetChanged = target == null || target.width != width || target.height != height;
 		var settingValues:Array<Dynamic> = [scene.multiTextureEnabled ? 1 : 0, scene.backgroundColor, scene.backgroundAlpha,
-			scene.camera == null ? 0 : scene.camera.fieldOfView, scene.camera == null ? 0 : scene.camera.near, scene.camera == null ? 0 : scene.camera.far, scene.lightingKey()];
+			scene.camera == null ? 0 : scene.camera.fieldOfView, scene.camera == null ? 0 : scene.camera.near, scene.camera == null ? 0 : scene.camera.far, scene.lightingKey(), scene.bloom.settingsKey()];
 		var settings = settingValues.join(":");
 		var needsRedraw = targetChanged || lastVersion != scene.contentVersion || settings != lastSettings;
 		// 缓存合成不遍历网格，也不触及主通道和阴影的 GL 状态。
@@ -106,6 +114,7 @@ class Renderer3D {
 				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard);
 				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
 				frameSlots = supportedSlots - (frameShadow ? 1 : 0);
+				prepareSoftDepth(scene, meshes, renderer, guard, width, height);
 				gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer); gl.viewport(0, 0, width, height);
 				gl.disable(gl.SCISSOR_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
 				gl.colorMask(true, true, true, true); gl.depthMask(true); gl.depthRange(0, 1);
@@ -113,7 +122,9 @@ class Renderer3D {
 				gl.clearColor(((scene.backgroundColor >> 16) & 255)/255.*alpha, ((scene.backgroundColor >> 8) & 255)/255.*alpha, (scene.backgroundColor & 255)/255.*alpha, alpha);
 				gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 				if (scene.camera != null) drawScene(scene, meshes, renderer, guard);
-				if (timed) mainTime = profileClock() - mark;
+				if (timed) { mainTime = profileClock() - mark; mark = profileClock(); }
+				prepareBloom(scene, guard, width, height);
+				if (timed) postTime = profileClock() - mark;
 				lastVersion = scene.contentVersion; lastSettings = settings;
 			}
 			if (timed) mark = profileClock();
@@ -125,7 +136,7 @@ class Renderer3D {
 		stats.redrawThisFrame = redrawn; stats.profileReady = timed;
 		stats.renderCpuMs = timed ? profileClock() - started : 0;
 		stats.shadowCpuMs = shadowTime; stats.mainCpuMs = mainTime;
-		stats.compositeCpuMs = compositeTime;
+		stats.compositeCpuMs = compositeTime; stats.postProcessCpuMs = postTime;
 		stats.stateFlushCpuMs = guard.flushCpuMs; stats.stateSnapshotCpuMs = guard.snapshotCpuMs;
 		stats.stateRestoreCpuMs = guard.restoreCpuMs; stats.samplerRestoreCpuMs = guard.samplerRestoreCpuMs;
 		stats.stateCpuMs = guard.flushCpuMs+guard.snapshotCpuMs+guard.restoreCpuMs+guard.samplerRestoreCpuMs;
@@ -168,6 +179,8 @@ class Renderer3D {
 		var viewport:Dynamic = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
 		maxTargetWidth = Std.int(Math.min(size, viewport[0])); maxTargetHeight = Std.int(Math.min(size, viewport[1]));
 		var version = Std.string(gl.getParameter(gl.VERSION));
+		var depthPrecision = (version.indexOf("WebGL") < 0 && version.indexOf("OpenGL ES") < 0) ? null : gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+		fragmentDepthPrecision = depthPrecision == null ? version.indexOf("WebGL") < 0 && version.indexOf("OpenGL ES") < 0 : depthPrecision.precision > 0;
 		sizedDepth = version.indexOf("WebGL 2") >= 0 || version.indexOf("OpenGL ES 3") >= 0;
 		if (version.indexOf("WebGL") >= 0) depthTextures = sizedDepth || gl.getExtension("WEBGL_depth_texture") != null;
 		else if (version.indexOf("OpenGL ES 2") >= 0) depthTextures = gl.getExtension("GL_OES_depth_texture") != null || gl.getExtension("OES_depth_texture") != null;
@@ -187,23 +200,84 @@ class Renderer3D {
 		#end
 	}
 
-	private function initialize():Void {
-		composite = new Program3DInfo(gl, MultiTextureShader3D.compile(gl,
+	/** 单独预绘制不透明和裁剪物体，主目标不会同时挂接被采样的深度纹理。 */
+	private function prepareSoftDepth(scene:Scene3D, meshes:Array<MeshObject>, renderer:OpenGLRenderer, guard:RenderStateGuard3D, width:Int, height:Int):Void {
+		frameSoft = false;
+		var needed = false, auxiliary = 0;
+		for (mesh in meshes) {
+			if (mesh.material.alphaMode == AlphaMode3D.BLEND && mesh.material.softParticleDistance > 0) needed = true;
+			auxiliary = Std.int(Math.max(auxiliary, mesh.material.textureUniformNames().length));
+		}
+		if (!needed || scene.camera == null) {
+			if (softDepth != null) softDepth.dispose(); softDepth = null; softFailure = ""; return;
+		}
+		var reason = !depthTextures ? "设备不支持深度纹理" : (!fragmentDepthPrecision ? "片元高精度不足" : (frameSlots - 1 - auxiliary < 1 ? "纹理槽位不足" : softFailure));
+		if (reason != "") {
+			if (softDepth != null) softDepth.dispose(); softDepth = null;
+			scene.stats.softParticleStatus = "回退：" + reason; return;
+		}
+		if (softDepth == null || softDepth.width != width || softDepth.height != height) {
+			if (softDepth != null) softDepth.dispose(); softDepth = null;
+			try { guard.activateTexture(0); softDepth = new Scene3DRenderTarget(gl,width,height,true,sizedDepth); }
+			catch (error:Dynamic) { softFailure = Std.string(error); scene.stats.softParticleStatus = "回退：" + softFailure; return; }
+		}
+		frameSlots--;
+		gl.bindFramebuffer(gl.FRAMEBUFFER,softDepth.framebuffer); gl.viewport(0,0,width,height);
+		gl.disable(gl.SCISSOR_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+		gl.colorMask(true,true,true,true); gl.depthMask(true); gl.depthRange(0,1); gl.clearDepth(1); gl.clearColor(0,0,0,0);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		var opaque = [for (mesh in meshes) if (mesh.material.alphaMode != AlphaMode3D.BLEND && mesh.material.depthWrite) mesh];
+		drawScene(scene,opaque,renderer,guard);
+		var stats = scene.stats;
+		stats.softDepthDrawCalls = stats.drawCalls; stats.softDepthTriangles = stats.triangles; stats.softDepthUploadedBytes = stats.uploadedBytes;
+		stats.softDepthTargetBytes = width * height * 6; stats.softParticleStatus = "启用";
+		stats.drawCalls = stats.triangles = stats.uploadedBytes = stats.visibleMeshes = stats.culledMeshes = stats.textureSlots = 0; stats.splitReasons.clear();
+		frameSoft = true;
+	}
+
+	private function prepareBloom(scene:Scene3D, guard:RenderStateGuard3D, width:Int, height:Int):Void {
+		bloomReady = false;
+		if (!scene.bloom.enabled) {
+			if (bloomPass != null) bloomPass.dispose(); bloomPass = null; bloomFailure = ""; return;
+		}
+		if (supportedSlots < 2 || bloomFailure != "") {
+			scene.stats.bloomStatus = "回退：" + (supportedSlots < 2 ? "纹理槽位不足" : bloomFailure); return;
+		}
+		try {
+			guard.activateTexture(0);
+			if (bloomComposite == null) bloomComposite = createComposite(true);
+			if (bloomPass == null) bloomPass = new BloomPass3D(gl);
+			bloomPass.render(target.texture,width,height,scene.bloom,guard,frameNormals);
+			bloomReady = true; scene.stats.bloomDrawCalls = 3; scene.stats.bloomTargetBytes = bloomPass.targetBytes; scene.stats.bloomStatus = "启用";
+		} catch (error:Dynamic) {
+			if (bloomPass != null) bloomPass.dispose(); bloomPass = null;
+			bloomFailure = Std.string(error); scene.stats.bloomStatus = "回退：" + bloomFailure;
+		}
+	}
+
+	private function createComposite(withBloom:Bool):Program3DInfo {
+		return new Program3DInfo(gl, MultiTextureShader3D.compile(gl,
 			"attribute vec3 aPosition;attribute vec2 aUV;uniform mat4 uMatrix;varying mediump vec2 vUV;void main(){gl_Position=uMatrix*vec4(aPosition,1.0);vUV=aUV;}",
 			"precision mediump float;varying mediump vec2 vUV;uniform sampler2D uSampler0;uniform vec4 uColorMultiplier;uniform vec4 uColorOffset;uniform float uAlpha;"
+			+ (withBloom ? "uniform sampler2D uBloom;uniform float uBloomIntensity;" : "")
 			// 将超过覆盖率的 RGB 单独保留，包括 alpha 为零的加法光效。
 			+ "void main(){vec4 color=texture2D(uSampler0,vUV);vec3 emission=max(color.rgb-vec3(color.a),vec3(0.0));"
 			+ "color.rgb=min(color.rgb,vec3(color.a));if(color.a>0.0){color.rgb/=color.a;}else{color.rgb=vec3(0.0);}"
 			+ "color=clamp(color*uColorMultiplier+uColorOffset,0.0,1.0);color.a*=uAlpha;"
+			+ (withBloom ? "emission+=texture2D(uBloom,vUV).rgb*uBloomIntensity;" : "")
 			+ "emission*=max(uColorMultiplier.rgb,vec3(0.0))*max(uColorMultiplier.a,0.0)*uAlpha;"
 			+ "gl_FragColor=vec4(color.rgb*color.a+emission,color.a);}"), 1, false);
+	}
+
+	private function initialize():Void {
+		composite = createComposite(false);
 		vertexBuffer = gl.createBuffer(); indexBuffer = gl.createBuffer();
 		white = new openfl.display.BitmapData(1, 1, true, 0xffffffff);
 		shadowPass = new ShadowPass3D(gl, depthTextures, sizedDepth, Std.int(Math.min(maxTargetWidth, maxTargetHeight)));
 	}
 
-	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>):String {
-		return Json.stringify([uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow)]);
+	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool):String {
+		return Json.stringify([soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -220,7 +294,7 @@ class Renderer3D {
 	}
 
 	private function getProgram(material:Material3D, multi:Bool):Program3DInfo {
-		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames());
+		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames(), frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0);
 		var info = programs.get(key);
 		if (info != null) return info;
 		var textureNames = material.textureUniformNames();
@@ -228,7 +302,7 @@ class Renderer3D {
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0); }
 			catch (error:Dynamic) {
 				if (slots <= 1) throw error;
 				trace("三维多纹理 Shader 回退，当前槽位数：" + slots + "，原因：" + Std.string(error));
@@ -296,7 +370,7 @@ class Renderer3D {
 
 	private function submit(batch:MeshBatch3D, projection:Matrix3D, scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
 		if (batch.indices.length == 0) return;
-		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames);
+		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0);
 		var info = programs.get(key);
 		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
 		gl.uniform1f(info.location("uAlphaMode"), batch.alphaMode);
@@ -347,6 +421,12 @@ class Renderer3D {
 			TextureBridge3D.applySampler(texture, batch.smoothing, batch.wrapU, batch.wrapV, batch.minSmoothing);
 			gl.uniform1i(info.location("uSampler" + slot), slot);
 		}
+		if (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0) {
+			guard.activateTexture(frameSlots); gl.bindTexture(gl.TEXTURE_2D, softDepth.depthTexture);
+			gl.uniform1i(info.location("uSceneDepth"), frameSlots);
+			gl.uniform4f(info.location("uSoftParams"), scene.camera.near, scene.camera.far, target.width, target.height);
+			gl.uniform1f(info.location("uSoftDistance"), batch.softParticleDistance);
+		}
 		if (batch.depthTest) gl.enable(gl.DEPTH_TEST); else gl.disable(gl.DEPTH_TEST);
 		gl.depthFunc(gl.LEQUAL); gl.depthMask(batch.depthWrite);
 		if (batch.cullMode == CullMode3D.NONE) gl.disable(gl.CULL_FACE);
@@ -371,7 +451,7 @@ class Renderer3D {
 		gl.drawElements(gl.TRIANGLES, batch.indices.length, gl.UNSIGNED_SHORT, 0);
 		scene.stats.drawCalls++; scene.stats.triangles += Std.int(batch.indices.length / 3);
 		scene.stats.uploadedBytes += batch.vertices.length * 4 + batch.indices.length * 2;
-		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length));
+		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length + (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0 ? 1 : 0)));
 		ContextStats.statsDrawCall(); ContextStats.statsVertexCount(batch.indices.length);
 	}
 
@@ -420,17 +500,23 @@ class Renderer3D {
 	}
 
 	private function drawComposite(scene:Scene3D, display:Scene3DDisplay, event:RenderEvent, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
+		var info = bloomReady ? bloomComposite : composite;
 		gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND);
-		gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.useProgram(composite.program);
+		gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.useProgram(info.program);
 		guard.activateTexture(0); gl.bindTexture(gl.TEXTURE_2D, target.texture);
-		gl.uniform1i(composite.location("uSampler0"), 0);
+		gl.uniform1i(info.location("uSampler0"), 0);
+		if (bloomReady) {
+			guard.activateTexture(1); gl.bindTexture(gl.TEXTURE_2D, bloomPass.texture);
+			gl.uniform1i(info.location("uBloom"), 1);
+			gl.uniform1f(info.location("uBloomIntensity"), scene.bloom.intensity);
+		}
 		var matrix = renderer.getMatrix(event.objectMatrix), values = new Float32Array(16);
 		for (i in 0...16) values[i] = matrix[i];
-		gl.uniformMatrix4fv(composite.location("uMatrix"), false, values);
+		gl.uniformMatrix4fv(info.location("uMatrix"), false, values);
 		var color = renderer.__getColorTransform(event.objectColorTransform);
-		gl.uniform4f(composite.location("uColorMultiplier"), color.redMultiplier, color.greenMultiplier, color.blueMultiplier, color.alphaMultiplier);
-		gl.uniform4f(composite.location("uColorOffset"), color.redOffset/255, color.greenOffset/255, color.blueOffset/255, color.alphaOffset/255);
-		gl.uniform1f(composite.location("uAlpha"), renderer.__getAlpha(display.__worldAlpha));
+		gl.uniform4f(info.location("uColorMultiplier"), color.redMultiplier, color.greenMultiplier, color.blueMultiplier, color.alphaMultiplier);
+		gl.uniform4f(info.location("uColorOffset"), color.redOffset/255, color.greenOffset/255, color.blueOffset/255, color.alphaOffset/255);
+		gl.uniform1f(info.location("uAlpha"), renderer.__getAlpha(display.__worldAlpha));
 		var w = scene.width, h = scene.height;
 		var vertices:Array<Float> = [0,0,0,0,1, w,0,0,1,1, w,h,0,1,0, 0,0,0,0,1, w,h,0,1,0, 0,h,0,0,0];
 		guard.bindVertexArray("composite");
@@ -457,8 +543,9 @@ class Renderer3D {
 	public function abandonContext():Void {
 		if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null;
 		if (shadowPass != null) shadowPass.abandonContext(); shadowPass = null;
-		frameShadow = false; frameSlots = 1;
-		capabilitiesReady = false; gl = null; vertexBuffer = null; indexBuffer = null; composite = null; target = null; programs.clear(); lastVersion = -1;
+		frameShadow = false; frameSlots = 1; frameSoft = false;
+		softDepth = null; softFailure = ""; bloomPass = null; bloomReady = false; bloomFailure = "";
+		capabilitiesReady = false; gl = null; vertexBuffer = null; indexBuffer = null; composite = null; bloomComposite = null; target = null; programs.clear(); lastVersion = -1;
 		if (white != null) white.dispose(); white = null;
 	}
 	#if (js && html5)
@@ -478,9 +565,12 @@ class Renderer3D {
 			if (vertexArrays != null) vertexArrays.dispose();
 			if (shadowPass != null) shadowPass.dispose();
 			if (target != null) target.dispose();
+			if (softDepth != null) softDepth.dispose();
+			if (bloomPass != null) bloomPass.dispose();
 			if (vertexBuffer != null) gl.deleteBuffer(vertexBuffer);
 			if (indexBuffer != null) gl.deleteBuffer(indexBuffer);
 			if (composite != null) gl.deleteProgram(composite.program);
+			if (bloomComposite != null) gl.deleteProgram(bloomComposite.program);
 			for (info in programs) gl.deleteProgram(info.program);
 		}
 		abandonContext();

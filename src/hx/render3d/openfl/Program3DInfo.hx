@@ -22,7 +22,7 @@ class Program3DInfo {
 		if (textureNames == null) textureNames = [];
 		this.program = program; this.slots = slots;
 		try {
-			for (name in (reflectCustom ? ["uBaseUVRect", "uBaseUVClamp", "uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
+			for (name in (reflectCustom ? ["uSceneDepth", "uSoftParams", "uSoftDistance", "uBaseUVRect", "uBaseUVClamp", "uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uBloom", "uBloomIntensity", "uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
 				locations.set(name, gl.getUniformLocation(program, name));
 			for (slot in 0...slots) {
 				var name = "uSampler" + slot;
