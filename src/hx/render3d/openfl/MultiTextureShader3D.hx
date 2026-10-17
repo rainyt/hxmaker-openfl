@@ -7,8 +7,9 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null):GLProgram {
 		shadow = shadow && lit;
+		if (textureNames == null) textureNames = [];
 		var precision = "mediump";
 		var format = isDesktop(gl) ? null : gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
 		if (format != null && format.precision > 0) precision = "highp";
@@ -30,8 +31,12 @@ class MultiTextureShader3D {
 		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
 			+ (lit ? "vNormal=aNormal;" : "") + (shadow ? "vShadowPosition=uLightViewProjection*vec4(aPosition,1.0);" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
-		fragment += declarations + "\nvoid main(){vec4 color;\n";
-		for (i in 0...slots) fragment += (i == 0 ? "if" : "else if") + "(vTextureId<" + (i + 0.5) + "){color=texture2D(uSampler" + i + ",vUV);}\n";
+		for (name in textureNames) fragment += "uniform sampler2D " + name + ";uniform vec4 " + name + "Rect;uniform vec4 " + name + "Clamp;\n";
+		if (uvCode != "") fragment += "uniform vec4 uBaseUVRect;uniform vec4 uBaseUVClamp;\n";
+		fragment += declarations + "\nvoid main(){vec4 color;vec2 sampleUV=vUV;\n";
+		if (uvCode != "") fragment += "vec2 localUV=(vUV-uBaseUVRect.xy)/uBaseUVRect.zw;\n" + uvCode
+			+ "\nsampleUV=clamp(uBaseUVRect.xy+localUV*uBaseUVRect.zw,uBaseUVClamp.xy,uBaseUVClamp.zw);\n";
+		for (i in 0...slots) fragment += (i == 0 ? "if" : "else if") + "(vTextureId<" + (i + 0.5) + "){color=texture2D(uSampler" + i + ",sampleUV);}\n";
 		fragment += "else{color=vec4(1.0,0.0,1.0,1.0);}\n"
 			+ "float sourceAlpha=color.a;if(sourceAlpha>0.0){color.rgb/=sourceAlpha;}else{color.rgb=vec3(0.0);}\n";
 		fragment += lit ? "color.rgb=toLinear(color.rgb)*toLinear(vColor.rgb);color.a*=vColor.a;\n" : "if(uLinearBaseColor>0.5){color.rgb=toDisplay(toLinear(color.rgb)*toLinear(vColor.rgb));color.a*=vColor.a;}else{color*=vColor;}\n";

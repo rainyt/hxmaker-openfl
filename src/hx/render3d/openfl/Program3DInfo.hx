@@ -18,10 +18,11 @@ class Program3DInfo {
 	public var slots(default, null):Int;
 	public var customUniforms(default, null):Array<UniformInfo3D> = [];
 	private var locations:Map<String, GLUniformLocation> = [];
-	public function new(gl:WebGLRenderContext, program:GLProgram, slots:Int, reflectCustom:Bool = true) {
+	public function new(gl:WebGLRenderContext, program:GLProgram, slots:Int, reflectCustom:Bool = true, textureNames:Array<String> = null) {
+		if (textureNames == null) textureNames = [];
 		this.program = program; this.slots = slots;
 		try {
-			for (name in (reflectCustom ? ["uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
+			for (name in (reflectCustom ? ["uBaseUVRect", "uBaseUVClamp", "uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
 				locations.set(name, gl.getUniformLocation(program, name));
 			for (slot in 0...slots) {
 				var name = "uSampler" + slot;
@@ -32,6 +33,10 @@ class Program3DInfo {
 				for (index in 0...count) {
 					var active = gl.getActiveUniform(program, index), name = active.name;
 					if (StringTools.startsWith(name, "uSampler") || locations.exists(name)) continue;
+					if (active.type == GL.SAMPLER_2D) {
+						if (active.size != 1 || textureNames.indexOf(name) < 0) throw "辅助纹理必须通过 setTextureUniform 绑定，且不支持数组";
+						locations.set(name, gl.getUniformLocation(program, name)); continue;
+					}
 					if (active.size != 1) throw "自定义三维 uniform 首版不支持数组";
 					var length = switch (active.type) {
 						case GL.FLOAT: 1;

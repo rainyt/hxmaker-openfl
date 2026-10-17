@@ -6,6 +6,7 @@ import hx.display3d.Node3D;
 import hx.display3d.MeshObject;
 import hx.material.Material3D;
 import hx.material.AlphaMode3D;
+import hx.material.BlendMode3D;
 import hx.material.CullMode3D;
 import hx.geom.Matrix3D;
 import hx.render3d.Math3D;
@@ -190,15 +191,19 @@ class Renderer3D {
 		composite = new Program3DInfo(gl, MultiTextureShader3D.compile(gl,
 			"attribute vec3 aPosition;attribute vec2 aUV;uniform mat4 uMatrix;varying mediump vec2 vUV;void main(){gl_Position=uMatrix*vec4(aPosition,1.0);vUV=aUV;}",
 			"precision mediump float;varying mediump vec2 vUV;uniform sampler2D uSampler0;uniform vec4 uColorMultiplier;uniform vec4 uColorOffset;uniform float uAlpha;"
-			+ "void main(){vec4 color=texture2D(uSampler0,vUV);if(color.a>0.0){color.rgb/=color.a;}else{color.rgb=vec3(0.0);}"
-			+ "color=clamp(color*uColorMultiplier+uColorOffset,0.0,1.0);color.a*=uAlpha;gl_FragColor=vec4(color.rgb*color.a,color.a);}"), 1, false);
+			// 将超过覆盖率的 RGB 单独保留，包括 alpha 为零的加法光效。
+			+ "void main(){vec4 color=texture2D(uSampler0,vUV);vec3 emission=max(color.rgb-vec3(color.a),vec3(0.0));"
+			+ "color.rgb=min(color.rgb,vec3(color.a));if(color.a>0.0){color.rgb/=color.a;}else{color.rgb=vec3(0.0);}"
+			+ "color=clamp(color*uColorMultiplier+uColorOffset,0.0,1.0);color.a*=uAlpha;"
+			+ "emission*=max(uColorMultiplier.rgb,vec3(0.0))*max(uColorMultiplier.a,0.0)*uAlpha;"
+			+ "gl_FragColor=vec4(color.rgb*color.a+emission,color.a);}"), 1, false);
 		vertexBuffer = gl.createBuffer(); indexBuffer = gl.createBuffer();
 		white = new openfl.display.BitmapData(1, 1, true, 0xffffffff);
 		shadowPass = new ShadowPass3D(gl, depthTextures, sizedDepth, Std.int(Math.min(maxTargetWidth, maxTargetHeight)));
 	}
 
-	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool):String {
-		return Json.stringify([declarations, code, Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow)]);
+	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>):String {
+		return Json.stringify([uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -215,20 +220,22 @@ class Renderer3D {
 	}
 
 	private function getProgram(material:Material3D, multi:Bool):Program3DInfo {
-		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled);
+		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames());
 		var info = programs.get(key);
 		if (info != null) return info;
-		var slots = multi ? frameSlots : 1;
+		var textureNames = material.textureUniformNames();
+		var slots = Std.int(Math.min(multi ? frameSlots : 1, frameSlots - textureNames.length));
+		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames); }
 			catch (error:Dynamic) {
 				if (slots <= 1) throw error;
 				trace("三维多纹理 Shader 回退，当前槽位数：" + slots + "，原因：" + Std.string(error));
 				slots = Std.int(Math.max(1, Math.floor(slots / 2)));
 			}
 		}
-		info = new Program3DInfo(gl, program, slots); programs.set(key, info); return info;
+		info = new Program3DInfo(gl, program, slots, true, textureNames); programs.set(key, info); return info;
 	}
 
 	private function drawScene(scene:Scene3D, meshes:Array<MeshObject>, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
@@ -247,7 +254,10 @@ class Renderer3D {
 		items.sort(function(a, b) {
 			var aBlend = a.mesh.material.alphaMode == AlphaMode3D.BLEND, bBlend = b.mesh.material.alphaMode == AlphaMode3D.BLEND;
 			if (aBlend != bBlend) return aBlend ? 1 : -1;
-			if (aBlend) { if (a.depth != b.depth) return a.depth > b.depth ? -1 : 1; }
+			if (aBlend) {
+				var priority = Reflect.compare(a.mesh.renderOrder, b.mesh.renderOrder);
+				if (priority != 0) return priority;
+				if (a.depth != b.depth) return a.depth > b.depth ? -1 : 1; }
 			else { var compare = Reflect.compare(a.key, b.key); if (compare != 0) return compare; if (a.depth != b.depth) return a.depth < b.depth ? -1 : 1; }
 			return a.order - b.order;
 		});
@@ -286,13 +296,36 @@ class Renderer3D {
 
 	private function submit(batch:MeshBatch3D, projection:Matrix3D, scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
 		if (batch.indices.length == 0) return;
-		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit);
+		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames);
 		var info = programs.get(key);
 		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
 		gl.uniform1f(info.location("uAlphaMode"), batch.alphaMode);
 		gl.uniform1f(info.location("uAlphaCutoff"), batch.alphaCutoff);
 		if (!batch.lit) gl.uniform1f(info.location("uLinearBaseColor"), batch.colorMultiplyLinear ? 1 : 0);
 		if (batch.lit) applyLighting(info, scene, batch.receiveShadow, guard);
+		if (batch.uvCode != "") {
+			var source = TextureBridge3D.source(batch.baseTexture, white);
+			guard.activateTexture(0); TextureBridge3D.resolve(source, renderer.__context3D);
+			var region = textureRegion(batch.baseTexture, source);
+			gl.uniform4f(info.location("uBaseUVRect"), region[0], region[1], region[2], region[3]);
+			gl.uniform4f(info.location("uBaseUVClamp"), region[4], region[5], region[6], region[7]);
+		}
+		// 辅助纹理占用主贴图槽位之后的位置，阴影槽位仍保留在设备末尾。
+		for (i in 0...batch.textureNames.length) {
+			var name = batch.textureNames[i], bitmap = batch.textureUniforms.get(name), slot = info.slots + i;
+			var source = TextureBridge3D.source(bitmap, white);
+			guard.activateTexture(slot);
+			var texture = TextureBridge3D.resolve(source, renderer.__context3D);
+			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
+			// 辅助贴图只使用 CLAMP，重复由 Shader 在区域内部完成。
+			if (batch.textures.indexOf(source) >= 0 && (batch.wrapU != 33071 || batch.wrapV != 33071))
+				throw "同一底层纹理同时作为主贴图和辅助贴图时，主贴图必须使用 CLAMP";
+			TextureBridge3D.applySampler(texture, batch.smoothing, 33071, 33071, batch.minSmoothing);
+			gl.uniform1i(info.location(name), slot);
+			var region = textureRegion(bitmap, source);
+			batch.uniforms.set(name + "Rect", region.slice(0, 4));
+			batch.uniforms.set(name + "Clamp", region.slice(4, 8));
+		}
 		// 描述与位置在链接后缓存，缺省值仍逐批重置，防止材质参数串用。
 		for (uniform in info.customUniforms) {
 			var values = batch.uniforms.get(uniform.name);
@@ -319,7 +352,12 @@ class Renderer3D {
 		if (batch.cullMode == CullMode3D.NONE) gl.disable(gl.CULL_FACE);
 		else { gl.enable(gl.CULL_FACE); gl.cullFace(batch.cullMode == CullMode3D.BACK ? gl.BACK : gl.FRONT); }
 		gl.frontFace(batch.mirrored ? gl.CW : gl.CCW);
-		if (batch.alphaMode == AlphaMode3D.BLEND) { gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
+		if (batch.alphaMode == AlphaMode3D.BLEND) {
+			gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD);
+			// 加法只累加预乘 RGB，保留目标 alpha，使透明离屏目标正确叠加到二维背景。
+			if (batch.blendMode == BlendMode3D.ADD) gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE);
+			else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+		}
 		else gl.disable(gl.BLEND);
 		guard.bindVertexArray("main");
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, floatData(batch.vertices), gl.STREAM_DRAW);
@@ -333,8 +371,23 @@ class Renderer3D {
 		gl.drawElements(gl.TRIANGLES, batch.indices.length, gl.UNSIGNED_SHORT, 0);
 		scene.stats.drawCalls++; scene.stats.triangles += Std.int(batch.indices.length / 3);
 		scene.stats.uploadedBytes += batch.vertices.length * 4 + batch.indices.length * 2;
-		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length));
+		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length));
 		ContextStats.statsDrawCall(); ContextStats.statsVertexCount(batch.indices.length);
+	}
+
+	/** 返回区域起点、大小和半像素内缩边界，兼容图集与底层填充。 */
+	private function textureRegion(bitmap:hx.display.BitmapData, source:openfl.display.BitmapData):Array<Float> {
+		var size = TextureBridge3D.uvSize(source), x = 0., y = 0., width = source.width * 1., height = source.height * 1.;
+		if (bitmap != null && bitmap.rect != null) {
+			x = bitmap.rect.x; y = bitmap.rect.y; width = bitmap.rect.width; height = bitmap.rect.height;
+		}
+		for (value in [x, y, width, height, size[0], size[1]])
+			if (!Math3D.finite(value)) throw "三维特效贴图区域必须有限";
+		if (size[0] <= 0 || size[1] <= 0 || width <= 0 || height <= 0 || x < 0 || y < 0 || x + width > source.width || y + height > source.height)
+			throw "三维特效贴图区域无效";
+		var insetX = Math.min(0.5, width * 0.5), insetY = Math.min(0.5, height * 0.5);
+		return [x / size[0], y / size[1], width / size[0], height / size[1],
+			(x + insetX) / size[0], (y + insetY) / size[1], (x + width - insetX) / size[0], (y + height - insetY) / size[1]];
 	}
 
 	/** 颜色均在线性空间累加；阴影只衰减方向光，不压暗环境光。 */

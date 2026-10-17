@@ -46,7 +46,7 @@ class ShadowPass3D {
 		}
 		var casters:Array<MeshObject> = [], receivers:Array<MeshObject> = [];
 		for (mesh in meshes) {
-			if (mesh.castShadow && mesh.material.alphaMode == AlphaMode3D.OPAQUE && mesh.material.fragmentCode == "") casters.push(mesh);
+			if (mesh.castShadow && mesh.material.alphaMode == AlphaMode3D.OPAQUE && mesh.material.fragmentCode == "" && mesh.material.fragmentUVCode == "") casters.push(mesh);
 			if (mesh.receiveShadow && mesh.material.lightingEnabled) receivers.push(mesh);
 		}
 		if (casters.length == 0 || receivers.length == 0) {
