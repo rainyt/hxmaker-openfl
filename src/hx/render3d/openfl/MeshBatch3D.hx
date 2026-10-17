@@ -37,13 +37,16 @@ class MeshBatch3D {
 	public var slots:Int;
 	public var lit:Bool;
 	public var pbr:Bool;
+	public var mapped:Bool;
+	public var normalMapped:Bool;
 	public var receiveShadow:Bool;
 	public var floatsPerVertex(get, never):Int;
-	private function get_floatsPerVertex():Int { return lit ? 13 : 10; }
+	private function get_floatsPerVertex():Int { return (lit ? 13 : 10) + (mapped ? 2 : 0) + (normalMapped ? 4 : 0); }
 	public function new(material:Material3D, mirrored:Bool, slots:Int, receiveShadow:Bool = true) {
 		uvCode = material.fragmentUVCode; textureNames = material.textureUniformNames();
 		textureUniforms = material.getTextureUniforms(); baseTexture = material.texture;
-		lit = material.lightingEnabled; pbr = lit && material.pbrEnabled; colorMultiplyLinear = material.colorMultiplyLinear; this.receiveShadow = receiveShadow;
+		lit = material.lightingEnabled; pbr = lit && material.pbrEnabled;
+		mapped = pbr && material.pbrMapMask != 0; normalMapped = mapped && (material.pbrMapMask & 2) != 0; colorMultiplyLinear = material.colorMultiplyLinear; this.receiveShadow = receiveShadow;
 		key = materialKey(material, mirrored, receiveShadow); declarations = material.fragmentDeclarations; fragmentCode = material.fragmentCode;
 		softParticleDistance = material.softParticleDistance; blendMode = material.blendMode;
 		uniforms = material.getUniforms(); alphaMode = material.alphaMode; alphaCutoff = material.alphaCutoff;
@@ -59,7 +62,7 @@ class MeshBatch3D {
 			Std.string(material.textureWrapU), Std.string(material.textureWrapV), Std.string(mirrored), Std.string(material.lightingEnabled), Std.string(material.lightingEnabled && material.pbrEnabled), Std.string(material.lightingEnabled && receiveShadow)]);
 	}
 	/** 添加一个顶点，颜色与透明度编码进顶点，避免为不同模型切换 uniform。 */
-	public function vertex(mesh:MeshObject, index:Int, textureId:Int, world:Array<Float>, source:openfl.display.BitmapData, normals:Array<Float> = null):Int {
+	public function vertex(mesh:MeshObject, index:Int, textureId:Int, world:Array<Float>, source:openfl.display.BitmapData, normals:Array<Float> = null, tangents:Array<Float> = null):Int {
 		var result = Std.int(vertices.length / floatsPerVertex), material = mesh.material, g = mesh.geometry;
 		var colors = g.colors, offset = index * 4;
 		var red = colors.length == 0 ? 1. : colors[offset];
@@ -74,6 +77,8 @@ class MeshBatch3D {
 		if (lit) {
 			vertices.push(normals[index*3]); vertices.push(normals[index*3+1]); vertices.push(normals[index*3+2]);
 		}
+		if (mapped) { vertices.push(g.uvs[index*2]); vertices.push(g.uvs[index*2+1]); }
+		if (normalMapped) for (i in 0...4) vertices.push(tangents[index*4+i]);
 		return result;
 	}
 }

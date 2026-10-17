@@ -52,6 +52,7 @@ class Renderer3D {
 	private var supportedSlots:Int = 1;
 	private var frameSlots:Int = 1;
 	private var frameNormals:Bool = false;
+	private var frameAttributes:Int = 4;
 	private var frameLights:Array<hx.light.Light3D> = [];
 	private var frameShadow:Bool = false;
 	private var frameIbl:Bool = false;
@@ -94,10 +95,13 @@ class Renderer3D {
 		var meshes:Array<MeshObject> = [];
 		if (needsRedraw) {
 			meshes = collectMeshes(scene.root);
-			frameNormals = false; for (mesh in meshes) if (mesh.material.lightingEnabled) { frameNormals = true; break; }
-			if (frameNormals && maxAttributes < 5) throw "当前设备不支持光照法线属性";
+			frameNormals = false; frameAttributes = 4;
+			for (mesh in meshes) if (mesh.material.lightingEnabled) {
+				frameNormals = true; frameAttributes = Std.int(Math.max(frameAttributes, mesh.material.pbrEnabled && mesh.material.pbrMapMask != 0 ? 7 : 5));
+			}
+			if (frameAttributes > maxAttributes) throw "当前设备不支持所需的 PBR UV 或切线顶点属性";
 		}
-		var guard = new RenderStateGuard3D(renderer, frameNormals ? 5 : 4, !needsRedraw, vertexArrays, timed);
+		var guard = new RenderStateGuard3D(renderer, frameAttributes, !needsRedraw, vertexArrays, timed);
 		try {
 			// 首次目标创建、阴影目标创建、纹理上传和采样恢复都会使用槽位 0。
 			guard.activateTexture(0);
@@ -373,6 +377,7 @@ class Renderer3D {
 			if (batch != null && batch.key != item.key) { submit(batch, projection, scene, renderer, guard); scene.stats.split("material"); batch = null; }
 			if (batch == null) batch = new MeshBatch3D(material, item.mirrored, info.slots, mesh.receiveShadow);
 			var world = mesh.getWorldVertices(), normals = material.lightingEnabled ? mesh.getWorldNormals() : null;
+			var tangents = batch.normalMapped ? mesh.getWorldTangents() : null;
 			var remap:Map<Int, Int> = [];
 			var indices = mesh.geometry.indices;
 			for (triangle in 0...Std.int(indices.length / 3)) {
@@ -388,7 +393,7 @@ class Renderer3D {
 				if (textureId < 0) { textureId = batch.textures.length; batch.textures.push(source); }
 				for (corner in 0...3) {
 					var index = indices[triangle * 3 + corner], mapped = remap.get(index);
-					if (mapped == null) { mapped = batch.vertex(mesh, index, textureId, world, source, normals); remap.set(index, mapped); }
+					if (mapped == null) { mapped = batch.vertex(mesh, index, textureId, world, source, normals, tangents); remap.set(index, mapped); }
 					batch.indices.push(mapped);
 				}
 			}
@@ -425,7 +430,20 @@ class Renderer3D {
 				throw "IBL 数据图集不能同时作为 PBR 辅助纹理";
 			if (batch.textures.indexOf(source) >= 0 && (batch.wrapU != 33071 || batch.wrapV != 33071))
 				throw "同一底层纹理同时作为主贴图和辅助贴图时，主贴图必须使用 CLAMP";
-			TextureBridge3D.applySampler(texture, batch.smoothing, 33071, 33071, batch.minSmoothing);
+			var sampling = batch.pbr && StringTools.startsWith(name, "uPbr") ? batch.uniforms.get(name + "Sampler") : null;
+			var smoothing = sampling == null ? batch.smoothing : sampling[0] > 0.5;
+			var minSmoothing = sampling == null ? batch.minSmoothing : sampling[1] > 0.5;
+			// 同一底层图片共享 GL 采样状态；不同过滤方式不能在一次绘制中并存。
+			if (batch.textures.indexOf(source) >= 0 && (smoothing != batch.smoothing || minSmoothing != batch.minSmoothing))
+				throw "同一图片作为基础色和 PBR 数据贴图时必须使用相同过滤设置";
+			for (other in batch.textureNames) {
+				if (other == name || TextureBridge3D.source(batch.textureUniforms.get(other), white) != source) continue;
+				var previous = batch.pbr && StringTools.startsWith(other, "uPbr") ? batch.uniforms.get(other + "Sampler") : null;
+				if (smoothing != (previous == null ? batch.smoothing : previous[0] > 0.5)
+					|| minSmoothing != (previous == null ? batch.minSmoothing : previous[1] > 0.5))
+					throw "同一图片绑定到多个材质贴图时必须使用相同过滤设置";
+			}
+			TextureBridge3D.applySampler(texture, smoothing, 33071, 33071, minSmoothing);
 			gl.uniform1i(info.location(name), slot);
 			var region = textureRegion(bitmap, source);
 			batch.uniforms.set(name + "Rect", region.slice(0, 4));
@@ -481,6 +499,10 @@ class Renderer3D {
 		gl.vertexAttribPointer(2, 1, gl.FLOAT, false, stride, 20); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 24);
 		if (batch.lit) { gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 3, gl.FLOAT, false, stride, 40); }
 		else if (frameNormals || guard.isolatedVertexArray && maxAttributes > 4) gl.disableVertexAttribArray(4);
+		if (batch.mapped) { gl.enableVertexAttribArray(6); gl.vertexAttribPointer(6, 2, gl.FLOAT, false, stride, 52); }
+		else if (frameAttributes >= 7 || guard.isolatedVertexArray && maxAttributes >= 7) gl.disableVertexAttribArray(6);
+		if (batch.normalMapped) { gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 4, gl.FLOAT, false, stride, 60); }
+		else if (frameAttributes >= 7 || guard.isolatedVertexArray && maxAttributes >= 7) gl.disableVertexAttribArray(5);
 		gl.drawElements(gl.TRIANGLES, batch.indices.length, gl.UNSIGNED_SHORT, 0);
 		scene.stats.drawCalls++; scene.stats.triangles += Std.int(batch.indices.length / 3);
 		scene.stats.uploadedBytes += batch.vertices.length * 4 + batch.indices.length * 2;
@@ -576,6 +598,7 @@ class Renderer3D {
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, floatData(vertices), gl.STREAM_DRAW);
 		gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.disableVertexAttribArray(2); gl.disableVertexAttribArray(3);
 		if (frameNormals) gl.disableVertexAttribArray(4);
+		if (frameAttributes >= 7) { gl.disableVertexAttribArray(5); gl.disableVertexAttribArray(6); }
 		gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 		gl.drawArrays(gl.TRIANGLES, 0, 6); scene.stats.compositeDrawCalls = 1;
 		ContextStats.statsDrawCall(); ContextStats.statsVertexCount(6);

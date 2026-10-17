@@ -12,6 +12,11 @@ class MultiTextureShader3D {
 		pbr = pbr && lit;
 		ibl = ibl && pbr;
 		if (textureNames == null) textureNames = [];
+		var mrMap = pbr && textureNames.indexOf("uPbrMetallicRoughnessMap") >= 0;
+		var normalMap = pbr && textureNames.indexOf("uPbrNormalMap") >= 0;
+		var aoMap = pbr && textureNames.indexOf("uPbrOcclusionMap") >= 0;
+		var emissionMap = pbr && textureNames.indexOf("uPbrEmissiveMap") >= 0;
+		var mapped = mrMap || normalMap || aoMap || emissionMap;
 		var precision = isDesktop(gl) ? "highp" : "mediump";
 		var format = isDesktop(gl) ? null : gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
 		if (format != null && format.precision > 0) precision = "highp";
@@ -27,6 +32,15 @@ class MultiTextureShader3D {
 			for (i in 0...lightSlots)
 				fragment += "uniform vec4 uSceneLightColor"+i+";uniform vec4 uSceneLightPosition"+i+";uniform vec3 uSceneLightDirection"+i+";uniform vec3 uSceneLightParams"+i+";\n";
 		}
+		if (mapped) {
+			vertex += "attribute vec2 aMaterialUV;varying mediump vec2 vMaterialUV;\n";
+			fragment += "varying mediump vec2 vMaterialUV;\n";
+		}
+		if (normalMap) {
+			vertex += "attribute vec4 aTangent;varying mediump vec4 vTangent;\n";
+			fragment += "varying mediump vec4 vTangent;uniform float uPbrNormalScale;\n";
+		}
+		if (aoMap) fragment += "uniform float uPbrOcclusionStrength;\n";
 		if (pbr) {
 			fragment += "uniform vec3 uCameraPosition;uniform float uPbrMetallic;uniform float uPbrRoughness;uniform vec3 uPbrBaseColor;"
 				+ "uniform vec3 uPbrEmissive;uniform float uPbrExposure;uniform float uPbrToneMapping;\n";
@@ -69,9 +83,19 @@ class MultiTextureShader3D {
 		}
 		if (shadow && shadowPCF) fragment += "uniform vec2 uShadowTexelSize;\n";
 		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
+			+ (mapped ? "vMaterialUV=aMaterialUV;" : "") + (normalMap ? "vTangent=aTangent;" : "")
 			+ (lit ? "vNormal=aNormal;vWorldPosition=aPosition;" : "") + (shadow ? "vShadowPosition=uLightViewProjection*vec4(aPosition,1.0);" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
 		for (name in textureNames) fragment += "uniform sampler2D " + name + ";uniform vec4 " + name + "Rect;uniform vec4 " + name + "Clamp;\n";
+		if (mapped) {
+			for (name in ["uPbrMetallicRoughnessMap", "uPbrNormalMap", "uPbrOcclusionMap", "uPbrEmissiveMap"])
+				if (textureNames.indexOf(name) >= 0) fragment += "uniform vec4 " + name + "Sampler;\n";
+			// 包裹先在贴图局部 UV 内执行，允许各贴图使用独立区域与采样模式。
+			fragment += "float pbrWrap(float uv,float mode){if(mode<20000.0)return fract(uv);if(mode>33300.0)return 1.0-abs(mod(uv,2.0)-1.0);return clamp(uv,0.0,1.0); }\n"
+				+ "vec2 pbrMapUV(vec4 region,vec4 bounds,vec4 samplerSettings){vec2 uv=vec2(pbrWrap(vMaterialUV.x,samplerSettings.z),pbrWrap(vMaterialUV.y,samplerSettings.w));"
+				+ "return clamp(region.xy+uv*region.zw,bounds.xy,bounds.zw); }\n"
+				+ "vec3 pbrMapRGB(vec4 sampleColor){return sampleColor.a>0.0?clamp(sampleColor.rgb/sampleColor.a,0.0,1.0):vec3(0.0); }\n";
+		}
 		if (uvCode != "") fragment += "uniform vec4 uBaseUVRect;uniform vec4 uBaseUVClamp;\n";
 		if (soft) fragment += "uniform highp sampler2D uSceneDepth;uniform vec4 uSoftParams;uniform float uSoftDistance;"
 			+ "float softLinearDepth(float d){float n=uSoftParams.x,f=uSoftParams.y;return (2.0*n*f)/(f+n-(2.0*d-1.0)*(f-n));}\n";
@@ -83,9 +107,26 @@ class MultiTextureShader3D {
 			+ "float sourceAlpha=color.a;if(sourceAlpha>0.0){color.rgb/=sourceAlpha;}else{color.rgb=vec3(0.0);}\n";
 		fragment += lit ? "color.rgb=toLinear(color.rgb)*toLinear(vColor.rgb);color.a*=vColor.a;\n" : "if(uLinearBaseColor>0.5){color.rgb=toDisplay(toLinear(color.rgb)*toLinear(vColor.rgb));color.a*=vColor.a;}else{color*=vColor;}\n";
 		fragment += fragmentCode + "\n";
+		if (pbr) {
+			fragment += "float metal=uPbrMetallic;float rough=uPbrRoughness;float ao=1.0;vec3 emission=uPbrEmissive;\n";
+			for (name in ["uPbrMetallicRoughnessMap", "uPbrNormalMap", "uPbrOcclusionMap", "uPbrEmissiveMap"]) {
+				if (textureNames.indexOf(name) < 0) continue;
+				var sample = "pbrMapRGB(texture2D(" + name + ",pbrMapUV("+name+"Rect,"+name+"Clamp,"+name+"Sampler)))";
+				switch (name) {
+					case "uPbrMetallicRoughnessMap": fragment += "vec3 mrSample="+sample+";rough*=mrSample.g;metal*=mrSample.b;\n";
+					case "uPbrNormalMap": fragment += "vec3 tangentNormal="+sample+"*2.0-1.0;tangentNormal.xy*=uPbrNormalScale;\n";
+					case "uPbrOcclusionMap": fragment += "ao=mix(1.0,"+sample+".r,uPbrOcclusionStrength);\n";
+					case "uPbrEmissiveMap": fragment += "emission*=toLinear("+sample+");\n";
+				}
+			}
+		}
 		if (lit) {
-			fragment += "vec3 normal=vNormal/max(length(vNormal),0.000001);if(!gl_FrontFacing)normal=-normal;"
-				+ "float diffuse=max(dot(normal,-uLightDirection),0.0);float visibility=1.0;\n";
+			fragment += "vec3 normal=vNormal/max(length(vNormal),0.000001);vec3 geometricNormal=gl_FrontFacing?normal:-normal;\n";
+			if (normalMap) fragment += "vec3 tangent=vTangent.xyz-normal*dot(normal,vTangent.xyz);"
+				+ "tangent=tangent/max(length(tangent),0.0001);vec3 bitangent=cross(normal,tangent)*(vTangent.w<0.0?-1.0:1.0);"
+				+ "vec3 mappedNormal=tangent*tangentNormal.x+bitangent*tangentNormal.y+normal*tangentNormal.z;"
+				+ "if(length(mappedNormal)>0.0001)normal=normalize(mappedNormal);\n";
+			fragment += "if(!gl_FrontFacing)normal=-normal;float diffuse=max(dot(geometricNormal,-uLightDirection),0.0);float visibility=1.0;\n";
 			if (shadow) fragment += "if(uReceiveShadow>0.5&&vShadowPosition.w>0.0){vec3 p=vShadowPosition.xyz/vShadowPosition.w*0.5+0.5;"
 				+ "if(p.x>=0.0&&p.x<=1.0&&p.y>=0.0&&p.y<=1.0&&p.z>=0.0&&p.z<=1.0){"
 				+ "float bias=uShadowBias+uShadowSlopeBias*(1.0-diffuse);"
@@ -95,11 +136,11 @@ class MultiTextureShader3D {
 					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+t,t,vec2(1.0)-t)).r))*0.25;"
 					: "visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);") + "}}\n";
 			if (pbr) {
-				fragment += "color.rgb*=uPbrBaseColor;float metal=clamp(uPbrMetallic,0.0,1.0);float rough=clamp(uPbrRoughness,"
+				fragment += "color.rgb*=uPbrBaseColor;metal=clamp(metal,0.0,1.0);rough=clamp(rough,"
 					+ (precision == "highp" ? "0.045" : "0.1") + ",1.0);"
 					+ "vec3 deltaView=uCameraPosition-vWorldPosition;vec3 viewDirection=deltaView/max(length(deltaView),0.0001);"
 					+ "vec3 ambientF=pbrFresnel(max(dot(normal,viewDirection),0.0),mix(vec3(0.04),color.rgb,metal));"
-					+ "vec3 radiance=uAmbientColor*color.rgb*(1.0-metal)*(vec3(1.0)-ambientF);\n";
+					+ "vec3 radiance=uAmbientColor*color.rgb*(1.0-metal)*(vec3(1.0)-ambientF)*ao;\n";
 			} else fragment += "vec3 illumination=uAmbientColor;\n";
 			// 展开固定数量的灯光，避免兼容设备上的动态 uniform 数组索引。
 			for (i in 0...lightSlots) {
@@ -110,8 +151,8 @@ class MultiTextureShader3D {
 					+ (pbr ? "radiance+=pbrDirect(normal,viewDirection,toLight,color.rgb,metal,rough)*lc.rgb*attenuation*mix(1.0,visibility,lc.a);"
 						: "illumination+=lc.rgb*max(dot(normal,toLight),0.0)*attenuation*mix(1.0,visibility,lc.a);") + "}}\n";
 			}
-			if (ibl) fragment += "radiance+=pbrEnvironment(normal,viewDirection,color.rgb,metal,rough);\n";
-			if (pbr) fragment += "radiance=max((radiance+uPbrEmissive)*uPbrExposure,vec3(0.0));"
+			if (ibl) fragment += "radiance+=pbrEnvironment(normal,viewDirection,color.rgb,metal,rough)*ao;\n";
+			if (pbr) fragment += "radiance=max((radiance+emission)*uPbrExposure,vec3(0.0));"
 				+ "if(uPbrToneMapping>0.5)radiance=radiance/(vec3(1.0)+radiance);color.rgb=toDisplay(radiance);\n";
 			else fragment += "color.rgb=toDisplay(color.rgb*illumination);\n";
 		}
@@ -143,6 +184,8 @@ class MultiTextureShader3D {
 			gl.bindAttribLocation(program, 0, "aPosition"); gl.bindAttribLocation(program, 1, "aUV");
 			gl.bindAttribLocation(program, 2, "aTextureId"); gl.bindAttribLocation(program, 3, "aColor");
 			if (vertex.indexOf("attribute vec3 aNormal") >= 0) gl.bindAttribLocation(program, 4, "aNormal");
+			if (vertex.indexOf("attribute vec4 aTangent") >= 0) gl.bindAttribLocation(program, 5, "aTangent");
+			if (vertex.indexOf("attribute vec2 aMaterialUV") >= 0) gl.bindAttribLocation(program, 6, "aMaterialUV");
 			gl.linkProgram(program);
 			var linked:Dynamic = gl.getProgramParameter(program, gl.LINK_STATUS);
 			if (linked == false || linked == 0) throw "三维 Shader 链接失败：" + gl.getProgramInfoLog(program);
