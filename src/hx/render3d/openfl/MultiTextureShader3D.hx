@@ -7,10 +7,11 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false):GLProgram {
 		shadow = shadow && lit;
+		pbr = pbr && lit;
 		if (textureNames == null) textureNames = [];
-		var precision = "mediump";
+		var precision = isDesktop(gl) ? "highp" : "mediump";
 		var format = isDesktop(gl) ? null : gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
 		if (format != null && format.precision > 0) precision = "highp";
 		var vertex = "attribute vec3 aPosition; attribute vec2 aUV; attribute float aTextureId; attribute vec4 aColor;\n"
@@ -24,6 +25,22 @@ class MultiTextureShader3D {
 			fragment += "varying mediump vec3 vNormal;varying " + precision + " vec3 vWorldPosition;uniform vec3 uAmbientColor;uniform vec3 uLightDirection;\n";
 			for (i in 0...lightSlots)
 				fragment += "uniform vec4 uSceneLightColor"+i+";uniform vec4 uSceneLightPosition"+i+";uniform vec3 uSceneLightDirection"+i+";uniform vec3 uSceneLightParams"+i+";\n";
+		}
+		if (pbr) {
+			fragment += "uniform vec3 uCameraPosition;uniform float uPbrMetallic;uniform float uPbrRoughness;uniform vec3 uPbrBaseColor;"
+				+ "uniform vec3 uPbrEmissive;uniform float uPbrExposure;uniform float uPbrToneMapping;\n";
+			// 采用 GGX、相关 Smith 可见性和 Schlick 菲涅耳；先平方感知粗糙度。
+			// 叉积形式避免高光中心 1-NoH² 的消减误差；半精度设备提高粗糙度下限。
+			fragment += "vec3 pbrFresnel(float cosine,vec3 f0){float t=1.0-clamp(cosine,0.0,1.0);float t2=t*t;return f0+(vec3(1.0)-f0)*(t2*t2*t); }\n"
+				+ "vec3 pbrDirect(vec3 n,vec3 v,vec3 l,vec3 base,float metal,float rough){"
+				+ "float nl=clamp(dot(n,l),0.0,1.0);float nv=clamp(dot(n,v),0.001,1.0);if(nl<=0.0)return vec3(0.0);"
+				+ "vec3 sum=v+l;vec3 h=sum/max(length(sum),0.0001);float nh=clamp(dot(n,h),0.0,1.0);"
+				+ "float a=rough*rough;float a2=a*a;vec3 nhCross=cross(n,h);float nhA=nh*a;"
+				+ "float ratio=a/max(dot(nhCross,nhCross)+nhA*nhA,0.000001);float distribution=ratio*ratio/3.14159265;"
+				+ "float gv=nl*sqrt(nv*nv*(1.0-a2)+a2);float gl=nv*sqrt(nl*nl*(1.0-a2)+a2);"
+				+ "float visibility=0.5/max(gv+gl,0.0001);vec3 f=pbrFresnel(dot(v,h),mix(vec3(0.04),base,metal));"
+				+ "vec3 diffusePart=(vec3(1.0)-f)*(1.0-metal)*base/3.14159265;"
+				+ "return (diffusePart+f*(distribution*visibility))*nl;}\n";
 		}
 		if (shadow) {
 			var varying = "varying " + precision + " vec4 vShadowPosition;\n";
@@ -57,16 +74,25 @@ class MultiTextureShader3D {
 					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(-t.x,t.y),t,vec2(1.0)-t)).r)"
 					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+t,t,vec2(1.0)-t)).r))*0.25;"
 					: "visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);") + "}}\n";
-			fragment += "vec3 illumination=uAmbientColor;\n";
+			if (pbr) {
+				fragment += "color.rgb*=uPbrBaseColor;float metal=clamp(uPbrMetallic,0.0,1.0);float rough=clamp(uPbrRoughness,"
+					+ (precision == "highp" ? "0.045" : "0.1") + ",1.0);"
+					+ "vec3 deltaView=uCameraPosition-vWorldPosition;vec3 viewDirection=deltaView/max(length(deltaView),0.0001);"
+					+ "vec3 ambientF=pbrFresnel(max(dot(normal,viewDirection),0.0),mix(vec3(0.04),color.rgb,metal));"
+					+ "vec3 radiance=uAmbientColor*color.rgb*(1.0-metal)*(vec3(1.0)-ambientF);\n";
+			} else fragment += "vec3 illumination=uAmbientColor;\n";
 			// 展开固定数量的灯光，避免兼容设备上的动态 uniform 数组索引。
 			for (i in 0...lightSlots) {
 				fragment += "{vec4 lc=uSceneLightColor"+i+";if(dot(lc.rgb,lc.rgb)>0.0){vec4 lp=uSceneLightPosition"+i+";vec3 ld=uSceneLightDirection"+i+";vec3 params=uSceneLightParams"+i+";"
 					+ "vec3 toLight=-ld;float attenuation=1.0;if(lp.w>0.5){vec3 delta=lp.xyz-vWorldPosition;float distance=length(delta);toLight=delta/max(distance,0.000001);"
 					+ "float falloff=max(1.0-distance/params.x,0.0);attenuation=falloff*falloff;"
 					+ "if(lp.w>1.5)attenuation*=smoothstep(params.z,params.y,dot(-toLight,ld));}"
-					+ "illumination+=lc.rgb*max(dot(normal,toLight),0.0)*attenuation*mix(1.0,visibility,lc.a);}}\n";
+					+ (pbr ? "radiance+=pbrDirect(normal,viewDirection,toLight,color.rgb,metal,rough)*lc.rgb*attenuation*mix(1.0,visibility,lc.a);"
+						: "illumination+=lc.rgb*max(dot(normal,toLight),0.0)*attenuation*mix(1.0,visibility,lc.a);") + "}}\n";
 			}
-			fragment += "color.rgb=toDisplay(color.rgb*illumination);\n";
+			if (pbr) fragment += "radiance=max((radiance+uPbrEmissive)*uPbrExposure,vec3(0.0));"
+				+ "if(uPbrToneMapping>0.5)radiance=radiance/(vec3(1.0)+radiance);color.rgb=toDisplay(radiance);\n";
+			else fragment += "color.rgb=toDisplay(color.rgb*illumination);\n";
 		}
 		if (soft) fragment += "float depthSample=texture2D(uSceneDepth,gl_FragCoord.xy/uSoftParams.zw).r;"
 			+ "if(depthSample<1.0){float sceneZ=softLinearDepth(depthSample);float particleZ=softLinearDepth(gl_FragCoord.z);"

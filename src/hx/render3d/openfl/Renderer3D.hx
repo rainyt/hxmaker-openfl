@@ -256,8 +256,8 @@ class Renderer3D {
 		shadowPass = new ShadowPass3D(gl, depthTextures, sizedDepth, Std.int(Math.min(maxTargetWidth, maxTargetHeight)));
 	}
 
-	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool):String {
-		return Json.stringify([soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
+	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool, pbr:Bool):String {
+		return Json.stringify([pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -274,7 +274,7 @@ class Renderer3D {
 	}
 
 	private function getProgram(material:Material3D, multi:Bool):Program3DInfo {
-		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames(), frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0);
+		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames(), frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, material.lightingEnabled && material.pbrEnabled);
 		var info = programs.get(key);
 		if (info != null) return info;
 		var textureNames = material.textureUniformNames();
@@ -282,7 +282,7 @@ class Renderer3D {
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null, lightSlots = material.lightingEnabled ? Scene3D.MAX_LIGHTS : 0;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1, lightSlots); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1, lightSlots, material.pbrEnabled); }
 			catch (error:Dynamic) {
 				if (slots <= 1) {
 					if (lightSlots <= 1) throw error;
@@ -355,7 +355,7 @@ class Renderer3D {
 
 	private function submit(batch:MeshBatch3D, projection:Matrix3D, scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
 		if (batch.indices.length == 0) return;
-		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0);
+		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0, batch.pbr);
 		var info = programs.get(key);
 		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
 		gl.uniform1f(info.location("uAlphaMode"), batch.alphaMode);
@@ -459,6 +459,8 @@ class Renderer3D {
 	private function applyLighting(info:Program3DInfo, scene:Scene3D, receive:Bool, guard:RenderStateGuard3D):Void {
 		var ambient = linearColor(scene.ambientColor, scene.ambientIntensity), light = scene.light;
 		gl.uniform3f(info.location("uAmbientColor"), ambient[0],ambient[1],ambient[2]);
+		var camera = scene.camera.getWorldPosition();
+		gl.uniform3f(info.location("uCameraPosition"), camera.x, camera.y, camera.z);
 		var lights = frameLights;
 		scene.stats.activeLights = Std.int(Math.max(scene.stats.activeLights, Math.min(lights.length, info.lightSlots)));
 		scene.stats.skippedLights = Std.int(Math.max(scene.stats.skippedLights, Math.max(0, lights.length - info.lightSlots)));

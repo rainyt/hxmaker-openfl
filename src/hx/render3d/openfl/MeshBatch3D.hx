@@ -36,13 +36,14 @@ class MeshBatch3D {
 	public var mirrored:Bool;
 	public var slots:Int;
 	public var lit:Bool;
+	public var pbr:Bool;
 	public var receiveShadow:Bool;
 	public var floatsPerVertex(get, never):Int;
 	private function get_floatsPerVertex():Int { return lit ? 13 : 10; }
 	public function new(material:Material3D, mirrored:Bool, slots:Int, receiveShadow:Bool = true) {
 		uvCode = material.fragmentUVCode; textureNames = material.textureUniformNames();
 		textureUniforms = material.getTextureUniforms(); baseTexture = material.texture;
-		lit = material.lightingEnabled; colorMultiplyLinear = material.colorMultiplyLinear; this.receiveShadow = receiveShadow;
+		lit = material.lightingEnabled; pbr = lit && material.pbrEnabled; colorMultiplyLinear = material.colorMultiplyLinear; this.receiveShadow = receiveShadow;
 		key = materialKey(material, mirrored, receiveShadow); declarations = material.fragmentDeclarations; fragmentCode = material.fragmentCode;
 		softParticleDistance = material.softParticleDistance; blendMode = material.blendMode;
 		uniforms = material.getUniforms(); alphaMode = material.alphaMode; alphaCutoff = material.alphaCutoff;
@@ -55,7 +56,7 @@ class MeshBatch3D {
 		return Json.stringify([material.fragmentUVCode, material.textureBindingKey(), material.textureUniformNames().join(","), material.fragmentDeclarations, material.fragmentCode, material.uniformKey(), Std.string(material.alphaMode),
 			Std.string(material.softParticleDistance), Std.string(material.blendMode), Std.string(material.alphaCutoff), Std.string(material.cullMode), Std.string(material.depthTest), Std.string(material.depthWrite),
 			Std.string(!material.lightingEnabled && material.colorMultiplyLinear), Std.string(material.smoothing), Std.string(material.textureMinSmoothing == null ? material.smoothing : material.textureMinSmoothing),
-			Std.string(material.textureWrapU), Std.string(material.textureWrapV), Std.string(mirrored), Std.string(material.lightingEnabled), Std.string(material.lightingEnabled && receiveShadow)]);
+			Std.string(material.textureWrapU), Std.string(material.textureWrapV), Std.string(mirrored), Std.string(material.lightingEnabled), Std.string(material.lightingEnabled && material.pbrEnabled), Std.string(material.lightingEnabled && receiveShadow)]);
 	}
 	/** 添加一个顶点，颜色与透明度编码进顶点，避免为不同模型切换 uniform。 */
 	public function vertex(mesh:MeshObject, index:Int, textureId:Int, world:Array<Float>, source:openfl.display.BitmapData, normals:Array<Float> = null):Int {
