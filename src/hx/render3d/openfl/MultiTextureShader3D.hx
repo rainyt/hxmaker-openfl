@@ -7,7 +7,7 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false):GLProgram {
 		shadow = shadow && lit;
 		if (textureNames == null) textureNames = [];
 		var precision = "mediump";
@@ -28,6 +28,7 @@ class MultiTextureShader3D {
 			vertex += "uniform mat4 uLightViewProjection;" + varying;
 			fragment += varying + "uniform " + precision + " sampler2D uShadowMap;uniform float uReceiveShadow;uniform float uShadowBias;uniform float uShadowSlopeBias;\n";
 		}
+		if (shadow && shadowPCF) fragment += "uniform vec2 uShadowTexelSize;\n";
 		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
 			+ (lit ? "vNormal=aNormal;" : "") + (shadow ? "vShadowPosition=uLightViewProjection*vec4(aPosition,1.0);" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
@@ -48,7 +49,12 @@ class MultiTextureShader3D {
 				+ "float diffuse=max(dot(normal,-uLightDirection),0.0);float visibility=1.0;\n";
 			if (shadow) fragment += "if(uReceiveShadow>0.5&&vShadowPosition.w>0.0){vec3 p=vShadowPosition.xyz/vShadowPosition.w*0.5+0.5;"
 				+ "if(p.x>=0.0&&p.x<=1.0&&p.y>=0.0&&p.y<=1.0&&p.z>=0.0&&p.z<=1.0){"
-				+ "float bias=uShadowBias+uShadowSlopeBias*(1.0-diffuse);visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);}}\n";
+				+ "float bias=uShadowBias+uShadowSlopeBias*(1.0-diffuse);"
+				+ (shadowPCF ? "vec2 t=uShadowTexelSize*0.5;visibility=(step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(-t.x,-t.y),t,vec2(1.0)-t)).r)"
+					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(t.x,-t.y),t,vec2(1.0)-t)).r)"
+					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(-t.x,t.y),t,vec2(1.0)-t)).r)"
+					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+t,t,vec2(1.0)-t)).r))*0.25;"
+					: "visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);") + "}}\n";
 			fragment += "color.rgb=toDisplay(color.rgb*(uAmbientColor+uLightColor*diffuse*visibility));\n";
 		}
 		if (soft) fragment += "float depthSample=texture2D(uSceneDepth,gl_FragCoord.xy/uSoftParams.zw).r;"

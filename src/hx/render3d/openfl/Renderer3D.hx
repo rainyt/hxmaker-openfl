@@ -51,6 +51,7 @@ class Renderer3D {
 	private var frameSlots:Int = 1;
 	private var frameNormals:Bool = false;
 	private var frameShadow:Bool = false;
+	private var sceneShadowFilter:Int = 0;
 	private var maxAttributes:Int = 4;
 	private var depthTextures:Bool = false;
 	private var sizedDepth:Bool = false;
@@ -111,8 +112,9 @@ class Renderer3D {
 			if (needsRedraw) {
 				redrawn = true; scene.stats.reset(); scene.stats.targetBytes = width * height * 6;
 				if (timed) mark = profileClock();
-				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard);
+				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard, renderer.__context3D, white);
 				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
+				sceneShadowFilter = frameShadow ? cast scene.light.shadowFilter : 0;
 				frameSlots = supportedSlots - (frameShadow ? 1 : 0);
 				prepareSoftDepth(scene, meshes, renderer, guard, width, height);
 				gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer); gl.viewport(0, 0, width, height);
@@ -277,7 +279,7 @@ class Renderer3D {
 	}
 
 	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool):String {
-		return Json.stringify([soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow)]);
+		return Json.stringify([soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -302,7 +304,7 @@ class Renderer3D {
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1); }
 			catch (error:Dynamic) {
 				if (slots <= 1) throw error;
 				trace("三维多纹理 Shader 回退，当前槽位数：" + slots + "，原因：" + Std.string(error));
@@ -485,6 +487,7 @@ class Renderer3D {
 			var slot = supportedSlots - 1;
 			guard.activateTexture(slot); gl.bindTexture(gl.TEXTURE_2D, shadowPass.texture);
 			gl.uniform1i(info.location("uShadowMap"), slot);
+			if (sceneShadowFilter == 1) gl.uniform2f(info.location("uShadowTexelSize"), 1.0 / scene.stats.shadowMapSize, 1.0 / scene.stats.shadowMapSize);
 			gl.uniformMatrix4fv(info.location("uLightViewProjection"), false, floatData(shadowPass.matrix.rawData));
 			gl.uniform1f(info.location("uReceiveShadow"), receive ? 1 : 0);
 			gl.uniform1f(info.location("uShadowBias"), light.shadowBias); gl.uniform1f(info.location("uShadowSlopeBias"), light.shadowSlopeBias);
