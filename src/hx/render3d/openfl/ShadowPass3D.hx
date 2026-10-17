@@ -47,7 +47,7 @@ class ShadowPass3D {
 	}
 	public function render(scene:Scene3D, meshes:Array<MeshObject>, textureUnits:Int, guard:RenderStateGuard3D, context:openfl.display3D.Context3D, white:openfl.display.BitmapData):Bool {
 		var light = scene.light;
-		if (light == null || !light.isWorldVisible() || !light.shadowEnabled || light.intensity <= 0) {
+		if (light == null || light.isDisposed || light.scene != scene || !light.isWorldVisible() || !light.shadowEnabled || light.intensity <= 0) {
 			releaseTarget(); scene.stats.shadowStatus = "关闭"; return false;
 		}
 		if (!available || textureUnits < 2) {

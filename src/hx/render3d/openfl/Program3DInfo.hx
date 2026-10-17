@@ -16,17 +16,24 @@ private typedef UniformInfo3D = {
 class Program3DInfo {
 	public var program(default, null):GLProgram;
 	public var slots(default, null):Int;
+	public var lightSlots(default, null):Int;
 	public var customUniforms(default, null):Array<UniformInfo3D> = [];
 	private var locations:Map<String, GLUniformLocation> = [];
-	public function new(gl:WebGLRenderContext, program:GLProgram, slots:Int, reflectCustom:Bool = true, textureNames:Array<String> = null) {
+	public function new(gl:WebGLRenderContext, program:GLProgram, slots:Int, reflectCustom:Bool = true, textureNames:Array<String> = null, lightSlots:Int = 4) {
 		if (textureNames == null) textureNames = [];
-		this.program = program; this.slots = slots;
+		this.program = program; this.slots = slots; this.lightSlots = lightSlots;
 		try {
 			for (name in (reflectCustom ? ["uSceneDepth", "uSoftParams", "uSoftDistance", "uBaseUVRect", "uBaseUVClamp", "uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uShadowTexelSize", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uBloom", "uBloomIntensity", "uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
 				locations.set(name, gl.getUniformLocation(program, name));
 			for (slot in 0...slots) {
 				var name = "uSampler" + slot;
 				locations.set(name, gl.getUniformLocation(program, name));
+			}
+			if (reflectCustom) for (i in 0...lightSlots) {
+				for (prefix in ["uSceneLightColor", "uSceneLightPosition", "uSceneLightDirection", "uSceneLightParams"]) {
+					var name = prefix + i;
+					locations.set(name, gl.getUniformLocation(program, name));
+				}
 			}
 			if (reflectCustom) {
 				var count:Int = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);

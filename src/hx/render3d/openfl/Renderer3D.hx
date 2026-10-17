@@ -3,6 +3,8 @@ package hx.render3d.openfl;
 import haxe.Json;
 import hx.display.Scene3D;
 import hx.display3d.Node3D;
+import hx.light.PointLight3D;
+import hx.light.SpotLight3D;
 import hx.display3d.MeshObject;
 import hx.material.Material3D;
 import hx.material.AlphaMode3D;
@@ -50,6 +52,7 @@ class Renderer3D {
 	private var supportedSlots:Int = 1;
 	private var frameSlots:Int = 1;
 	private var frameNormals:Bool = false;
+	private var frameLights:Array<hx.light.Light3D> = [];
 	private var frameShadow:Bool = false;
 	private var sceneShadowFilter:Int = 0;
 	private var maxAttributes:Int = 4;
@@ -110,7 +113,7 @@ class Renderer3D {
 			}
 			scene.stats.targetWidth = width; scene.stats.targetHeight = height;
 			if (needsRedraw) {
-				redrawn = true; scene.stats.reset(); scene.stats.targetBytes = width * height * 6;
+				redrawn = true; scene.stats.reset(); frameLights = scene.getActiveLights(); scene.stats.targetBytes = width * height * 6;
 				if (timed) mark = profileClock();
 				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard, renderer.__context3D, white);
 				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
@@ -302,16 +305,21 @@ class Renderer3D {
 		var textureNames = material.textureUniformNames();
 		var slots = Std.int(Math.min(multi ? frameSlots : 1, frameSlots - textureNames.length));
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
-		var program:GLProgram = null;
+		var program:GLProgram = null, lightSlots = material.lightingEnabled ? Scene3D.MAX_LIGHTS : 0;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1, lightSlots); }
 			catch (error:Dynamic) {
-				if (slots <= 1) throw error;
+				if (slots <= 1) {
+					if (lightSlots <= 1) throw error;
+					lightSlots--;
+					trace("三维光照 Shader 回退，当前灯光上限：" + lightSlots + "，原因：" + Std.string(error));
+					continue;
+				}
 				trace("三维多纹理 Shader 回退，当前槽位数：" + slots + "，原因：" + Std.string(error));
 				slots = Std.int(Math.max(1, Math.floor(slots / 2)));
 			}
 		}
-		info = new Program3DInfo(gl, program, slots, true, textureNames); programs.set(key, info); return info;
+		info = new Program3DInfo(gl, program, slots, true, textureNames, lightSlots); programs.set(key, info); return info;
 	}
 
 	private function drawScene(scene:Scene3D, meshes:Array<MeshObject>, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
@@ -472,16 +480,33 @@ class Renderer3D {
 			(x + insetX) / size[0], (y + insetY) / size[1], (x + width - insetX) / size[0], (y + height - insetY) / size[1]];
 	}
 
-	/** 颜色均在线性空间累加；阴影只衰减方向光，不压暗环境光。 */
+	/** 颜色均在线性空间累加；阴影只衰减主方向光，不压暗其他灯光。 */
 	private function applyLighting(info:Program3DInfo, scene:Scene3D, receive:Bool, guard:RenderStateGuard3D):Void {
 		var ambient = linearColor(scene.ambientColor, scene.ambientIntensity), light = scene.light;
 		gl.uniform3f(info.location("uAmbientColor"), ambient[0],ambient[1],ambient[2]);
-		if (light != null && light.isWorldVisible()) {
-			var color = linearColor(light.color, light.intensity), direction = light.getWorldDirection();
-			gl.uniform3f(info.location("uLightColor"), color[0],color[1],color[2]);
-			gl.uniform3f(info.location("uLightDirection"), direction.x,direction.y,direction.z);
-		} else {
-			gl.uniform3f(info.location("uLightColor"), 0,0,0); gl.uniform3f(info.location("uLightDirection"), 0,-1,0);
+		var lights = frameLights;
+		scene.stats.activeLights = Std.int(Math.max(scene.stats.activeLights, Math.min(lights.length, info.lightSlots)));
+		scene.stats.skippedLights = Std.int(Math.max(scene.stats.skippedLights, Math.max(0, lights.length - info.lightSlots)));
+		var direction = light == null || light.isDisposed || light.scene != scene ? new hx.geom.Vector3D(0, -1, 0) : light.getWorldDirection();
+		gl.uniform3f(info.location("uLightDirection"), direction.x, direction.y, direction.z);
+		for (i in 0...info.lightSlots) {
+			if (i >= lights.length) {
+				gl.uniform4f(info.location("uSceneLightColor" + i), 0, 0, 0, 0);
+				gl.uniform4f(info.location("uSceneLightPosition" + i), 0, 0, 0, 0);
+				gl.uniform3f(info.location("uSceneLightDirection" + i), 0, -1, 0);
+				gl.uniform3f(info.location("uSceneLightParams" + i), 1, 1, 0);
+				continue;
+			}
+			var current = lights[i], color = linearColor(current.color, current.intensity);
+			var m = current.getWorldMatrix().rawData, d = current.getWorldDirection();
+			var point:PointLight3D = Std.isOfType(current, PointLight3D) ? cast current : null;
+			var spot:SpotLight3D = Std.isOfType(current, SpotLight3D) ? cast current : null;
+			gl.uniform4f(info.location("uSceneLightColor" + i), color[0], color[1], color[2], frameShadow && current == light ? 1 : 0);
+			gl.uniform4f(info.location("uSceneLightPosition" + i), m[12], m[13], m[14], spot != null ? 2 : point != null ? 1 : 0);
+			gl.uniform3f(info.location("uSceneLightDirection" + i), d.x, d.y, d.z);
+			gl.uniform3f(info.location("uSceneLightParams" + i), point == null ? 1 : point.range,
+				spot == null ? 1 : Math.cos(spot.innerAngle * Math.PI / 180),
+				spot == null ? 0 : Math.cos(spot.outerAngle * Math.PI / 180));
 		}
 		if (frameShadow) {
 			var slot = supportedSlots - 1;
@@ -545,6 +570,7 @@ class Renderer3D {
 	/** 上下文已失效时仅丢弃句柄，不能在新上下文删除旧句柄。 */
 	public function abandonContext():Void {
 		if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null;
+		frameLights = [];
 		if (shadowPass != null) shadowPass.abandonContext(); shadowPass = null;
 		frameShadow = false; frameSlots = 1; frameSoft = false;
 		softDepth = null; softFailure = ""; bloomPass = null; bloomReady = false; bloomFailure = "";

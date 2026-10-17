@@ -7,7 +7,7 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4):GLProgram {
 		shadow = shadow && lit;
 		if (textureNames == null) textureNames = [];
 		var precision = "mediump";
@@ -20,8 +20,10 @@ class MultiTextureShader3D {
 		fragment += "vec3 toLinear(vec3 c){c=clamp(c,0.0,1.0);return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,step(c,vec3(0.04045)));}\n"
 			+ "vec3 toDisplay(vec3 c){c=max(c,vec3(0.0));return clamp(mix(1.055*pow(c,vec3(1.0/2.4))-0.055,c*12.92,step(c,vec3(0.0031308))),0.0,1.0);}\n";
 		if (lit) {
-			vertex += "attribute vec3 aNormal;varying mediump vec3 vNormal;\n";
-			fragment += "varying mediump vec3 vNormal;uniform vec3 uAmbientColor;uniform vec3 uLightColor;uniform vec3 uLightDirection;\n";
+			vertex += "attribute vec3 aNormal;varying mediump vec3 vNormal;varying " + precision + " vec3 vWorldPosition;\n";
+			fragment += "varying mediump vec3 vNormal;varying " + precision + " vec3 vWorldPosition;uniform vec3 uAmbientColor;uniform vec3 uLightDirection;\n";
+			for (i in 0...lightSlots)
+				fragment += "uniform vec4 uSceneLightColor"+i+";uniform vec4 uSceneLightPosition"+i+";uniform vec3 uSceneLightDirection"+i+";uniform vec3 uSceneLightParams"+i+";\n";
 		}
 		if (shadow) {
 			var varying = "varying " + precision + " vec4 vShadowPosition;\n";
@@ -30,7 +32,7 @@ class MultiTextureShader3D {
 		}
 		if (shadow && shadowPCF) fragment += "uniform vec2 uShadowTexelSize;\n";
 		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
-			+ (lit ? "vNormal=aNormal;" : "") + (shadow ? "vShadowPosition=uLightViewProjection*vec4(aPosition,1.0);" : "") + "}";
+			+ (lit ? "vNormal=aNormal;vWorldPosition=aPosition;" : "") + (shadow ? "vShadowPosition=uLightViewProjection*vec4(aPosition,1.0);" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
 		for (name in textureNames) fragment += "uniform sampler2D " + name + ";uniform vec4 " + name + "Rect;uniform vec4 " + name + "Clamp;\n";
 		if (uvCode != "") fragment += "uniform vec4 uBaseUVRect;uniform vec4 uBaseUVClamp;\n";
@@ -55,7 +57,16 @@ class MultiTextureShader3D {
 					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(-t.x,t.y),t,vec2(1.0)-t)).r)"
 					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+t,t,vec2(1.0)-t)).r))*0.25;"
 					: "visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);") + "}}\n";
-			fragment += "color.rgb=toDisplay(color.rgb*(uAmbientColor+uLightColor*diffuse*visibility));\n";
+			fragment += "vec3 illumination=uAmbientColor;\n";
+			// 展开固定数量的灯光，避免兼容设备上的动态 uniform 数组索引。
+			for (i in 0...lightSlots) {
+				fragment += "{vec4 lc=uSceneLightColor"+i+";if(dot(lc.rgb,lc.rgb)>0.0){vec4 lp=uSceneLightPosition"+i+";vec3 ld=uSceneLightDirection"+i+";vec3 params=uSceneLightParams"+i+";"
+					+ "vec3 toLight=-ld;float attenuation=1.0;if(lp.w>0.5){vec3 delta=lp.xyz-vWorldPosition;float distance=length(delta);toLight=delta/max(distance,0.000001);"
+					+ "float falloff=max(1.0-distance/params.x,0.0);attenuation=falloff*falloff;"
+					+ "if(lp.w>1.5)attenuation*=smoothstep(params.z,params.y,dot(-toLight,ld));}"
+					+ "illumination+=lc.rgb*max(dot(normal,toLight),0.0)*attenuation*mix(1.0,visibility,lc.a);}}\n";
+			}
+			fragment += "color.rgb=toDisplay(color.rgb*illumination);\n";
 		}
 		if (soft) fragment += "float depthSample=texture2D(uSceneDepth,gl_FragCoord.xy/uSoftParams.zw).r;"
 			+ "if(depthSample<1.0){float sceneZ=softLinearDepth(depthSample);float particleZ=softLinearDepth(gl_FragCoord.z);"
