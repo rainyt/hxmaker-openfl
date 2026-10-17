@@ -2,8 +2,8 @@ package hx.render3d.openfl;
 
 import haxe.Json;
 import hx.display.Scene3D;
-import hx.display.Node3D;
-import hx.display.MeshObject;
+import hx.display3d.Node3D;
+import hx.display3d.MeshObject;
 import hx.material.Material3D;
 import hx.material.AlphaMode3D;
 import hx.material.CullMode3D;

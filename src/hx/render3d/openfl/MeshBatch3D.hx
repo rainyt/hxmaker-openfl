@@ -1,6 +1,6 @@
 package hx.render3d.openfl;
 
-import hx.display.MeshObject;
+import hx.display3d.MeshObject;
 import hx.material.Material3D;
 import hx.material.AlphaMode3D;
 import hx.material.CullMode3D;

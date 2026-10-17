@@ -1,7 +1,7 @@
 package hx.render3d.openfl;
 
 import hx.display.Scene3D;
-import hx.display.MeshObject;
+import hx.display3d.MeshObject;
 import hx.light.DirectionalLight3D;
 import hx.geom.Matrix3D;
 import hx.geom.Bounds3D;
