@@ -41,6 +41,12 @@ class MeshBatch3D {
 	public var mapped:Bool;
 	public var normalMapped:Bool;
 	public var receiveShadow:Bool;
+	private var vertexMesh:MeshObject;
+	private var vertexSource:openfl.display.BitmapData;
+	private var uvOffsetU:Float;
+	private var uvOffsetV:Float;
+	private var uvScaleU:Float;
+	private var uvScaleV:Float;
 	public var floatsPerVertex(get, never):Int;
 	private function get_floatsPerVertex():Int { return (lit ? 13 : 10) + (mapped ? 2 : 0) + (normalMapped ? 4 : 0); }
 	public function new(material:Material3D, mirrored:Bool, slots:Int, receiveShadow:Bool = true) {
@@ -72,11 +78,20 @@ class MeshBatch3D {
 		var green = colors.length == 0 ? 1. : colors[offset + 1];
 		var blue = colors.length == 0 ? 1. : colors[offset + 2];
 		var alpha = colors.length == 0 ? 1. : colors[offset + 3];
-		var texture = material.texture, size = TextureBridge3D.uvSize(source);
-		var x = 0., y = 0., width = source.width * 1., height = source.height * 1.;
-		if (texture != null && texture.rect != null) { x = texture.rect.x; y = texture.rect.y; width = texture.rect.width; height = texture.rect.height; }
-		for (v in [world[index*3], world[index*3+1], world[index*3+2], (x+g.uvs[index*2]*width)/size[0], (y+g.uvs[index*2+1]*height)/size[1],
-			textureId * 1., ((material.color >> 16) & 255)/255. * red, ((material.color >> 8) & 255)/255. * green, (material.color & 255)/255. * blue, material.opacity * alpha]) vertices.push(v);
+		// 一个网格内的图集区域保持一致，只计算一次，避免每个顶点创建临时数组。
+		if (vertexMesh != mesh || vertexSource != source) {
+			vertexMesh = mesh; vertexSource = source;
+			var texture = material.texture, size = TextureBridge3D.uvSize(source);
+			var rect = texture == null ? null : texture.rect;
+			uvOffsetU = rect == null ? 0 : rect.x / size[0]; uvOffsetV = rect == null ? 0 : rect.y / size[1];
+			uvScaleU = (rect == null ? source.width : rect.width) / size[0];
+			uvScaleV = (rect == null ? source.height : rect.height) / size[1];
+		}
+		vertices.push(world[index*3]); vertices.push(world[index*3+1]); vertices.push(world[index*3+2]);
+		vertices.push(uvOffsetU+g.uvs[index*2]*uvScaleU); vertices.push(uvOffsetV+g.uvs[index*2+1]*uvScaleV);
+		vertices.push(textureId); vertices.push(((material.color >> 16) & 255)/255. * red);
+		vertices.push(((material.color >> 8) & 255)/255. * green); vertices.push((material.color & 255)/255. * blue);
+		vertices.push(material.opacity * alpha);
 		if (lit) {
 			vertices.push(normals[index*3]); vertices.push(normals[index*3+1]); vertices.push(normals[index*3+2]);
 		}

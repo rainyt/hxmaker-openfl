@@ -29,12 +29,14 @@ class RenderStateGuard3D {
 	private var vertexArrays:VertexArrayBridge3D;
 	private var previousVertexArray:Dynamic;
 	private var timed:Bool;
+	private var stateCache:GLStateCache3D;
 	public function new(renderer:OpenGLRenderer, attributeCount:Int = 4, compositeOnly:Bool = false,
 		vertexArrays:VertexArrayBridge3D = null, timed:Bool = false) {
 		this.timed = timed; this.vertexArrays = vertexArrays;
 		this.compositeOnly = compositeOnly;
 		isolatedVertexArray = vertexArrays != null && vertexArrays.available;
 		gl = renderer.gl; context = renderer.__context3D;
+		stateCache = GLStateCache3D.obtain(gl);
 		var mark = timed ? clock() : 0.;
 		// 蒙版可能刚更新待提交状态，先同步后才能保存真实的父级裁剪。
 		context.__flushGL(); cachedTexture = context.__contextState.__currentGLTexture2D;
@@ -73,9 +75,16 @@ class RenderStateGuard3D {
 		return haxe.Timer.stamp()*1000;
 		#end
 	}
-	private function query(key:Int):Dynamic { queryCount++; return gl.getParameter(key); }
+	private function query(key:Int):Dynamic {
+		if (stateCache == null) { queryCount++; return gl.getParameter(key); }
+		var before = stateCache.misses, value = stateCache.query(key);
+		queryCount += stateCache.misses-before; return value;
+	}
 	private function save(key:Int):Void { values.set(key, query(key)); }
-	private function saveEnabled(key:Int):Void { queryCount++; enabled.set(key, gl.isEnabled(key)); }
+	private function saveEnabled(key:Int):Void {
+		if (stateCache == null) { queryCount++; enabled.set(key, gl.isEnabled(key)); return; }
+		var before = stateCache.misses; enabled.set(key, stateCache.isEnabled(key)); queryCount += stateCache.misses-before;
+	}
 	/** 必须在首次绑定或上传之前调用；首次访问才查询原绑定，后续只切换槽位。 */
 	public function activateTexture(slot:Int):Void {
 		if (textures.exists(slot)) { gl.activeTexture(gl.TEXTURE0+slot); return; }
