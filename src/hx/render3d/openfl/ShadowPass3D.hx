@@ -4,10 +4,11 @@ import hx.display.Scene3D;
 import hx.display3d.MeshObject;
 import hx.light.DirectionalLight3D;
 import hx.geom.Matrix3D;
-import hx.geom.Bounds3D;
 import hx.material.AlphaMode3D;
 import hx.material.CullMode3D;
-import hx.render3d.DirectionalShadowFit3D;
+import hx.render3d.DirectionalShadowPlanner3D;
+import hx.render3d.DirectionalShadowSettings3D;
+import hx.light.ShadowFilter3D;
 import hx.utils.ContextStats;
 import lime.graphics.WebGLRenderContext;
 import lime.graphics.opengl.GLTexture;
@@ -25,15 +26,25 @@ class ShadowPass3D {
 	public var cascadeParams(default, null):Array<Float> = [0., 0., 0., 0.];
 	public var cameraDepth(default, null):Array<Float> = [0., 0., -1., 0.];
 	public var worldTexels(default, null):Array<Float> = [0., 0.];
+	public var filter(default, null):ShadowFilter3D = ShadowFilter3D.PCF4;
+	public var filterRadius(default, null):Float = 1.25;
+	public var depthBiases(default, null):Array<Float> = [0., 0.];
+	public var slopeBiases(default, null):Array<Float> = [0., 0.];
+	private var planner:DirectionalShadowPlanner3D = new DirectionalShadowPlanner3D();
+	private var fitMode:String = "关闭";
+	private var coverageDistance:Float = 0;
+	private var updated:Array<Bool> = [];
+	private var degradation:String = "";
+	private var lastResourceRequest:String;
+	private var failedKey:String;
+	private var failedLight:DirectionalLight3D;
 	public var texture(get, never):GLTexture;
 	private function get_texture():GLTexture { return target == null ? null : target.texture; }
 	private var gl:WebGLRenderContext;
 	private var available:Bool;
 	private var sizedDepth:Bool;
 	private var maximum:Int;
-	private var failedSize:Int = -1;
-	private var failedCascades:Int = -1;
-	private var singleFallback:{light:DirectionalLight3D, size:Int, requestedSize:Int, version:Int} = null;
+	private var allocationFallback:{light:DirectionalLight3D, key:String, size:Int, count:Int} = null;
 	private var target:ShadowMap3D;
 	private var program:GLProgram;
 	private var location:GLUniformLocation;
@@ -42,10 +53,9 @@ class ShadowPass3D {
 	private var maskSampler:GLUniformLocation;
 	private var maskCutoff:GLUniformLocation;
 	private var maskOpacity:GLUniformLocation;
-	private var lastSnapshot:Array<Dynamic>;
+	private var lastSnapshots:Array<Array<Dynamic>> = [];
 	private var lastLight:DirectionalLight3D;
 	private var lastRequest:Int = -1;
-	private var lastSize:Int = 0;
 	private var vertices:GLBuffer;
 	private var indices:GLBuffer;
 	public function new(gl:WebGLRenderContext, available:Bool, sizedDepth:Bool, maximum:Int) {
@@ -64,78 +74,82 @@ class ShadowPass3D {
 			if (mesh.castShadow && (mesh.material.alphaMode == AlphaMode3D.OPAQUE || mesh.material.alphaMode == AlphaMode3D.MASK) && mesh.material.fragmentCode == "" && mesh.material.fragmentUVCode == "") casters.push(mesh);
 			if (mesh.receiveShadow && mesh.material.lightingEnabled) receivers.push(mesh);
 		}
-		var count = light.shadowBounds == null && scene.camera != null ? light.shadowCascadeCount : 1;
-		var fallback = count == 2 && singleFallback != null && singleFallback.light == light
-			&& singleFallback.requestedSize == light.shadowMapSize && singleFallback.version == light.shadowUpdateVersion;
-		if (fallback) count = 1;
-		// 级联横向排列；分辨率按设备上限向下取二次幂，不能分配越界图集。
+		if (casters.length == 0 || receivers.length == 0 || maximum < 16) {
+			releaseTarget(); scene.stats.shadowStatus = maximum < 16 ? "设备阴影尺寸不足" : casters.length == 0 ? "无可用投射物" : "无接收阴影材质"; return false;
+		}
+		var settings = new DirectionalShadowSettings3D(light);
+		filter = settings.filter; filterRadius = settings.radius;
+		var resourceRequest = [light.shadowQuality * 1., light.shadowMapSize * 1., light.shadowCascadeCount * 1.,
+			light.hasShadowOverride("shadowMapSize") ? 1. : 0., light.hasShadowOverride("shadowCascadeCount") ? 1. : 0., light.shadowBounds == null ? 0. : 1.].join(":");
+		// 冻结模式先于自动规划，镜头变化不能偷偷改变已经冻结的贴图布局。
+		if (!light.shadowAutoUpdate && target != null && lastSnapshots.length == target.cascades && !Lambda.exists(lastSnapshots, snapshot -> snapshot == null) && lastLight == light
+			&& lastRequest == light.shadowUpdateVersion && lastResourceRequest == resourceRequest) {
+			updated = [for (_ in 0...target.cascades) false]; updateBiases(settings); updateStats(scene);
+			scene.stats.shadowStatus = "开启（手动冻结）"; scene.stats.shadowCacheHit = true; return true;
+		}
+		var plan = planner.plan(scene.camera, scene.width / scene.height, light,
+			[for (mesh in casters) mesh.getWorldBounds()], [for (mesh in receivers) mesh.getWorldBounds()], haxe.Timer.stamp());
+		var count = plan.count;
 		if (maximum < count * 16) count = 1;
 		var tileLimit = Std.int(Math.pow(2, Math.floor(Math.log(maximum / count) / Math.log(2))));
-		var size = Std.int(Math.min(tileLimit, light.shadowMapSize));
-		if (fallback) size = Std.int(Math.min(size, singleFallback.size));
-		// 手动冻结模式保留生成时的取景和级联选择，不能因后来移动相机而剔除全部投影物。
-		if (!light.shadowAutoUpdate && target != null && target.size == size && target.cascades == count
-			&& lastSnapshot != null && lastLight == light && lastRequest == light.shadowUpdateVersion
-			&& casters.length > 0 && receivers.length > 0) {
-			updateStats(scene); scene.stats.shadowStatus = "开启（复用缓存）"; scene.stats.shadowCacheHit = true; return true;
-		}
-		var fits:Array<DirectionalShadowFit3D> = [], params = [0., 0., 0., 0.];
-		var depth = [0., 0., -1., 0.];
-		if (light.shadowBounds == null && scene.camera != null) {
-			var camera = scene.camera, near = camera.near;
-			var end = light.shadowDistance == 0 ? camera.far : Math.min(camera.far, Math.max(near + 0.001, light.shadowDistance));
-			var split = count == 2 ? DirectionalShadowFit3D.splitDistance(near, end) : end;
-			var blendStart = count == 2 ? split - (split - near) * 0.15 : end;
-			var direction = light.getWorldDirection(), aspect = scene.width / scene.height;
-			fits.push(new DirectionalShadowFit3D(camera, aspect, split, direction));
-			if (count == 2) fits.push(new DirectionalShadowFit3D(camera, aspect, end, direction, blendStart));
-			params = [split, blendStart, end - (end - near) * light.shadowFadeRatio, end];
-			var v = camera.getViewMatrix().rawData;
-			depth = [-v[2], -v[6], -v[10], -v[14]];
-			// 只剔除无法沿光向影响任何级联的物体，保留镜头外的上游投影物。
-			casters = casters.filter(mesh -> Lambda.exists(fits, fit -> fit.affects(mesh.getWorldBounds(), light.shadowPadding)));
-		}
-		if (casters.length == 0 || receivers.length == 0) {
-			releaseTarget(); scene.stats.shadowStatus = casters.length == 0 ? "无可用投射物" : "无接收阴影材质"; return false;
+		var requestedSize = settings.tileSize(count), size = Std.int(Math.min(tileLimit, requestedSize));
+		var allocationKey = [count, size, light.shadowUpdateVersion].join(":");
+		degradation = size < requestedSize ? "设备尺寸上限" : "";
+		if (allocationFallback != null && allocationFallback.light == light && allocationFallback.key == allocationKey) {
+			count = allocationFallback.count; size = allocationFallback.size; degradation = "阴影分配回退";
 		}
 		if (target != null && (target.size != size || target.cascades != count)) releaseTarget();
 		if (target == null) {
-			if (failedSize == size && failedCascades == count) { scene.stats.shadowStatus = "阴影目标创建失败"; return false; }
-			try { target = new ShadowMap3D(gl, size, sizedDepth, count); }
-			catch (error:Dynamic) {
-				// 图集分配失败时先保留单级阴影，不因高质量配置直接失去全部阴影。
-				if (count == 2) {
-					try {
-						target = new ShadowMap3D(gl, size, sizedDepth, 1); count = 1;
-						singleFallback = {light: light, size: size, requestedSize: light.shadowMapSize, version: light.shadowUpdateVersion};
-						fits = [new DirectionalShadowFit3D(scene.camera, scene.width / scene.height, params[3], light.getWorldDirection())];
-						params[0] = params[3]; params[1] = params[3];
-						trace("两级阴影图集创建失败，已保留单级阴影；调整尺寸或请求更新后会重试。");
-					} catch (_:Dynamic) { if (target != null) target.dispose(); target = null; singleFallback = null; }
-				}
-				if (target == null) {
-					failedSize = size; failedCascades = count; scene.stats.shadowStatus = "阴影目标创建失败";
-					trace("三维阴影已降级为仅光照：" + Std.string(error)); return false;
+			if (failedLight == light && failedKey == allocationKey) { scene.stats.shadowStatus = "阴影目标创建失败"; return false; }
+			var originalCount = count, originalSize = size;
+			while (target == null && size >= 16) {
+				try { target = new ShadowMap3D(gl, size, sizedDepth, count); }
+				catch (_:Dynamic) {
+					if (count == 2) {
+						try { target = new ShadowMap3D(gl, size, sizedDepth, 1); count = 1; } catch (_:Dynamic) {}
+					}
+					if (target == null) { size = Std.int(size / 2); count = originalCount; }
 				}
 			}
+			if (target == null) {
+				failedLight = light; failedKey = allocationKey; scene.stats.shadowStatus = "阴影目标创建失败"; return false;
+			}
+			if (count != originalCount || size != originalSize) {
+				allocationFallback = {light: light, key: allocationKey, count: count, size: size}; degradation = "阴影分配回退";
+			}
 		}
-		var nextMatrices = fits.length == 0 ? [lightMatrix(light, casters, receivers, size)]
-			: [for (fit in fits) fit.projection([for (mesh in casters) mesh.getWorldBounds()], light.shadowPadding, size)];
-		// 比较实际投影矩阵，纹素对齐后的相机微移不必重新绘制相同阴影图。
-		var snapshot:Array<Dynamic> = [light, size, count, light.shadowUpdateVersion];
-		for (projection in nextMatrices) for (value in projection.rawData) snapshot.push(value);
-		for (mesh in casters) {
-			snapshot.push(mesh); snapshot.push(mesh.geometry); snapshot.push(mesh.geometry.version);
-			snapshot.push(mesh.material); snapshot.push(mesh.material.version);
-			for (value in mesh.getWorldMatrix().rawData) snapshot.push(value);
+		var nextMatrices = plan.projections(size, count);
+		var params = plan.params.copy();
+		if (count == 1 && plan.count == 2) { params[0] = params[3]; params[1] = params[3]; }
+		var candidates:Array<Array<MeshObject>> = [];
+		var snapshots:Array<Array<Dynamic>> = [];
+		updated = [];
+		for (i in 0...count) {
+			var projection = nextMatrices[i];
+			var active = casters.filter(mesh -> mesh.getWorldBounds().inFrustum(projection));
+			candidates.push(active);
+			var snapshot:Array<Dynamic> = [for (value in projection.rawData) value];
+			for (mesh in active) {
+				snapshot.push(mesh); snapshot.push(mesh.geometry); snapshot.push(mesh.geometry.version);
+				// 不透明材质的粗糙度、颜色等变化不影响投影；MASK 继续跟踪纹理像素失效。
+				var material = mesh.material;
+				snapshot.push(material.alphaMode); snapshot.push(material.cullMode);
+				if (material.alphaMode == AlphaMode3D.MASK) { snapshot.push(material); snapshot.push(material.version); }
+				for (value in mesh.getWorldMatrix().rawData) snapshot.push(value);
+			}
+			snapshots.push(snapshot);
+			var previous = i < lastSnapshots.length ? lastSnapshots[i] : null;
+			var changed = lastLight != light || lastRequest != light.shadowUpdateVersion || previous == null || previous.length != snapshot.length;
+			if (!changed) for (j in 0...snapshot.length) if (snapshot[j] != previous[j]) { changed = true; break; }
+			updated.push(changed);
 		}
-		var unchanged = lastSnapshot != null && snapshot.length == lastSnapshot.length;
-		if (unchanged) for (i in 0...snapshot.length) if (snapshot[i] != lastSnapshot[i]) { unchanged = false; break; }
-		if (lastSnapshot != null && lastLight == light && lastSize == size && lastRequest == light.shadowUpdateVersion
-			&& (!light.shadowAutoUpdate || unchanged)) {
-			if (light.shadowAutoUpdate) { cascadeParams = params; cameraDepth = depth; }
-			updateStats(scene); scene.stats.shadowStatus = "开启（复用缓存）"; scene.stats.shadowCacheHit = true;
-			return true;
+		matrices = nextMatrices; matrix = matrices[0]; cascadeParams = params; cameraDepth = plan.cameraDepth;
+		fitMode = plan.mode; coverageDistance = plan.distance;
+		updateBiases(settings); updateStats(scene);
+		var allCached = updated.indexOf(true) < 0;
+		if (allCached) {
+			lastResourceRequest = resourceRequest;
+			scene.stats.shadowStatus = "开启（复用缓存）"; scene.stats.shadowCacheHit = true; return true;
 		}
 		if (program == null) {
 			program = MultiTextureShader3D.compile(gl,
@@ -151,31 +165,49 @@ class ShadowPass3D {
 			maskSampler = gl.getUniformLocation(maskProgram, "uMask");
 			maskCutoff = gl.getUniformLocation(maskProgram, "uCutoff"); maskOpacity = gl.getUniformLocation(maskProgram, "uOpacity");
 		}
-		// 绘制中途失败时禁止下一帧复用部分写入的阴影。
-		lastSnapshot = null; matrices = nextMatrices; matrix = matrices[0]; cascadeParams = params; cameraDepth = depth;
-		worldTexels = [for (projection in matrices) {
-			var m = projection.rawData;
-			2.0 / (Math.sqrt(m[0]*m[0] + m[4]*m[4] + m[8]*m[8]) * size);
-		}];
-		if (worldTexels.length == 1) worldTexels.push(worldTexels[0]);
-		updateStats(scene); scene.stats.shadowStatus = "开启";
+		// 只清理并重绘失效级联；一个图集仍只占用一个公共纹理槽位。
 		gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-		gl.disable(gl.SCISSOR_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND);
+		gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.enable(gl.SCISSOR_TEST);
 		gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
 		gl.colorMask(false, false, false, false); gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.depthFunc(gl.LEQUAL); gl.depthRange(0, 1);
-		gl.clearDepth(1); gl.clear(gl.DEPTH_BUFFER_BIT);
-		for (i in 0...count) {
-			gl.viewport(i * size, 0, size, size);
-			var candidates = fits.length == 0 ? casters : casters.filter(mesh -> fits[i].affects(mesh.getWorldBounds(), light.shadowPadding));
-			drawCascade(scene, candidates, matrices[i], guard, context, white, mipmaps);
+		gl.clearDepth(1);
+		for (i in 0...count) if (updated[i]) {
+			// 先丢弃该级缓存，异常后不可复用部分写入的深度。
+			lastSnapshots[i] = null;
+			gl.viewport(i * size, 0, size, size); gl.scissor(i * size, 0, size, size); gl.clear(gl.DEPTH_BUFFER_BIT);
+			drawCascade(scene, candidates[i], matrices[i], guard, context, white, mipmaps);
+			lastSnapshots[i] = snapshots[i];
 		}
-		lastSnapshot = snapshot; lastLight = light; lastRequest = light.shadowUpdateVersion; lastSize = size; return true;
+		gl.disable(gl.SCISSOR_TEST);
+		lastLight = light; lastRequest = light.shadowUpdateVersion; lastResourceRequest = resourceRequest;
+		return true;
+	}
+
+	private function updateBiases(settings:DirectionalShadowSettings3D):Void {
+		worldTexels = []; depthBiases = []; slopeBiases = [];
+		for (projection in matrices) {
+			var m = projection.rawData;
+			var x = 2.0 / Math.sqrt(m[0]*m[0]+m[4]*m[4]+m[8]*m[8]);
+			var y = 2.0 / Math.sqrt(m[1]*m[1]+m[5]*m[5]+m[9]*m[9]);
+			var texel = (settings.adaptive ? Math.max(x,y) : x) / target.size;
+			var depth = 2.0 / Math.sqrt(m[2]*m[2]+m[6]*m[6]+m[10]*m[10]);
+			worldTexels.push(texel);
+			depthBiases.push(settings.depthBias(texel, depth, target.depthBits, false));
+			slopeBiases.push(settings.depthBias(texel, depth, target.depthBits, true));
+		}
+		if (worldTexels.length == 1) { worldTexels.push(worldTexels[0]); depthBiases.push(depthBiases[0]); slopeBiases.push(slopeBiases[0]); }
 	}
 
 	private function updateStats(scene:Scene3D):Void {
+		scene.stats.shadowStatus = "开启";
 		scene.stats.shadowMapSize = target.size; scene.stats.shadowMapBytes = target.bytes;
 		scene.stats.shadowCascades = target.cascades; scene.stats.shadowDepthBits = target.depthBits;
 		scene.stats.shadowWorldTexels = worldTexels.slice(0, target.cascades);
+		scene.stats.shadowFitMode = fitMode; scene.stats.shadowEffectiveDistance = coverageDistance;
+		scene.stats.shadowEffectiveFilter = cast filter; scene.stats.shadowEffectiveFilterRadius = filterRadius;
+		scene.stats.shadowCascadeUpdated = updated.copy(); scene.stats.shadowDegradation = degradation;
+		scene.stats.shadowDepthBiases = depthBiases.slice(0, target.cascades);
+		scene.stats.shadowSlopeBiases = slopeBiases.slice(0, target.cascades);
 	}
 
 	private function drawCascade(scene:Scene3D, casters:Array<MeshObject>, matrix:Matrix3D, guard:RenderStateGuard3D,
@@ -250,30 +282,19 @@ class ShadowPass3D {
 		}
 		flush();
 	}
-	/** 手动世界范围沿用单级正交投影。 */
-	private function lightMatrix(light:DirectionalLight3D, casters:Array<MeshObject>, receivers:Array<MeshObject>, size:Int):Matrix3D {
-		var view = DirectionalShadowFit3D.lightView(light.getWorldDirection());
-		var bounds = new Bounds3D();
-		function include(box:Bounds3D):Void {
-			if (!box.isEmpty()) { bounds.include(box.min.x,box.min.y,box.min.z); bounds.include(box.max.x,box.max.y,box.max.z); }
-		}
-		if (light.shadowBounds != null) include(light.shadowBounds.transformed(view));
-		else {
-			for (mesh in casters) include(mesh.getWorldBounds().transformed(view));
-			for (mesh in receivers) {
-				var box = mesh.getWorldBounds().transformed(view);
-				if (!box.isEmpty()) { bounds.min.z = Math.min(bounds.min.z, box.min.z); bounds.max.z = Math.max(bounds.max.z, box.max.z); }
-			}
-		}
-		return DirectionalShadowFit3D.projectionFor(view, bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y,
-			bounds.min.z, bounds.max.z, light.shadowPadding, size);
-	}
 	private static function floats(values:Array<Float>):Float32Array {
 		var result = new Float32Array(values.length); for (i in 0...values.length) result[i] = values[i]; return result;
 	}
-	private function releaseTarget():Void { matrices = []; worldTexels = [0., 0.]; lastSnapshot = null; lastLight = null; if (target != null) target.dispose(); target = null; failedSize = -1; failedCascades = -1; }
+	private function releaseTarget():Void {
+		matrices = []; worldTexels = [0., 0.]; lastSnapshots = []; lastLight = null; lastResourceRequest = null;
+		if (target != null) target.dispose(); target = null; failedKey = null; failedLight = null;
+	}
 	/** 上下文丢失只丢弃句柄，不在新上下文删除旧资源。 */
-	public function abandonContext():Void { singleFallback = null; matrices = []; worldTexels = [0., 0.]; target = null; program = null; maskProgram = null; lastSnapshot = null; lastLight = null; location = null; vertices = null; indices = null; failedSize = -1; failedCascades = -1; }
+	public function abandonContext():Void {
+		allocationFallback = null; matrices = []; worldTexels = [0., 0.]; target = null;
+		program = null; maskProgram = null; lastSnapshots = []; lastLight = null; lastResourceRequest = null;
+		location = null; vertices = null; indices = null; failedKey = null; failedLight = null; planner.reset();
+	}
 	public function dispose():Void {
 		if (gl != null && !gl.isContextLost()) {
 			releaseTarget(); if (program != null) gl.deleteProgram(program); if (maskProgram != null) gl.deleteProgram(maskProgram);

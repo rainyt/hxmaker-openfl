@@ -7,7 +7,8 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false, ibl:Bool = false):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false, ibl:Bool = false, shadowFilter:Int = -1):GLProgram {
+		var filter = shadowFilter < 0 ? (shadowPCF ? 1 : 0) : shadowFilter;
 		shadow = shadow && lit;
 		pbr = pbr && lit;
 		ibl = ibl && pbr;
@@ -80,22 +81,35 @@ class MultiTextureShader3D {
 			// 在片元阶段按世界位置计算两级坐标，避免增加级联 varying 导致兼容设备超限。
 			fragment += "uniform mat4 uLightViewProjection;uniform mat4 uLightViewProjectionFar;"
 				+ "uniform " + precision + " sampler2D uShadowMap;uniform float uReceiveShadow;"
-				+ "uniform float uShadowBias;uniform float uShadowSlopeBias;uniform float uShadowNormalBias;"
+				+ "uniform float uShadowBias;uniform float uShadowSlopeBias;uniform vec2 uShadowDepthBiases;uniform vec2 uShadowSlopeBiases;uniform float uShadowNormalBias;"
 				+ "uniform float uShadowCascadeCount;uniform vec4 uShadowCascadeParams;uniform vec4 uShadowCameraDepth;"
-				+ "uniform vec2 uShadowTexelSize;uniform vec2 uShadowWorldTexels;\n";
+				+ "uniform vec2 uShadowTexelSize;uniform vec2 uShadowWorldTexels;uniform float uShadowFilterRadius;\n";
 			fragment += "float shadowCompare(vec2 uv,float tile,float referenceDepth){"
 				+ "vec2 atlasTexel=vec2(uShadowTexelSize.x/uShadowCascadeCount,uShadowTexelSize.y);"
 				+ "vec2 lo=vec2(tile/uShadowCascadeCount,0.0)+atlasTexel*0.5;"
 				+ "vec2 hi=vec2((tile+1.0)/uShadowCascadeCount,1.0)-atlasTexel*0.5;"
 				+ "vec2 atlasUV=vec2((uv.x+tile)/uShadowCascadeCount,uv.y);"
 				+ "return step(referenceDepth,texture2D(uShadowMap,clamp(atlasUV,lo,hi)).r); }\n";
-			fragment += "vec2 sampleDirectionalShadow(mat4 projection,float tile,float worldTexel,vec3 normal,float diffuse){"
+			fragment += "vec2 sampleDirectionalShadow(mat4 projection,float tile,float worldTexel,vec3 normal,float diffuse,float depthBias,float slopeBias){"
 				+ "float offset=uShadowNormalBias*worldTexel*(1.0-diffuse);"
 				+ "vec4 position=projection*vec4(vWorldPosition+normal*offset,1.0);"
 				+ "vec3 p=position.xyz/position.w*0.5+0.5;"
 				+ "if(any(lessThan(p,vec3(0.0)))||any(greaterThan(p,vec3(1.0))))return vec2(1.0,0.0);"
-				+ "float referenceDepth=p.z-uShadowBias-uShadowSlopeBias*(1.0-diffuse);";
-			if (shadowPCF) {
+				+ "float referenceDepth=p.z-depthBias-slopeBias*(1.0-diffuse);";
+			if (filter == 2) {
+				// 在最近纹素中心构造连续三乘三帐篷核；半径最多 1.5，外侧权重在换格时归零。
+				fragment += "vec2 grid=p.xy/uShadowTexelSize-0.5;vec2 center=floor(grid+0.5);vec2 fraction=grid-center;"
+					+ "vec3 wx=max(vec3(0.0),vec3(uShadowFilterRadius)-abs(vec3(-1.0,0.0,1.0)-vec3(fraction.x)));"
+					+ "vec3 wy=max(vec3(0.0),vec3(uShadowFilterRadius)-abs(vec3(-1.0,0.0,1.0)-vec3(fraction.y)));"
+					+ "float total=(wx.x+wx.y+wx.z)*(wy.x+wy.y+wy.z);"
+					+ "if(total<0.000001)return vec2(shadowCompare(p.xy,tile,referenceDepth),1.0);"
+					+ "vec2 base=(center+0.5)*uShadowTexelSize;float sum=0.0;";
+				var components = ["x", "y", "z"];
+				for (y in 0...3) for (x in 0...3)
+					fragment += "sum+=shadowCompare(base+vec2(" + (x-1) + ".0," + (y-1) + ".0)*uShadowTexelSize,tile,referenceDepth)*wx."
+						+ components[x] + "*wy." + components[y] + ";";
+				fragment += "return vec2(sum/total,1.0); }\n";
+			} else if (filter == 1) {
 				// 比较结果按亚纹素位置双线性混合，四次采样不再只有五档阴影亮度。
 				fragment += "vec2 grid=p.xy/uShadowTexelSize-0.5;vec2 weight=fract(grid);"
 					+ "vec2 base=(floor(grid)+0.5)*uShadowTexelSize;"
@@ -153,11 +167,11 @@ class MultiTextureShader3D {
 			fragment += "if(!gl_FrontFacing)normal=-normal;float diffuse=max(dot(geometricNormal,-uLightDirection),0.0);float visibility=1.0;\n";
 			if (shadow) fragment += "if(uReceiveShadow>0.5){float shadowDepth=dot(uShadowCameraDepth,vec4(vWorldPosition,1.0));"
 				+ "vec2 nearShadow=vec2(1.0,0.0);vec2 farShadow=vec2(1.0,0.0);"
-				+ "if(uShadowCascadeCount<1.5||shadowDepth<uShadowCascadeParams.x)nearShadow=sampleDirectionalShadow(uLightViewProjection,0.0,uShadowWorldTexels.x,geometricNormal,diffuse);"
-				+ "if(uShadowCascadeCount>1.5&&(shadowDepth>=uShadowCascadeParams.y||nearShadow.y<0.5))farShadow=sampleDirectionalShadow(uLightViewProjectionFar,1.0,uShadowWorldTexels.y,geometricNormal,diffuse);"
+				+ "if(uShadowCascadeCount<1.5||shadowDepth<uShadowCascadeParams.x)nearShadow=sampleDirectionalShadow(uLightViewProjection,0.0,uShadowWorldTexels.x,geometricNormal,diffuse,uShadowDepthBiases.x,uShadowSlopeBiases.x);"
+				+ "if(uShadowCascadeCount>1.5&&(shadowDepth>=uShadowCascadeParams.y||nearShadow.y<0.5))farShadow=sampleDirectionalShadow(uLightViewProjectionFar,1.0,uShadowWorldTexels.y,geometricNormal,diffuse,uShadowDepthBiases.y,uShadowSlopeBiases.y);"
 				+ "visibility=nearShadow.x;"
 				+ "if(uShadowCascadeCount>1.5){if(shadowDepth>=uShadowCascadeParams.x||nearShadow.y<0.5)visibility=farShadow.x;"
-				+ "else if(shadowDepth>=uShadowCascadeParams.y&&farShadow.y>0.5)visibility=mix(nearShadow.x,farShadow.x,smoothstep(uShadowCascadeParams.y,uShadowCascadeParams.x,shadowDepth));}"
+				+ "else if(shadowDepth>=uShadowCascadeParams.y&&farShadow.y>0.5)visibility=mix(nearShadow.x,farShadow.x,smoothstep(0.0,1.0,(shadowDepth-uShadowCascadeParams.y)/max(uShadowCascadeParams.x-uShadowCascadeParams.y,0.000001)));}"
 				+ "if(uShadowCascadeParams.w>0.0){float fade=uShadowCascadeParams.z<uShadowCascadeParams.w?"
 				+ "smoothstep(uShadowCascadeParams.z,uShadowCascadeParams.w,shadowDepth):step(uShadowCascadeParams.w,shadowDepth);visibility=mix(visibility,1.0,fade);}}\n";
 			if (pbr) {

@@ -118,7 +118,7 @@ class Renderer3D {
 				if (timed) mark = profileClock();
 				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard, renderer.__context3D, white, mipmaps);
 				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
-				sceneShadowFilter = frameShadow ? cast scene.light.shadowFilter : 0;
+				sceneShadowFilter = frameShadow ? cast shadowPass.filter : 0;
 				frameSlots = supportedSlots - (frameShadow ? 1 : 0);
 				prepareEnvironment(scene, meshes);
 				prepareSoftDepth(scene, meshes, renderer, guard, width, height);
@@ -331,7 +331,7 @@ class Renderer3D {
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null, lightSlots = material.lightingEnabled ? Scene3D.MAX_LIGHTS : 0;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter == 1, lightSlots, material.pbrEnabled, frameIbl); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter > 0, lightSlots, material.pbrEnabled, frameIbl, sceneShadowFilter); }
 			catch (error:Dynamic) {
 				if (slots <= 1) {
 					if (lightSlots <= 1) throw error;
@@ -588,8 +588,11 @@ class Renderer3D {
 			gl.uniform4f(info.location("uShadowCameraDepth"), depth[0], depth[1], depth[2], depth[3]);
 			gl.uniform2f(info.location("uShadowWorldTexels"), shadowPass.worldTexels[0], shadowPass.worldTexels[1]);
 			gl.uniform1f(info.location("uShadowNormalBias"), light.shadowNormalBias);
+			gl.uniform1f(info.location("uShadowFilterRadius"), shadowPass.filterRadius);
 			gl.uniform1f(info.location("uReceiveShadow"), receive ? 1 : 0);
-			gl.uniform1f(info.location("uShadowBias"), light.shadowBias); gl.uniform1f(info.location("uShadowSlopeBias"), light.shadowSlopeBias);
+			gl.uniform2f(info.location("uShadowDepthBiases"), shadowPass.depthBiases[0], shadowPass.depthBiases[1]);
+			gl.uniform2f(info.location("uShadowSlopeBiases"), shadowPass.slopeBiases[0], shadowPass.slopeBiases[1]);
+			gl.uniform1f(info.location("uShadowBias"), shadowPass.depthBiases[0]); gl.uniform1f(info.location("uShadowSlopeBias"), shadowPass.slopeBiases[0]);
 		}
 	}
 	private static function linearColor(color:Int, intensity:Float):Array<Float> {
