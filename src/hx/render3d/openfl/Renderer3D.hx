@@ -68,6 +68,7 @@ class Renderer3D {
 	private var lastSettings:String;
 	public function new() {}
 
+	private var mipmaps:MipmapCache3D = new MipmapCache3D();
 	public function render(scene:Scene3D, display:Scene3DDisplay, event:RenderEvent):Void {
 		if (scene.isDisposed || scene.width <= 0 || scene.height <= 0) return;
 		var renderer:OpenGLRenderer = cast event.renderer;
@@ -101,6 +102,7 @@ class Renderer3D {
 			}
 			if (frameAttributes > maxAttributes) throw "当前设备不支持所需的 PBR UV 或切线顶点属性";
 		}
+		mipmaps.prune();
 		var guard = new RenderStateGuard3D(renderer, frameAttributes, !needsRedraw, vertexArrays, timed);
 		try {
 			// 首次目标创建、阴影目标创建、纹理上传和采样恢复都会使用槽位 0。
@@ -114,7 +116,7 @@ class Renderer3D {
 			if (needsRedraw) {
 				redrawn = true; scene.stats.reset(); frameLights = scene.getActiveLights(); scene.stats.targetBytes = width * height * 6;
 				if (timed) mark = profileClock();
-				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard, renderer.__context3D, white);
+				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard, renderer.__context3D, white, mipmaps);
 				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
 				sceneShadowFilter = frameShadow ? cast scene.light.shadowFilter : 0;
 				frameSlots = supportedSlots - (frameShadow ? 1 : 0);
@@ -401,6 +403,18 @@ class Renderer3D {
 		if (batch != null) submit(batch, projection, scene, renderer, guard);
 	}
 
+	private static function effectiveFilter(bitmap:hx.display.BitmapData, source:openfl.display.BitmapData, filter:Int):Int {
+		return filter >= 9984 && !MipmapCache3D.supported(bitmap, source) ? hx.material.TextureMinFilter3D.base(filter) : filter;
+	}
+	private static function auxiliarySampler(batch:MeshBatch3D, name:String, bitmap:hx.display.BitmapData, source:openfl.display.BitmapData):Array<Int> {
+		var sampling = batch.pbr && StringTools.startsWith(name, "uPbr") ? batch.uniforms.get(name + "Sampler") : null;
+		var requested = batch.uniforms.get(name + "MinFilter");
+		var filter = requested == null ? batch.minFilter : Std.int(requested[0]);
+		var hardware = sampling != null && MipmapCache3D.supported(bitmap, source);
+		return [sampling == null ? (batch.smoothing ? 1 : 0) : (sampling[0] > 0.5 ? 1 : 0), effectiveFilter(bitmap, source, filter),
+			hardware ? Std.int(sampling[2]) : 33071, hardware ? Std.int(sampling[3]) : 33071];
+	}
+
 	private function submit(batch:MeshBatch3D, projection:Matrix3D, scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
 		if (batch.indices.length == 0) return;
 		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0, batch.pbr);
@@ -425,25 +439,29 @@ class Renderer3D {
 			guard.activateTexture(slot);
 			var texture = TextureBridge3D.resolve(source, renderer.__context3D);
 			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
-			// 辅助贴图只使用 CLAMP，重复由 Shader 在区域内部完成。
 			if (frameIbl && batch.pbr && source == TextureBridge3D.source(frameEnvironment.atlas, white))
 				throw "IBL 数据图集不能同时作为 PBR 辅助纹理";
-			if (batch.textures.indexOf(source) >= 0 && (batch.wrapU != 33071 || batch.wrapV != 33071))
-				throw "同一底层纹理同时作为主贴图和辅助贴图时，主贴图必须使用 CLAMP";
-			var sampling = batch.pbr && StringTools.startsWith(name, "uPbr") ? batch.uniforms.get(name + "Sampler") : null;
-			var smoothing = sampling == null ? batch.smoothing : sampling[0] > 0.5;
-			var minSmoothing = sampling == null ? batch.minSmoothing : sampling[1] > 0.5;
-			// 同一底层图片共享 GL 采样状态；不同过滤方式不能在一次绘制中并存。
-			if (batch.textures.indexOf(source) >= 0 && (smoothing != batch.smoothing || minSmoothing != batch.minSmoothing))
-				throw "同一图片作为基础色和 PBR 数据贴图时必须使用相同过滤设置";
-			for (other in batch.textureNames) {
-				if (other == name || TextureBridge3D.source(batch.textureUniforms.get(other), white) != source) continue;
-				var previous = batch.pbr && StringTools.startsWith(other, "uPbr") ? batch.uniforms.get(other + "Sampler") : null;
-				if (smoothing != (previous == null ? batch.smoothing : previous[0] > 0.5)
-					|| minSmoothing != (previous == null ? batch.minSmoothing : previous[1] > 0.5))
-					throw "同一图片绑定到多个材质贴图时必须使用相同过滤设置";
+			var settings = auxiliarySampler(batch, name, bitmap, source);
+			// 整图使用硬件包裹，保留连续 UV 导数；图集继续在 Shader 内包裹。
+			if (batch.pbr && StringTools.startsWith(name, "uPbr"))
+				batch.uniforms.set(name + "HardwareWrap", [MipmapCache3D.supported(bitmap, source) ? 1. : 0.]);
+			if (batch.textures.indexOf(source) >= 0) {
+				var baseFilter = effectiveFilter(batch.baseTexture, source, batch.minFilter);
+				if (settings[0] != (batch.smoothing ? 1 : 0) || settings[1] != baseFilter
+					|| settings[2] != batch.wrapU || settings[3] != batch.wrapV)
+					throw "同一图片作为基础色和 PBR 数据贴图时必须使用相同过滤与包裹设置";
 			}
-			TextureBridge3D.applySampler(texture, smoothing, 33071, 33071, minSmoothing);
+			for (other in batch.textureNames) {
+				var otherBitmap = batch.textureUniforms.get(other);
+				if (other == name || TextureBridge3D.source(otherBitmap, white) != source) continue;
+				var previous = auxiliarySampler(batch, other, otherBitmap, source);
+				for (index in 0...4) if (settings[index] != previous[index])
+					throw "同一图片绑定到多个材质贴图时必须使用相同过滤与包裹设置";
+			}
+			var requested = batch.uniforms.get(name + "MinFilter");
+			var requestedFilter = requested == null ? batch.minFilter : Std.int(requested[0]);
+			var filter = mipmaps.prepare(bitmap, source, texture, requestedFilter);
+			TextureBridge3D.applySampler(texture, settings[0] == 1, settings[2], settings[3], null, filter);
 			gl.uniform1i(info.location(name), slot);
 			var region = textureRegion(bitmap, source);
 			batch.uniforms.set(name + "Rect", region.slice(0, 4));
@@ -469,7 +487,8 @@ class Renderer3D {
 			guard.activateTexture(slot);
 			var texture = TextureBridge3D.resolve(batch.textures[slot], renderer.__context3D);
 			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
-			TextureBridge3D.applySampler(texture, batch.smoothing, batch.wrapU, batch.wrapV, batch.minSmoothing);
+			var filter = mipmaps.prepare(batch.baseTexture, batch.textures[slot], texture, batch.minFilter);
+			TextureBridge3D.applySampler(texture, batch.smoothing, batch.wrapU, batch.wrapV, batch.minSmoothing, filter);
 			gl.uniform1i(info.location("uSampler" + slot), slot);
 		}
 		if (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0) {
@@ -559,8 +578,16 @@ class Renderer3D {
 			var slot = supportedSlots - 1;
 			guard.activateTexture(slot); gl.bindTexture(gl.TEXTURE_2D, shadowPass.texture);
 			gl.uniform1i(info.location("uShadowMap"), slot);
-			if (sceneShadowFilter == 1) gl.uniform2f(info.location("uShadowTexelSize"), 1.0 / scene.stats.shadowMapSize, 1.0 / scene.stats.shadowMapSize);
+			gl.uniform2f(info.location("uShadowTexelSize"), 1.0 / scene.stats.shadowMapSize, 1.0 / scene.stats.shadowMapSize);
 			gl.uniformMatrix4fv(info.location("uLightViewProjection"), false, floatData(shadowPass.matrix.rawData));
+			var farMatrix = shadowPass.matrices.length > 1 ? shadowPass.matrices[1] : shadowPass.matrix;
+			gl.uniformMatrix4fv(info.location("uLightViewProjectionFar"), false, floatData(farMatrix.rawData));
+			gl.uniform1f(info.location("uShadowCascadeCount"), shadowPass.matrices.length);
+			var params = shadowPass.cascadeParams, depth = shadowPass.cameraDepth;
+			gl.uniform4f(info.location("uShadowCascadeParams"), params[0], params[1], params[2], params[3]);
+			gl.uniform4f(info.location("uShadowCameraDepth"), depth[0], depth[1], depth[2], depth[3]);
+			gl.uniform2f(info.location("uShadowWorldTexels"), shadowPass.worldTexels[0], shadowPass.worldTexels[1]);
+			gl.uniform1f(info.location("uShadowNormalBias"), light.shadowNormalBias);
 			gl.uniform1f(info.location("uReceiveShadow"), receive ? 1 : 0);
 			gl.uniform1f(info.location("uShadowBias"), light.shadowBias); gl.uniform1f(info.location("uShadowSlopeBias"), light.shadowSlopeBias);
 		}
@@ -617,6 +644,7 @@ class Renderer3D {
 
 	/** 上下文已失效时仅丢弃句柄，不能在新上下文删除旧句柄。 */
 	public function abandonContext():Void {
+		mipmaps.clear();
 		if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null;
 		frameLights = [];
 		if (shadowPass != null) shadowPass.abandonContext(); shadowPass = null;

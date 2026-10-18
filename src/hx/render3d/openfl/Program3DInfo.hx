@@ -23,7 +23,7 @@ class Program3DInfo {
 		if (textureNames == null) textureNames = [];
 		this.program = program; this.slots = slots; this.lightSlots = lightSlots;
 		try {
-			for (name in (reflectCustom ? ["uIblAtlas", "uIblAtlasSize", "uIblLayout", "uIblTransform", "uSceneDepth", "uSoftParams", "uSoftDistance", "uBaseUVRect", "uBaseUVClamp", "uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uCameraPosition", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uShadowTexelSize", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias"] : ["uBloom", "uBloomIntensity", "uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
+			for (name in (reflectCustom ? ["uIblAtlas", "uIblAtlasSize", "uIblLayout", "uIblTransform", "uSceneDepth", "uSoftParams", "uSoftDistance", "uBaseUVRect", "uBaseUVClamp", "uViewProjection", "uAlphaMode", "uAlphaCutoff", "uLinearBaseColor", "uAmbientColor", "uCameraPosition", "uLightColor", "uLightDirection", "uLightViewProjection", "uShadowMap", "uShadowTexelSize", "uReceiveShadow", "uShadowBias", "uShadowSlopeBias", "uLightViewProjectionFar", "uShadowNormalBias", "uShadowCascadeCount", "uShadowCascadeParams", "uShadowCameraDepth", "uShadowWorldTexels"] : ["uBloom", "uBloomIntensity", "uMatrix", "uColorMultiplier", "uColorOffset", "uAlpha"]))
 				locations.set(name, gl.getUniformLocation(program, name));
 			for (slot in 0...slots) {
 				var name = "uSampler" + slot;

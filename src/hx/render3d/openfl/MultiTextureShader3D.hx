@@ -77,22 +77,46 @@ class MultiTextureShader3D {
 				+ "return (diffuse+reflection*(f0*brdf.x+vec3(brdf.y)))*uIblTransform.z;}\n";
 		}
 		if (shadow) {
-			var varying = "varying " + precision + " vec4 vShadowPosition;\n";
-			vertex += "uniform mat4 uLightViewProjection;" + varying;
-			fragment += varying + "uniform " + precision + " sampler2D uShadowMap;uniform float uReceiveShadow;uniform float uShadowBias;uniform float uShadowSlopeBias;\n";
+			// 在片元阶段按世界位置计算两级坐标，避免增加级联 varying 导致兼容设备超限。
+			fragment += "uniform mat4 uLightViewProjection;uniform mat4 uLightViewProjectionFar;"
+				+ "uniform " + precision + " sampler2D uShadowMap;uniform float uReceiveShadow;"
+				+ "uniform float uShadowBias;uniform float uShadowSlopeBias;uniform float uShadowNormalBias;"
+				+ "uniform float uShadowCascadeCount;uniform vec4 uShadowCascadeParams;uniform vec4 uShadowCameraDepth;"
+				+ "uniform vec2 uShadowTexelSize;uniform vec2 uShadowWorldTexels;\n";
+			fragment += "float shadowCompare(vec2 uv,float tile,float referenceDepth){"
+				+ "vec2 atlasTexel=vec2(uShadowTexelSize.x/uShadowCascadeCount,uShadowTexelSize.y);"
+				+ "vec2 lo=vec2(tile/uShadowCascadeCount,0.0)+atlasTexel*0.5;"
+				+ "vec2 hi=vec2((tile+1.0)/uShadowCascadeCount,1.0)-atlasTexel*0.5;"
+				+ "vec2 atlasUV=vec2((uv.x+tile)/uShadowCascadeCount,uv.y);"
+				+ "return step(referenceDepth,texture2D(uShadowMap,clamp(atlasUV,lo,hi)).r); }\n";
+			fragment += "vec2 sampleDirectionalShadow(mat4 projection,float tile,float worldTexel,vec3 normal,float diffuse){"
+				+ "float offset=uShadowNormalBias*worldTexel*(1.0-diffuse);"
+				+ "vec4 position=projection*vec4(vWorldPosition+normal*offset,1.0);"
+				+ "vec3 p=position.xyz/position.w*0.5+0.5;"
+				+ "if(any(lessThan(p,vec3(0.0)))||any(greaterThan(p,vec3(1.0))))return vec2(1.0,0.0);"
+				+ "float referenceDepth=p.z-uShadowBias-uShadowSlopeBias*(1.0-diffuse);";
+			if (shadowPCF) {
+				// 比较结果按亚纹素位置双线性混合，四次采样不再只有五档阴影亮度。
+				fragment += "vec2 grid=p.xy/uShadowTexelSize-0.5;vec2 weight=fract(grid);"
+					+ "vec2 base=(floor(grid)+0.5)*uShadowTexelSize;"
+					+ "float a=shadowCompare(base,tile,referenceDepth);"
+					+ "float b=shadowCompare(base+vec2(uShadowTexelSize.x,0.0),tile,referenceDepth);"
+					+ "float c=shadowCompare(base+vec2(0.0,uShadowTexelSize.y),tile,referenceDepth);"
+					+ "float d=shadowCompare(base+uShadowTexelSize,tile,referenceDepth);"
+					+ "return vec2(mix(mix(a,b,weight.x),mix(c,d,weight.x),weight.y),1.0); }\n";
+			} else fragment += "return vec2(shadowCompare(p.xy,tile,referenceDepth),1.0); }\n";
 		}
-		if (shadow && shadowPCF) fragment += "uniform vec2 uShadowTexelSize;\n";
 		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
 			+ (mapped ? "vMaterialUV=aMaterialUV;" : "") + (normalMap ? "vTangent=aTangent;" : "")
-			+ (lit ? "vNormal=aNormal;vWorldPosition=aPosition;" : "") + (shadow ? "vShadowPosition=uLightViewProjection*vec4(aPosition,1.0);" : "") + "}";
+			+ (lit ? "vNormal=aNormal;vWorldPosition=aPosition;" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
 		for (name in textureNames) fragment += "uniform sampler2D " + name + ";uniform vec4 " + name + "Rect;uniform vec4 " + name + "Clamp;\n";
 		if (mapped) {
 			for (name in ["uPbrMetallicRoughnessMap", "uPbrNormalMap", "uPbrOcclusionMap", "uPbrEmissiveMap"])
-				if (textureNames.indexOf(name) >= 0) fragment += "uniform vec4 " + name + "Sampler;\n";
+				if (textureNames.indexOf(name) >= 0) fragment += "uniform vec4 " + name + "Sampler;uniform float " + name + "HardwareWrap;\n";
 			// 包裹先在贴图局部 UV 内执行，允许各贴图使用独立区域与采样模式。
 			fragment += "float pbrWrap(float uv,float mode){if(mode<20000.0)return fract(uv);if(mode>33300.0)return 1.0-abs(mod(uv,2.0)-1.0);return clamp(uv,0.0,1.0); }\n"
-				+ "vec2 pbrMapUV(vec4 region,vec4 bounds,vec4 samplerSettings){vec2 uv=vec2(pbrWrap(vMaterialUV.x,samplerSettings.z),pbrWrap(vMaterialUV.y,samplerSettings.w));"
+				+ "vec2 pbrMapUV(vec4 region,vec4 bounds,vec4 samplerSettings,float hardwareWrap){if(hardwareWrap>0.5)return region.xy+vMaterialUV*region.zw;vec2 uv=vec2(pbrWrap(vMaterialUV.x,samplerSettings.z),pbrWrap(vMaterialUV.y,samplerSettings.w));"
 				+ "return clamp(region.xy+uv*region.zw,bounds.xy,bounds.zw); }\n"
 				+ "vec3 pbrMapRGB(vec4 sampleColor){return sampleColor.a>0.0?clamp(sampleColor.rgb/sampleColor.a,0.0,1.0):vec3(0.0); }\n";
 		}
@@ -111,7 +135,7 @@ class MultiTextureShader3D {
 			fragment += "float metal=uPbrMetallic;float rough=uPbrRoughness;float ao=1.0;vec3 emission=uPbrEmissive;\n";
 			for (name in ["uPbrMetallicRoughnessMap", "uPbrNormalMap", "uPbrOcclusionMap", "uPbrEmissiveMap"]) {
 				if (textureNames.indexOf(name) < 0) continue;
-				var sample = "pbrMapRGB(texture2D(" + name + ",pbrMapUV("+name+"Rect,"+name+"Clamp,"+name+"Sampler)))";
+				var sample = "pbrMapRGB(texture2D(" + name + ",pbrMapUV("+name+"Rect,"+name+"Clamp,"+name+"Sampler,"+name+"HardwareWrap)))";
 				switch (name) {
 					case "uPbrMetallicRoughnessMap": fragment += "vec3 mrSample="+sample+";rough*=mrSample.g;metal*=mrSample.b;\n";
 					case "uPbrNormalMap": fragment += "vec3 tangentNormal="+sample+"*2.0-1.0;tangentNormal.xy*=uPbrNormalScale;\n";
@@ -127,14 +151,15 @@ class MultiTextureShader3D {
 				+ "vec3 mappedNormal=tangent*tangentNormal.x+bitangent*tangentNormal.y+normal*tangentNormal.z;"
 				+ "if(length(mappedNormal)>0.0001)normal=normalize(mappedNormal);\n";
 			fragment += "if(!gl_FrontFacing)normal=-normal;float diffuse=max(dot(geometricNormal,-uLightDirection),0.0);float visibility=1.0;\n";
-			if (shadow) fragment += "if(uReceiveShadow>0.5&&vShadowPosition.w>0.0){vec3 p=vShadowPosition.xyz/vShadowPosition.w*0.5+0.5;"
-				+ "if(p.x>=0.0&&p.x<=1.0&&p.y>=0.0&&p.y<=1.0&&p.z>=0.0&&p.z<=1.0){"
-				+ "float bias=uShadowBias+uShadowSlopeBias*(1.0-diffuse);"
-				+ (shadowPCF ? "vec2 t=uShadowTexelSize*0.5;visibility=(step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(-t.x,-t.y),t,vec2(1.0)-t)).r)"
-					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(t.x,-t.y),t,vec2(1.0)-t)).r)"
-					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+vec2(-t.x,t.y),t,vec2(1.0)-t)).r)"
-					+ "+step(p.z-bias,texture2D(uShadowMap,clamp(p.xy+t,t,vec2(1.0)-t)).r))*0.25;"
-					: "visibility=step(p.z-bias,texture2D(uShadowMap,p.xy).r);") + "}}\n";
+			if (shadow) fragment += "if(uReceiveShadow>0.5){float shadowDepth=dot(uShadowCameraDepth,vec4(vWorldPosition,1.0));"
+				+ "vec2 nearShadow=vec2(1.0,0.0);vec2 farShadow=vec2(1.0,0.0);"
+				+ "if(uShadowCascadeCount<1.5||shadowDepth<uShadowCascadeParams.x)nearShadow=sampleDirectionalShadow(uLightViewProjection,0.0,uShadowWorldTexels.x,geometricNormal,diffuse);"
+				+ "if(uShadowCascadeCount>1.5&&(shadowDepth>=uShadowCascadeParams.y||nearShadow.y<0.5))farShadow=sampleDirectionalShadow(uLightViewProjectionFar,1.0,uShadowWorldTexels.y,geometricNormal,diffuse);"
+				+ "visibility=nearShadow.x;"
+				+ "if(uShadowCascadeCount>1.5){if(shadowDepth>=uShadowCascadeParams.x||nearShadow.y<0.5)visibility=farShadow.x;"
+				+ "else if(shadowDepth>=uShadowCascadeParams.y&&farShadow.y>0.5)visibility=mix(nearShadow.x,farShadow.x,smoothstep(uShadowCascadeParams.y,uShadowCascadeParams.x,shadowDepth));}"
+				+ "if(uShadowCascadeParams.w>0.0){float fade=uShadowCascadeParams.z<uShadowCascadeParams.w?"
+				+ "smoothstep(uShadowCascadeParams.z,uShadowCascadeParams.w,shadowDepth):step(uShadowCascadeParams.w,shadowDepth);visibility=mix(visibility,1.0,fade);}}\n";
 			if (pbr) {
 				fragment += "color.rgb*=uPbrBaseColor;metal=clamp(metal,0.0,1.0);rough=clamp(rough,"
 					+ (precision == "highp" ? "0.045" : "0.1") + ",1.0);"

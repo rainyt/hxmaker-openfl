@@ -31,6 +31,7 @@ class MeshBatch3D {
 	public var smoothing:Bool;
 	public var colorMultiplyLinear:Bool;
 	public var minSmoothing:Bool;
+	public var minFilter:Int;
 	public var wrapU:Int;
 	public var wrapV:Int;
 	public var mirrored:Bool;
@@ -53,12 +54,14 @@ class MeshBatch3D {
 		cullMode = material.cullMode; depthTest = material.depthTest;
 		depthWrite = material.depthWrite && material.alphaMode != AlphaMode3D.BLEND;
 		smoothing = material.smoothing; minSmoothing = material.textureMinSmoothing == null ? smoothing : material.textureMinSmoothing;
+		minFilter = hx.material.TextureMinFilter3D.resolve(material.textureMinFilter, minSmoothing);
 		wrapU = material.textureWrapU; wrapV = material.textureWrapV; this.mirrored = mirrored; this.slots = slots;
 	}
 	public static function materialKey(material:Material3D, mirrored:Bool, receiveShadow:Bool = true):String {
 		return Json.stringify([material.fragmentUVCode, material.textureBindingKey(), material.textureUniformNames().join(","), material.fragmentDeclarations, material.fragmentCode, material.uniformKey(), Std.string(material.alphaMode),
 			Std.string(material.softParticleDistance), Std.string(material.blendMode), Std.string(material.alphaCutoff), Std.string(material.cullMode), Std.string(material.depthTest), Std.string(material.depthWrite),
 			Std.string(!material.lightingEnabled && material.colorMultiplyLinear), Std.string(material.smoothing), Std.string(material.textureMinSmoothing == null ? material.smoothing : material.textureMinSmoothing),
+			Std.string(material.textureMinFilter), Std.string(material.textureMinFilter != null && material.textureMinFilter >= 9984 && material.texture != null && material.texture.rect != null),
 			Std.string(material.textureWrapU), Std.string(material.textureWrapV), Std.string(mirrored), Std.string(material.lightingEnabled), Std.string(material.lightingEnabled && material.pbrEnabled), Std.string(material.lightingEnabled && receiveShadow)]);
 	}
 	/** 添加一个顶点，颜色与透明度编码进顶点，避免为不同模型切换 uniform。 */

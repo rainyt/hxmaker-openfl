@@ -32,9 +32,10 @@ class TextureBridge3D {
 	}
 	public static function handle(texture:TextureBase):GLTexture { return texture.__textureID; }
 	/** 使用 OpenFL 的采样状态缓存，临时切换与恢复都经过同一个协议。 */
-	public static function applySampler(texture:TextureBase, smoothing:Bool, wrapU:Int = 33071, wrapV:Int = 33071, minSmoothing:Null<Bool> = null):Void {
+	public static function applySampler(texture:TextureBase, smoothing:Bool, wrapU:Int = 33071, wrapV:Int = 33071, minSmoothing:Null<Bool> = null, minFilter:Null<Int> = null):Void {
 		var min = minSmoothing == null ? smoothing : minSmoothing;
-		if (wrapU != 33648 && wrapV != 33648 && min == smoothing) {
+		var filter = hx.material.TextureMinFilter3D.resolve(minFilter, min);
+		if (wrapU != 33648 && wrapV != 33648 && filter == (smoothing ? 9729 : 9728)) {
 			if (wrapU == 33071 && wrapV == 33071) texture.__setSamplerState(smoothing ? linearSampler : nearestSampler);
 			else {
 				var wrap:Context3DWrapMode = wrapU == 10497 ? (wrapV == 10497 ? REPEAT : REPEAT_U_CLAMP_V) : CLAMP_U_REPEAT_V;
@@ -43,7 +44,7 @@ class TextureBridge3D {
 		} else {
 			// OpenFL 的采样枚举不能表达镜像或独立缩小过滤；修改后清空缓存，使恢复强制同步。
 			var gl = texture.__context.gl;
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min ? gl.LINEAR : gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, smoothing ? gl.LINEAR : gl.NEAREST);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapU);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapV);
@@ -68,11 +69,11 @@ class TextureBridge3D {
 		if (previous != null) {
 			texture.__setSamplerState(previous);
 		} else {
-			// 尚未设置过采样状态的 OpenFL 纹理仍使用 GL 初始值。
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+			// 无缓存的共享位图恢复为完整的基础层采样，避免缺少 mip 链时变黑。
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 			texture.__samplerState = null;
 		}
 	}
