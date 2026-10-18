@@ -41,6 +41,9 @@ class Renderer3D {
 	#end
 	private var target:Scene3DRenderTarget;
 	private var softDepth:Scene3DRenderTarget;
+	private var frameFog:Bool = false;
+	private var fogScale:Float = 1;
+	private var fogRange:Array<Float> = [];
 	private var frameSoft:Bool = false;
 	private var softFailure:String = "";
 	private var fragmentDepthPrecision:Bool = true;
@@ -93,7 +96,7 @@ class Renderer3D {
 		var targetChanged = target == null || target.width != width || target.height != height;
 		var settingValues:Array<Dynamic> = [scene.multiTextureEnabled ? 1 : 0, scene.backgroundColor, scene.backgroundAlpha,
 			scene.camera == null ? 0 : scene.camera.fieldOfView, scene.camera == null ? 0 : scene.camera.near, scene.camera == null ? 0 : scene.camera.far, scene.lightingKey(), scene.bloom.settingsKey()];
-		var settings = settingValues.join(":") + ":sky:" + scene.skyboxKey();
+		var settings = settingValues.join(":") + ":sky:" + scene.skyboxKey() + ":fog:" + scene.fog.settingsKey();
 		var needsRedraw = targetChanged || lastVersion != scene.contentVersion || settings != lastSettings;
 		// 缓存合成不遍历网格，也不触及主通道和阴影的 GL 状态。
 		var meshes:Array<MeshObject> = [];
@@ -124,7 +127,9 @@ class Renderer3D {
 				sceneShadowFilter = frameShadow ? cast shadowPass.filter : 0;
 				frameSlots = supportedSlots - (frameShadow ? 1 : 0);
 				prepareEnvironment(scene, meshes);
+				frameFog = false;
 				prepareSoftDepth(scene, meshes, renderer, guard, width, height);
+				prepareFog(scene);
 				gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer); gl.viewport(0, 0, width, height);
 				gl.disable(gl.SCISSOR_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
 				gl.colorMask(true, true, true, true); gl.depthMask(true); gl.depthRange(0, 1);
@@ -195,6 +200,33 @@ class Renderer3D {
 		#end
 	}
 
+	/** 距离以相机远裁剪范围归一化；低精度设备无法表达的参数明确回退。 */
+	private function prepareFog(scene:Scene3D):Void {
+		frameFog = false;
+		var fog = scene.fog;
+		if (!fog.enabled || fog.maxOpacity == 0 || (fog.mode != hx.render3d.FogMode3D.LINEAR && fog.density == 0)) return;
+		if (scene.camera == null) { scene.stats.fogStatus = "无相机"; return; }
+		fogScale = 1 / Math.max(1, Math.max(scene.camera.far, Math.max(fog.start, fog.end)));
+		var inverseRange = fog.mode == hx.render3d.FogMode3D.LINEAR ? 1 / ((fog.end-fog.start)*fogScale) : 0.;
+		var density = fog.mode == hx.render3d.FogMode3D.LINEAR ? 0. : fog.density/fogScale;
+		if (!fragmentDepthPrecision && (inverseRange > 10000 || density > 10000)) {
+			scene.stats.fogStatus = "回退：距离雾参数超过片元精度"; return;
+		}
+		if (!Math3D.finite(inverseRange) || inverseRange > 1e30 || !Math3D.finite(density) || density > 1e30)
+			throw "距离雾与相机范围超出着色器支持范围";
+		fogRange = [fog.start*fogScale, inverseRange, density,
+			fog.mode == hx.render3d.FogMode3D.LINEAR ? 0. : fog.mode == hx.render3d.FogMode3D.EXP ? 1. : 2.];
+		frameFog = true; scene.stats.fogStatus = "启用";
+	}
+
+	private function applyFog(info:Program3DInfo, scene:Scene3D, additive:Bool):Void {
+		var origin = scene.camera.getWorldPosition(), color = scene.fog.getLinearColor();
+		gl.uniform4f(info.location("uFogOriginScale"), origin.x, origin.y, origin.z, fogScale);
+		gl.uniform4f(info.location("uFogRange"), fogRange[0], fogRange[1], fogRange[2], fogRange[3]);
+		gl.uniform4f(info.location("uFogColorOpacity"), color[0], color[1], color[2], scene.fog.maxOpacity);
+		gl.uniform1f(info.location("uFogAdditive"), additive ? 1 : 0);
+	}
+
 	/** 独立天空通道；不占用模型批次的纹理槽位。 */
 	private function drawSkybox(scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
 		var sky = scene.skybox;
@@ -214,7 +246,7 @@ class Renderer3D {
 			try { skyboxPass = new SkyboxPass3D(gl, fragmentDepthPrecision); }
 			catch (error:Dynamic) { skyboxFailure = Std.string(error); scene.stats.skyboxStatus = "回退：" + skyboxFailure; return; }
 		}
-		skyboxPass.render(scene, renderer, guard, frameAttributes);
+		skyboxPass.render(scene, renderer, guard, frameAttributes, frameFog);
 	}
 
 	/** IBL 预留一个公共纹理槽；不增加绘制通道，也不拆分相同参数的 PBR 网格。 */
@@ -333,7 +365,7 @@ class Renderer3D {
 	}
 
 	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool, pbr:Bool):String {
-		return Json.stringify([pbr && frameIbl ? 1 : 0, pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
+		return Json.stringify([frameFog ? 1 : 0, pbr && frameIbl ? 1 : 0, pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -358,7 +390,7 @@ class Renderer3D {
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null, lightSlots = material.lightingEnabled ? Scene3D.MAX_LIGHTS : 0;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter > 0, lightSlots, material.pbrEnabled, frameIbl, sceneShadowFilter); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter > 0, lightSlots, material.pbrEnabled, frameIbl, sceneShadowFilter, frameFog); }
 			catch (error:Dynamic) {
 				if (slots <= 1) {
 					if (lightSlots <= 1) throw error;
@@ -452,6 +484,7 @@ class Renderer3D {
 		if (!batch.lit) gl.uniform1f(info.location("uLinearBaseColor"), batch.colorMultiplyLinear ? 1 : 0);
 		if (batch.lit) applyLighting(info, scene, batch.receiveShadow, guard);
 		if (batch.pbr && frameIbl) applyEnvironment(info, scene, renderer, guard);
+		if (frameFog) applyFog(info, scene, batch.alphaMode == AlphaMode3D.BLEND && batch.blendMode == BlendMode3D.ADD);
 		if (batch.uvCode != "") {
 			var source = TextureBridge3D.source(batch.baseTexture, white);
 			guard.activateTexture(0); TextureBridge3D.resolve(source, renderer.__context3D);
@@ -678,6 +711,7 @@ class Renderer3D {
 		if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null;
 		frameLights = [];
 		if (shadowPass != null) shadowPass.abandonContext(); shadowPass = null;
+		frameFog = false; fogRange = [];
 		frameShadow = false; frameSlots = 1; frameSoft = false; frameIbl = false; frameEnvironment = null;
 		skyboxPass = null; skyboxFailure = "";
 		softDepth = null; softFailure = ""; bloomPass = null; bloomReady = false; bloomFailure = "";

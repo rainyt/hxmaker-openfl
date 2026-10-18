@@ -7,7 +7,7 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false, ibl:Bool = false, shadowFilter:Int = -1):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false, ibl:Bool = false, shadowFilter:Int = -1, fog:Bool = false):GLProgram {
 		var filter = shadowFilter < 0 ? (shadowPCF ? 1 : 0) : shadowFilter;
 		shadow = shadow && lit;
 		pbr = pbr && lit;
@@ -27,6 +27,11 @@ class MultiTextureShader3D {
 			+ "uniform float uAlphaMode; uniform float uAlphaCutoff; uniform float uLinearBaseColor;\n";
 		fragment += "vec3 toLinear(vec3 c){c=clamp(c,0.0,1.0);return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,step(c,vec3(0.04045)));}\n"
 			+ "vec3 toDisplay(vec3 c){c=max(c,vec3(0.0));return clamp(mix(1.055*pow(c,vec3(1.0/2.4))-0.055,c*12.92,step(c,vec3(0.0031308))),0.0,1.0);}\n";
+		if (fog) {
+			// 先在顶点阶段减去相机原点并缩放，片元阶段保留欧氏距离而不是视线深度。
+			vertex += "uniform vec4 uFogOriginScale;varying " + precision + " vec3 vFogPosition;\n";
+			fragment += "varying " + precision + " vec3 vFogPosition;uniform vec4 uFogRange;uniform vec4 uFogColorOpacity;uniform float uFogAdditive;\n";
+		}
 		if (lit) {
 			vertex += "attribute vec3 aNormal;varying mediump vec3 vNormal;varying " + precision + " vec3 vWorldPosition;\n";
 			fragment += "varying mediump vec3 vNormal;varying " + precision + " vec3 vWorldPosition;uniform vec3 uAmbientColor;uniform vec3 uLightDirection;\n";
@@ -122,7 +127,8 @@ class MultiTextureShader3D {
 		}
 		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
 			+ (mapped ? "vMaterialUV=aMaterialUV;" : "") + (normalMap ? "vTangent=aTangent;" : "")
-			+ (lit ? "vNormal=aNormal;vWorldPosition=aPosition;" : "") + "}";
+			+ (lit ? "vNormal=aNormal;vWorldPosition=aPosition;" : "")
+			+ (fog ? "vFogPosition=(aPosition-uFogOriginScale.xyz)*uFogOriginScale.w;" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
 		for (name in textureNames) fragment += "uniform sampler2D " + name + ";uniform vec4 " + name + "Rect;uniform vec4 " + name + "Clamp;\n";
 		if (mapped) {
@@ -198,6 +204,13 @@ class MultiTextureShader3D {
 		if (soft) fragment += "float depthSample=texture2D(uSceneDepth,gl_FragCoord.xy/uSoftParams.zw).r;"
 			+ "if(depthSample<1.0){float sceneZ=softLinearDepth(depthSample);float particleZ=softLinearDepth(gl_FragCoord.z);"
 			+ "color.a*=clamp((sceneZ-particleZ)/max(uSoftDistance,0.00001),0.0,1.0);}";
+		if (fog) fragment += "float fogMagnitude=max(max(abs(vFogPosition.x),abs(vFogPosition.y)),abs(vFogPosition.z));"
+			+ "float fogDistance=fogMagnitude>0.0?fogMagnitude*length(vFogPosition/fogMagnitude):0.0;"
+			+ "float fogDelta=max(fogDistance-uFogRange.x,0.0);float fogAmount;"
+			+ "if(uFogRange.w<0.5){fogAmount=clamp(fogDelta*uFogRange.y,0.0,1.0);}"
+			+ "else{float optical=min(fogDelta*uFogRange.z,16.0);if(uFogRange.w>1.5)optical*=optical;fogAmount=1.0-exp(-optical);}"
+			+ "fogAmount*=uFogColorOpacity.a;"
+			+ "if(uFogAdditive>0.5){color.rgb*=1.0-fogAmount;}else{color.rgb=toDisplay(mix(toLinear(color.rgb),uFogColorOpacity.rgb,fogAmount));}\n";
 		fragment += "if(uAlphaMode<0.5){color.a=1.0;}else if(uAlphaMode<1.5){if(color.a<uAlphaCutoff)discard;color.a=1.0;}\n"
 			+ "gl_FragColor=vec4(color.rgb*color.a,color.a);}";
 		return compile(gl, vertex, fragment);

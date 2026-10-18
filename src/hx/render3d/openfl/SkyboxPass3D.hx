@@ -23,7 +23,7 @@ class SkyboxPass3D {
 		var vertex = "attribute vec2 aPosition;uniform mat4 uCameraWorld;uniform vec2 uProjection;varying " + precision + " vec3 vDirection;"
 			+ "void main(){gl_Position=vec4(aPosition,0.0,1.0);vDirection=(uCameraWorld*vec4(aPosition/uProjection,-1.0,0.0)).xyz;}";
 		var fragment = "precision " + precision + " float;varying " + precision + " vec3 vDirection;"
-			+ "uniform sampler2D uTexture;uniform vec2 uTextureSize;uniform vec3 uLayout;uniform vec3 uTransform;uniform vec3 uColor;"
+			+ "uniform sampler2D uTexture;uniform vec2 uTextureSize;uniform vec3 uLayout;uniform vec3 uTransform;uniform vec3 uColor;uniform vec4 uFogColorOpacity;"
 			+ "vec3 toLinear(vec3 c){return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,step(c,vec3(0.04045)));}"
 			+ "vec3 toDisplay(vec3 c){c=clamp(c,0.0,1.0);return clamp(mix(1.055*pow(c,vec3(1.0/2.4))-0.055,c*12.92,step(c,vec3(0.0031308))),0.0,1.0);}"
 			+ "vec3 pixel(vec2 p){p.x=mod(p.x,uLayout.x);p.y=clamp(p.y,0.0,uLayout.y-1.0);return toLinear(texture2D(uTexture,(p+0.5)/uTextureSize).rgb);}"
@@ -33,10 +33,10 @@ class SkyboxPass3D {
 			+ "if(uLayout.z>0.5){c=texture2D(uTexture,(vec2(1.0)+vec2(u,v)*uLayout.xy)/uTextureSize).rgb*uColor.x;}"
 			+ "else{vec2 p=vec2(u,v)*uLayout.xy-0.5;vec2 base=floor(p);vec2 t=fract(p);"
 			+ "c=mix(mix(pixel(base),pixel(base+vec2(1.0,0.0)),t.x),mix(pixel(base+vec2(0.0,1.0)),pixel(base+vec2(1.0)),t.x),t.y);}"
-			+ "c*=uTransform.z;if(uColor.y>0.5)c=c/(vec3(1.0)+c);gl_FragColor=vec4(toDisplay(c),1.0);}";
+			+ "c*=uTransform.z;if(uColor.y>0.5)c=c/(vec3(1.0)+c);c=mix(clamp(c,0.0,1.0),uFogColorOpacity.rgb,uFogColorOpacity.a);gl_FragColor=vec4(toDisplay(c),1.0);}";
 		try {
 			program = MultiTextureShader3D.compile(gl, vertex, fragment);
-			for (name in ["uCameraWorld", "uProjection", "uTexture", "uTextureSize", "uLayout", "uTransform", "uColor"])
+			for (name in ["uFogColorOpacity", "uCameraWorld", "uProjection", "uTexture", "uTextureSize", "uLayout", "uTransform", "uColor"])
 				uniforms.set(name, gl.getUniformLocation(program, name));
 			vertices = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
 			var data = new Float32Array(6), values = [-1., -1., 3., -1., -1., 3.];
@@ -45,7 +45,7 @@ class SkyboxPass3D {
 		} catch (error:Dynamic) { dispose(); throw error; }
 	}
 
-	public function render(scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D, attributeCount:Int):Void {
+	public function render(scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D, attributeCount:Int, fogEnabled:Bool = false):Void {
 		var sky = scene.skybox, resource = sky.texture;
 		guard.activateTexture(0);
 		var source = TextureBridge3D.source(resource.bitmap, null);
@@ -66,6 +66,8 @@ class SkyboxPass3D {
 		var angle = (sky.rotation % 360) * Math.PI / 180;
 		gl.uniform3f(uniforms.get("uTransform"), Math.cos(angle), Math.sin(angle), sky.intensity * sky.exposure);
 		gl.uniform3f(uniforms.get("uColor"), resource.radianceRange, sky.toneMapping ? 1 : 0, 0);
+		var fogColor = scene.fog.getLinearColor();
+		gl.uniform4f(uniforms.get("uFogColorOpacity"), fogColor[0], fogColor[1], fogColor[2], fogEnabled ? scene.fog.skyboxFactor() : 0);
 		guard.bindVertexArray("skybox"); gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
 		gl.enableVertexAttribArray(0); for (i in 1...attributeCount) gl.disableVertexAttribArray(i);
 		gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0); gl.drawArrays(gl.TRIANGLES, 0, 3);
