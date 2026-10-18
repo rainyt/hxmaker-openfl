@@ -259,7 +259,7 @@ class Render implements IRender implements IScene3DRenderer {
 					if (highDpi)
 						__drawMatrix.scale(2, 2);
 					__cacheBitmap.bitmapData.draw(shape, __drawMatrix, null, null, null, true);
-					__pool.release(cast shape);
+					releaseSprite(cast shape);
 				}
 			} else {
 				stage.addChild(shape);
@@ -326,21 +326,41 @@ class Render implements IRender implements IScene3DRenderer {
 				if (highDpi)
 					__drawMatrix.scale(2, 2);
 				__cacheBitmap.bitmapData.draw(__cacheSprite, __drawMatrix, null, null, null, true);
-				this.__cacheSprite.removeChild(sprite);
 				releaseSprite(sprite);
 			}
 		}
 	}
 
-	/** 递归归还绘制容器和嵌套遮罩，避免残留子对象或重复归还。 */
+	/** 完整拆离并清理旧引用后，才允许绘制容器重新进入对象池。 */
 	private function releaseSprite(sprite:EngineSprite):Void {
+		var parent = sprite.parent;
+		if (parent != null)
+			parent.removeChild(sprite);
+		var sprites:Array<EngineSprite> = [];
+		collectSpritesForRelease(sprite, sprites);
+		finishSpriteRelease(sprites, parent);
+	}
+
+	/** 按子对象优先的顺序收集，拆离期间不归还对象池。 */
+	private function collectSpritesForRelease(sprite:EngineSprite, sprites:Array<EngineSprite>):Void {
 		while (sprite.numChildren > 0) {
 			var child = sprite.removeChildAt(sprite.numChildren - 1);
 			if (child is EngineSprite)
-				releaseSprite(cast child);
+				collectSpritesForRelease(cast child, sprites);
 		}
-		if (sprite.isPool)
-			__pool.release(sprite);
+		sprites.push(sprite);
+	}
+
+	/** 先清理所有延迟队列及原父容器，再统一归还，避免新旧层级交叉引用。 */
+	private function finishSpriteRelease(sprites:Array<EngineSprite>, parent:openfl.display.DisplayObjectContainer):Void {
+		for (sprite in sprites)
+			EngineSprite.cleanupRemovedChildren(sprite);
+		if (parent != null)
+			EngineSprite.cleanupRemovedChildren(parent);
+		for (sprite in sprites) {
+			if (sprite.isPool)
+				__pool.release(sprite);
+		}
 	}
 
 	public var stage(get, never):Sprite;
@@ -385,18 +405,19 @@ class Render implements IRender implements IScene3DRenderer {
 
 	public function clear():Void {
 		prepareContext();
-		// 清理所有层级的绘制容器，嵌套遮罩也归还对象池。
-		for (i in 0...__stage.numChildren) {
-			var display = __stage.getChildAt(i);
+		// 先拆离整棵绘制树，防止仍在旧容器延迟队列中的对象提前被复用。
+		var sprites:Array<EngineSprite> = [];
+		while (__stage.numChildren > 0) {
+			var display = __stage.removeChildAt(__stage.numChildren - 1);
 			if (display is EngineSprite)
-				releaseSprite(cast display);
+				collectSpritesForRelease(cast display, sprites);
 		}
+		finishSpriteRelease(sprites, __stage);
 		__maskStack.resize(0);
 		__maskSprite = null;
 		__drawCallCount = 0;
 		drawImageBuffDataIndex = 0;
 		this.createImageBufferData(0);
-		__stage.removeChildren();
 		if (cacheAsBitmap) {
 			__stage.addChild(__cacheBitmap);
 			__cacheBitmap.bitmapData.fillRect(__cacheBitmap.bitmapData.rect, 0x0);
