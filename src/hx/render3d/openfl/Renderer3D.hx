@@ -44,6 +44,9 @@ class Renderer3D {
 	private var frameSoft:Bool = false;
 	private var softFailure:String = "";
 	private var fragmentDepthPrecision:Bool = true;
+	private var skyboxPass:SkyboxPass3D;
+	private var skyboxFailure:String = "";
+	private var maxTextureSize:Int = 1;
 	private var bloomPass:BloomPass3D;
 	private var bloomReady:Bool = false;
 	private var bloomFailure:String = "";
@@ -90,7 +93,7 @@ class Renderer3D {
 		var targetChanged = target == null || target.width != width || target.height != height;
 		var settingValues:Array<Dynamic> = [scene.multiTextureEnabled ? 1 : 0, scene.backgroundColor, scene.backgroundAlpha,
 			scene.camera == null ? 0 : scene.camera.fieldOfView, scene.camera == null ? 0 : scene.camera.near, scene.camera == null ? 0 : scene.camera.far, scene.lightingKey(), scene.bloom.settingsKey()];
-		var settings = settingValues.join(":");
+		var settings = settingValues.join(":") + ":sky:" + scene.skyboxKey();
 		var needsRedraw = targetChanged || lastVersion != scene.contentVersion || settings != lastSettings;
 		// 缓存合成不遍历网格，也不触及主通道和阴影的 GL 状态。
 		var meshes:Array<MeshObject> = [];
@@ -128,6 +131,7 @@ class Renderer3D {
 				var alpha = scene.backgroundAlpha;
 				gl.clearColor(((scene.backgroundColor >> 16) & 255)/255.*alpha, ((scene.backgroundColor >> 8) & 255)/255.*alpha, (scene.backgroundColor & 255)/255.*alpha, alpha);
 				gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+				drawSkybox(scene, renderer, guard);
 				if (scene.camera != null) drawScene(scene, meshes, renderer, guard);
 				if (timed) { mainTime = profileClock() - mark; mark = profileClock(); }
 				prepareBloom(scene, guard, width, height);
@@ -165,7 +169,8 @@ class Renderer3D {
 		supportedSlots = Std.int(Math.min(16, Math.min(count, gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS))));
 		maxAttributes = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
 		if (supportedSlots < 1 || maxAttributes < 4) throw "当前设备不支持基础三维顶点或纹理输入";
-		var size = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+		maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+		var size = Math.min(maxTextureSize, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
 		var viewport:Dynamic = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
 		maxTargetWidth = Std.int(Math.min(size, viewport[0])); maxTargetHeight = Std.int(Math.min(size, viewport[1]));
 		var version = Std.string(gl.getParameter(gl.VERSION));
@@ -188,6 +193,28 @@ class Renderer3D {
 			}
 		}
 		#end
+	}
+
+	/** 独立天空通道；不占用模型批次的纹理槽位。 */
+	private function drawSkybox(scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
+		var sky = scene.skybox;
+		if (sky == null || !sky.enabled) return;
+		if (scene.camera == null) { scene.stats.skyboxStatus = "无相机"; return; }
+		var resource = sky.texture, source = TextureBridge3D.source(resource.bitmap, white);
+		// 上传之前先判断逻辑尺寸，避免超限纹理触发 GL 错误。
+		if (source.width > maxTextureSize || source.height > maxTextureSize) {
+			scene.stats.skyboxStatus = "回退：天空图片超过设备纹理尺寸限制"; return;
+		}
+		if (!fragmentDepthPrecision && (source.width > 1024 || source.height > 1024 || resource.radianceRange > 60000
+			|| sky.intensity * sky.exposure > 60000 || sky.intensity * sky.exposure * resource.radianceRange > 60000)) {
+			scene.stats.skyboxStatus = "回退：天空资源或亮度超过片元精度"; return;
+		}
+		if (skyboxFailure != "") { scene.stats.skyboxStatus = "回退：" + skyboxFailure; return; }
+		if (skyboxPass == null) {
+			try { skyboxPass = new SkyboxPass3D(gl, fragmentDepthPrecision); }
+			catch (error:Dynamic) { skyboxFailure = Std.string(error); scene.stats.skyboxStatus = "回退：" + skyboxFailure; return; }
+		}
+		skyboxPass.render(scene, renderer, guard, frameAttributes);
 	}
 
 	/** IBL 预留一个公共纹理槽；不增加绘制通道，也不拆分相同参数的 PBR 网格。 */
@@ -652,6 +679,7 @@ class Renderer3D {
 		frameLights = [];
 		if (shadowPass != null) shadowPass.abandonContext(); shadowPass = null;
 		frameShadow = false; frameSlots = 1; frameSoft = false; frameIbl = false; frameEnvironment = null;
+		skyboxPass = null; skyboxFailure = "";
 		softDepth = null; softFailure = ""; bloomPass = null; bloomReady = false; bloomFailure = "";
 		capabilitiesReady = false; gl = null; vertexBuffer = null; indexBuffer = null; composite = null; bloomComposite = null; target = null; programs.clear(); lastVersion = -1;
 		if (white != null) white.dispose(); white = null;
@@ -675,6 +703,7 @@ class Renderer3D {
 			if (target != null) target.dispose();
 			if (softDepth != null) softDepth.dispose();
 			if (bloomPass != null) bloomPass.dispose();
+			if (skyboxPass != null) skyboxPass.dispose();
 			if (vertexBuffer != null) gl.deleteBuffer(vertexBuffer);
 			if (indexBuffer != null) gl.deleteBuffer(indexBuffer);
 			if (composite != null) gl.deleteProgram(composite.program);
