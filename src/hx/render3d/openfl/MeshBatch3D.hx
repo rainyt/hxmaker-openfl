@@ -8,6 +8,7 @@ import hx.material.CullMode3D;
 import haxe.Json;
 
 /** 一个稳定的绘制批次，纹理编号和索引仅在此批次中有效。 */
+@:access(hx.material.Material3D)
 class MeshBatch3D {
 	public static inline var MAX_VERTICES:Int = 65535;
 	public var vertices:Array<Float> = [];
@@ -38,6 +39,7 @@ class MeshBatch3D {
 	public var slots:Int;
 	public var lit:Bool;
 	public var pbr:Bool;
+	public var vertexPbr:Bool = false;
 	public var mapped:Bool;
 	public var normalMapped:Bool;
 	public var receiveShadow:Bool;
@@ -48,13 +50,14 @@ class MeshBatch3D {
 	private var uvScaleU:Float;
 	private var uvScaleV:Float;
 	public var floatsPerVertex(get, never):Int;
-	private function get_floatsPerVertex():Int { return (lit ? 13 : 10) + (mapped ? 2 : 0) + (normalMapped ? 4 : 0); }
-	public function new(material:Material3D, mirrored:Bool, slots:Int, receiveShadow:Bool = true) {
+	private function get_floatsPerVertex():Int { return (lit ? 13 : 10) + (mapped ? 2 : 0) + (normalMapped ? 4 : 0) + (vertexPbr ? 4 : 0); }
+	public function new(material:Material3D, mirrored:Bool, slots:Int, receiveShadow:Bool = true, vertexPbr:Bool = false) {
+		this.vertexPbr = vertexPbr;
 		uvCode = material.fragmentUVCode; textureNames = material.textureUniformNames();
 		textureUniforms = material.getTextureUniforms(); baseTexture = material.texture;
 		lit = material.lightingEnabled; pbr = lit && material.pbrEnabled;
 		mapped = pbr && material.pbrMapMask != 0; normalMapped = mapped && (material.pbrMapMask & 2) != 0; colorMultiplyLinear = material.colorMultiplyLinear; this.receiveShadow = receiveShadow;
-		key = materialKey(material, mirrored, receiveShadow); declarations = material.fragmentDeclarations; fragmentCode = material.fragmentCode;
+		key = materialKey(material, mirrored, receiveShadow, vertexPbr); declarations = material.fragmentDeclarations; fragmentCode = material.fragmentCode;
 		softParticleDistance = material.softParticleDistance; blendMode = material.blendMode;
 		uniforms = material.getUniforms(); alphaMode = material.alphaMode; alphaCutoff = material.alphaCutoff;
 		cullMode = material.cullMode; depthTest = material.depthTest;
@@ -63,8 +66,25 @@ class MeshBatch3D {
 		minFilter = hx.material.TextureMinFilter3D.resolve(material.textureMinFilter, minSmoothing);
 		wrapU = material.textureWrapU; wrapV = material.textureWrapV; this.mirrored = mirrored; this.slots = slots;
 	}
-	public static function materialKey(material:Material3D, mirrored:Bool, receiveShadow:Bool = true):String {
-		return Json.stringify([material.fragmentUVCode, material.textureBindingKey(), material.textureUniformNames().join(","), material.fragmentDeclarations, material.fragmentCode, material.uniformKey(), Std.string(material.alphaMode),
+	/** 无辅助贴图的标准 PBR 可将线性基础色和粗糙度编码为一个额外顶点属性。 */
+	public static function supportsVertexPbr(material:Material3D):Bool {
+		return material.lightingEnabled && Std.isOfType(material, hx.material.PbrMaterial3D)
+			&& material.alphaMode != AlphaMode3D.BLEND && material.textureUniformNames().length == 0
+			&& material.fragmentDeclarations == "" && material.fragmentCode == "" && material.fragmentUVCode == "";
+	}
+	/** 直接读取只读参数，不复制整套 uniform；写入缓存时仍保留独立的四分量快照。 */
+	public static function pbrVertexParameters(material:Material3D):Array<Float> {
+		var color=material.__uniforms.get("uPbrBaseColor"),rough=material.__uniforms.get("uPbrRoughness");
+		if(color==null||color.length!=3||rough==null||rough.length!=1)throw "PBR 顶点材质参数长度无效";
+		return [color[0],color[1],color[2],rough[0]];
+	}
+	public static function materialKey(material:Material3D, mirrored:Bool, receiveShadow:Bool = true, vertexPbr:Bool = false):String {
+		var uniformKey:String;
+		if(vertexPbr){
+			var keys=[for(key in material.__uniforms.keys())if(key!="uPbrBaseColor"&&key!="uPbrRoughness")key];keys.sort(Reflect.compare);
+			uniformKey=[for(key in keys)key+":"+material.__uniforms.get(key).join(",")].join(";");
+		}else uniformKey=material.uniformKey();
+		return Json.stringify([vertexPbr, material.fragmentUVCode, material.textureBindingKey(), material.textureUniformNames().join(","), material.fragmentDeclarations, material.fragmentCode, uniformKey, Std.string(material.alphaMode),
 			Std.string(material.softParticleDistance), Std.string(material.blendMode), Std.string(material.alphaCutoff), Std.string(material.cullMode), Std.string(material.depthTest), Std.string(material.depthWrite),
 			Std.string(!material.lightingEnabled && material.colorMultiplyLinear), Std.string(material.smoothing), Std.string(material.textureMinSmoothing == null ? material.smoothing : material.textureMinSmoothing),
 			Std.string(material.textureMinFilter), Std.string(material.textureMinFilter != null && material.textureMinFilter >= 9984 && material.texture != null && material.texture.rect != null),

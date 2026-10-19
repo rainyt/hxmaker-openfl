@@ -18,7 +18,7 @@ private typedef MainEntry3D = {
 	var ranges:Array<MainRange3D>;
 	var used:Bool;
 }
-private typedef MainGroup3D = { var owner:Node3D; var meshes:Array<MeshObject>; var slots:Int; var mirrored:Bool; }
+private typedef MainGroup3D = { var owner:Node3D; var meshes:Array<MeshObject>; var slots:Int; var mirrored:Bool; var vertexPbr:Bool; }
 typedef CachedMainDraw3D = {
 	var buffer:MainGeometryBuffer3D;
 	var batch:MeshBatch3D;
@@ -58,10 +58,10 @@ class MainGeometryCache3D {
 			transforms.set(mesh,m);
 			if(owner==null){var center=mesh.getWorldBounds().center();prefix="静态:"+Math.floor(center.x/16)+":"+Math.floor(center.y/16)+":"+Math.floor(center.z/16);}
 			else prefix="局部:"+owner.instanceId;
-			var base=prefix+":"+slots+":"+MeshBatch3D.materialKey(mesh.material,mirrored,mesh.receiveShadow),part=0,key=base+":0";
+			var base=prefix+":"+slots+":"+MeshBatch3D.materialKey(mesh.material,mirrored,mesh.receiveShadow,MeshBatch3D.supportsVertexPbr(mesh.material)),part=0,key=base+":0";
 			while(true){
 				var group=groups.get(key);
-				if(group==null){groups.set(key,{owner:owner,meshes:[mesh],slots:slots,mirrored:mirrored});break;}
+				if(group==null){groups.set(key,{owner:owner,meshes:[mesh],slots:slots,mirrored:mirrored,vertexPbr:MeshBatch3D.supportsVertexPbr(mesh.material)});break;}
 				var vertices=Std.int(mesh.geometry.positions.length/3),indices=mesh.geometry.indices.length,sources:Array<openfl.display.BitmapData>=[];
 				for(member in group.meshes){vertices+=Std.int(member.geometry.positions.length/3);indices+=member.geometry.indices.length;var source=TextureBridge3D.source(member.material.texture,white);if(sources.indexOf(source)<0)sources.push(source);}
 				var source=TextureBridge3D.source(mesh.material.texture,white);
@@ -79,7 +79,7 @@ class MainGeometryCache3D {
 			for(mesh in group.meshes)if(visible.exists(mesh)){active=true;break;}
 			if(entry!=null)entry.used=true;
 			if(!active)continue;
-			var snapshot:Array<Dynamic>=[],sources:Array<openfl.display.BitmapData>=[],regions:ObjectMap<MeshObject,Array<Float>>=new ObjectMap();
+			var snapshot:Array<Dynamic>=[],sources:Array<openfl.display.BitmapData>=[],regions:ObjectMap<MeshObject,Array<Float>>=new ObjectMap(),pbrValues:ObjectMap<MeshObject,Array<Float>>=new ObjectMap();
 			for(mesh in group.meshes){
 				var material=mesh.material,source=TextureBridge3D.source(material.texture,white);
 				guard.activateTexture(0);TextureBridge3D.resolve(source,context);
@@ -87,13 +87,14 @@ class MainGeometryCache3D {
 				var size=TextureBridge3D.uvSize(source),rect=material.texture==null?null:material.texture.rect;
 				var region=rect==null?[0.,0.,source.width/size[0],source.height/size[1]]:[rect.x/size[0],rect.y/size[1],rect.width/size[0],rect.height/size[1]];
 				regions.set(mesh,region);
+				if(group.vertexPbr){var values=MeshBatch3D.pbrVertexParameters(material);pbrValues.set(mesh,values);for(value in values)snapshot.push(value);}
 				snapshot.push(mesh);snapshot.push(mesh.geometry);snapshot.push(mesh.geometry.version);snapshot.push(material.color);snapshot.push(material.opacity);snapshot.push(source);
 				for(value in region)snapshot.push(value);for(value in transforms.get(mesh).rawData)snapshot.push(value);
 			}
 			if(entry==null){entry={buffer:new MainGeometryBuffer3D(gl),batch:null,snapshot:null,topology:null,ranges:[],used:true};entries.set(key,entry);}
 			if(!same(entry.snapshot,snapshot)){
 				entry.snapshot=null;
-				var batch=new MeshBatch3D(group.meshes[0].material,group.mirrored,group.slots,group.meshes[0].receiveShadow);batch.textures=sources;
+				var batch=new MeshBatch3D(group.meshes[0].material,group.mirrored,group.slots,group.meshes[0].receiveShadow,group.vertexPbr);batch.textures=sources;
 				var floats=0,elements=0,topology:Array<Dynamic>=[];
 				for(mesh in group.meshes){floats+=Std.int(mesh.geometry.positions.length/3)*batch.floatsPerVertex;elements+=mesh.geometry.indices.length;topology.push(mesh);topology.push(mesh.geometry);topology.push(mesh.geometry.positions.length);topology.push(mesh.geometry.indices.length);}
 				var indicesChanged=!same(entry.topology,topology),buffer=entry.buffer;
@@ -118,6 +119,7 @@ class MainGeometryCache3D {
 						if(batch.normalMapped){tangents=[];var source=g.getTangents();for(v in 0...Std.int(g.positions.length/3))Math3D.transformTangent(m.rawData,source[v*4],source[v*4+1],source[v*4+2],source[v*4+3],normals[v*3],normals[v*3+1],normals[v*3+2],tangents,v*4);}
 					}
 					var region=regions.get(mesh),textureId=sources.indexOf(TextureBridge3D.source(material.texture,white)),data=buffer.vertices,vertices=Std.int(g.positions.length/3);
+					var parameters=pbrValues.get(mesh);
 					var r=((material.color>>16)&255)/255.,green=((material.color>>8)&255)/255.,b=(material.color&255)/255.;
 					for(v in 0...vertices){
 						data[offset++]=positions[v*3];data[offset++]=positions[v*3+1];data[offset++]=positions[v*3+2];
@@ -126,6 +128,7 @@ class MainGeometryCache3D {
 						if(batch.lit){data[offset++]=normals[v*3];data[offset++]=normals[v*3+1];data[offset++]=normals[v*3+2];}
 						if(batch.mapped){data[offset++]=g.uvs[v*2];data[offset++]=g.uvs[v*2+1];}
 						if(batch.normalMapped)for(i in 0...4)data[offset++]=tangents[v*4+i];
+						if(batch.vertexPbr)for(i in 0...4)data[offset++]=parameters[i];
 					}
 					entry.ranges.push({mesh:mesh,start:indexOffset,count:g.indices.length});
 					if(indicesChanged)for(i in 0...g.indices.length)buffer.indices[indexOffset+i]=base+g.indices[i];

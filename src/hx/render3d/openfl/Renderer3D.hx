@@ -108,7 +108,7 @@ class Renderer3D {
 			meshes = collectMeshes(scene.root);
 			frameNormals = false; frameAttributes = 4;
 			for (mesh in meshes) if (mesh.material.lightingEnabled) {
-				frameNormals = true; frameAttributes = Std.int(Math.max(frameAttributes, mesh.material.pbrEnabled && mesh.material.pbrMapMask != 0 ? 7 : 5));
+				frameNormals = true; frameAttributes = Std.int(Math.max(frameAttributes, mesh.material.pbrEnabled && mesh.material.pbrMapMask != 0 ? 7 : MeshBatch3D.supportsVertexPbr(mesh.material) ? 6 : 5));
 			}
 			if (frameAttributes > maxAttributes) throw "当前设备不支持所需的 PBR UV 或切线顶点属性";
 		}
@@ -371,8 +371,8 @@ class Renderer3D {
 		shadowPass = new ShadowPass3D(gl, depthTextures, sizedDepth, Std.int(Math.min(maxTargetWidth, maxTargetHeight)));
 	}
 
-	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool, pbr:Bool):String {
-		return Json.stringify([frameFog ? 1 : 0, pbr && frameIbl ? 1 : 0, pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
+	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool, pbr:Bool, vertexPbr:Bool = false):String {
+		return Json.stringify([vertexPbr, frameFog ? 1 : 0, pbr && frameIbl ? 1 : 0, pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -388,8 +388,8 @@ class Renderer3D {
 		visit(root); return meshes;
 	}
 
-	private function getProgram(material:Material3D, multi:Bool):Program3DInfo {
-		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames(), frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, material.lightingEnabled && material.pbrEnabled);
+	private function getProgram(material:Material3D, multi:Bool, vertexPbr:Bool = false):Program3DInfo {
+		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames(), frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, material.lightingEnabled && material.pbrEnabled, vertexPbr);
 		var info = programs.get(key);
 		if (info != null) return info;
 		var textureNames = material.textureUniformNames();
@@ -397,7 +397,7 @@ class Renderer3D {
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null, lightSlots = material.lightingEnabled ? Scene3D.MAX_LIGHTS : 0;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter > 0, lightSlots, material.pbrEnabled, frameIbl, sceneShadowFilter, frameFog); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter > 0, lightSlots, material.pbrEnabled, frameIbl, sceneShadowFilter, frameFog, vertexPbr); }
 			catch (error:Dynamic) {
 				if (slots <= 1) {
 					if (lightSlots <= 1) throw error;
@@ -421,7 +421,7 @@ class Renderer3D {
 		var visible=new haxe.ds.ObjectMap<MeshObject,Bool>();
 		for(mesh in opaque){if(mesh.frustumCulling&&!mesh.getWorldBounds().inFrustum(projection))scene.stats.culledMeshes++;else{visible.set(mesh,true);scene.stats.visibleMeshes++;}}
 		guard.bindVertexArray("main");
-		var draws=mainGeometry.prepare(scene,opaque,visible,guard,renderer.__context3D,white,mesh->getProgram(mesh.material,scene.multiTextureEnabled).slots);
+		var draws=mainGeometry.prepare(scene,opaque,visible,guard,renderer.__context3D,white,mesh->getProgram(mesh.material,scene.multiTextureEnabled,MeshBatch3D.supportsVertexPbr(mesh.material)).slots);
 		for(draw in draws){var model=draw.owner==null?identityMatrix:draw.owner.getWorldMatrix();for(range in draw.ranges)submit(draw.batch,projection,scene,renderer,guard,draw.buffer,model,range.start,range.count);}
 		var transparent=meshes.filter(mesh->mesh.material.alphaMode==AlphaMode3D.BLEND);
 		if(transparent.length>0)drawSceneLegacy(scene,transparent,renderer,guard);
@@ -500,7 +500,7 @@ class Renderer3D {
 		if (count == 0) return;
 		if(model==null)model=identityMatrix;
 		var normal=model.clone();if(!normal.invert())throw "模型矩阵不可逆";normal.transpose();
-		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0, batch.pbr);
+		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0, batch.pbr, batch.vertexPbr);
 		var info = programs.get(key);
 		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
 		gl.uniformMatrix4fv(info.location("uModel"),false,floatData(model.rawData));
@@ -613,8 +613,9 @@ class Renderer3D {
 		else if (frameNormals || guard.isolatedVertexArray && maxAttributes > 4) gl.disableVertexAttribArray(4);
 		if (batch.mapped) { gl.enableVertexAttribArray(6); gl.vertexAttribPointer(6, 2, gl.FLOAT, false, stride, 52); }
 		else if (frameAttributes >= 7 || guard.isolatedVertexArray && maxAttributes >= 7) gl.disableVertexAttribArray(6);
-		if (batch.normalMapped) { gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 4, gl.FLOAT, false, stride, 60); }
-		else if (frameAttributes >= 7 || guard.isolatedVertexArray && maxAttributes >= 7) gl.disableVertexAttribArray(5);
+		if(batch.vertexPbr){gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,4,gl.FLOAT,false,stride,(batch.floatsPerVertex-4)*4);}
+		else if (batch.normalMapped) { gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 4, gl.FLOAT, false, stride, 60); }
+		else if (frameAttributes >= 6 || guard.isolatedVertexArray && maxAttributes >= 6) gl.disableVertexAttribArray(5);
 		gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, indexStart*2);
 		scene.stats.drawCalls++; scene.stats.triangles += Std.int(count / 3);
 		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length + (frameIbl && batch.pbr ? 1 : 0) + (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0 ? 1 : 0)));
@@ -720,7 +721,8 @@ class Renderer3D {
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, floatData(vertices), gl.STREAM_DRAW);
 		gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.disableVertexAttribArray(2); gl.disableVertexAttribArray(3);
 		if (frameNormals) gl.disableVertexAttribArray(4);
-		if (frameAttributes >= 7) { gl.disableVertexAttribArray(5); gl.disableVertexAttribArray(6); }
+		if (frameAttributes >= 6) gl.disableVertexAttribArray(5);
+		if (frameAttributes >= 7) gl.disableVertexAttribArray(6);
 		gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
 		gl.drawArrays(gl.TRIANGLES, 0, 6); scene.stats.compositeDrawCalls = 1;
 		ContextStats.statsDrawCall(); ContextStats.statsVertexCount(6);
