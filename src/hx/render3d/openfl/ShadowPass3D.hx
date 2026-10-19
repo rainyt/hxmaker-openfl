@@ -140,7 +140,7 @@ class ShadowPass3D {
 			candidates.push(active);
 			var snapshot:Array<Dynamic> = [for (value in projection.rawData) value];
 			for (mesh in active) {
-				snapshot.push(mesh.shadowMobility); snapshot.push(mesh); snapshot.push(mesh.geometry); snapshot.push(mesh.geometry.version);
+				snapshot.push(mesh.effectiveShadowMobility); snapshot.push(mesh); snapshot.push(mesh.geometry); snapshot.push(mesh.geometry.version);
 				// 不透明材质的粗糙度、颜色等变化不影响投影；MASK 继续跟踪纹理像素失效。
 				var material = mesh.material;
 				snapshot.push(material.alphaMode); snapshot.push(material.cullMode);
@@ -248,11 +248,11 @@ class ShadowPass3D {
 	private function prepareDynamic(scene:Scene3D, casters:Array<MeshObject>, candidates:Array<Array<MeshObject>>, guard:RenderStateGuard3D,
 		context:openfl.display3D.Context3D, white:openfl.display.BitmapData):Void {
 		var active:ObjectMap<Node3D,Bool>=new ObjectMap(), groups:ObjectMap<Node3D,Array<MeshObject>>=new ObjectMap();
-		for(cascade in candidates)for(mesh in cascade)if(mesh.shadowMobility==ShadowMobility3D.DYNAMIC)active.set(dynamicOwner(mesh),true);
+		for(cascade in candidates)for(mesh in cascade)if(mesh.shadowMobility!=ShadowMobility3D.STATIC)active.set(dynamicOwner(mesh),true);
 		for(owner in [for(owner in dynamicGeometry.keys())owner])if(!active.exists(owner)){
 			for(batch in dynamicGeometry.get(owner).batches)batch.dispose();dynamicGeometry.remove(owner);
 		}
-		for(mesh in casters)if(mesh.shadowMobility==ShadowMobility3D.DYNAMIC){
+		for(mesh in casters)if(mesh.shadowMobility!=ShadowMobility3D.STATIC){
 			var owner=dynamicOwner(mesh);if(!active.exists(owner))continue;
 			if(!groups.exists(owner))groups.set(owner,[]);groups.get(owner).push(mesh);
 		}
@@ -282,7 +282,7 @@ class ShadowPass3D {
 		var rebuilt=result.changed;
 		drawBatches(scene,batches,matrix,false,guard,context,white,mipmaps);
 		var drawn:ObjectMap<Node3D,Bool>=new ObjectMap();
-		for(mesh in casters)if(mesh.shadowMobility==ShadowMobility3D.DYNAMIC){
+		for(mesh in casters)if(mesh.shadowMobility!=ShadowMobility3D.STATIC){
 			var owner=dynamicOwner(mesh);if(drawn.exists(owner))continue;drawn.set(owner,true);
 			var cache=dynamicGeometry.get(owner), world=owner.getWorldMatrix();
 			rebuilt=rebuilt||cache.rebuilt;
@@ -333,7 +333,11 @@ class ShadowPass3D {
 				var nextKey=stateKey(mesh);
 				if(key!=nextKey){flush();key=nextKey;material=mesh.material;mirrored=transforms.get(mesh).determinant<0;masked=material.alphaMode==AlphaMode3D.MASK;stride=masked?6:3;}
 				var source=owner==null?mesh.getWorldVertices():mesh.geometry.positions;
-				if(owner!=null && mesh!=owner){source=[];transforms.get(mesh).transformVectors(mesh.geometry.positions,source);}
+				if(owner!=null && mesh!=owner){
+					var transform=transforms.get(mesh),unit=true;
+					for(i in 0...16)if(transform.rawData[i]!=(i%5==0?1:0)){unit=false;break;}
+					if(!unit){source=[];transform.transformVectors(mesh.geometry.positions,source);}
+				}
 				var sourceIndices=mesh.geometry.indices,remap:Map<Int,Int>=[],region=regions.get(mesh);
 				// 常见网格一次打包全部顶点，避免每个三角形建立索引映射。
 				var vertexCount=Std.int(source.length/3);

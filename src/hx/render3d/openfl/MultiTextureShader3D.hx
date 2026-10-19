@@ -22,7 +22,7 @@ class MultiTextureShader3D {
 		var format = isDesktop(gl) ? null : gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
 		if (format != null && format.precision > 0) precision = "highp";
 		var vertex = "attribute vec3 aPosition; attribute vec2 aUV; attribute float aTextureId; attribute vec4 aColor;\n"
-			+ "uniform mat4 uViewProjection; varying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n";
+			+ "uniform mat4 uViewProjection;uniform mat4 uModel;uniform mat4 uNormalMatrix;uniform float uModelSign; varying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n";
 		var fragment = "precision " + precision + " float;\nvarying mediump vec2 vUV; varying mediump float vTextureId; varying mediump vec4 vColor;\n"
 			+ "uniform float uAlphaMode; uniform float uAlphaCutoff; uniform float uLinearBaseColor;\n";
 		fragment += "vec3 toLinear(vec3 c){c=clamp(c,0.0,1.0);return mix(pow((c+0.055)/1.055,vec3(2.4)),c/12.92,step(c,vec3(0.04045)));}\n"
@@ -125,10 +125,11 @@ class MultiTextureShader3D {
 					+ "return vec2(mix(mix(a,b,weight.x),mix(c,d,weight.x),weight.y),1.0); }\n";
 			} else fragment += "return vec2(shadowCompare(p.xy,tile,referenceDepth),1.0); }\n";
 		}
-		vertex += "void main(){gl_Position=uViewProjection*vec4(aPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
-			+ (mapped ? "vMaterialUV=aMaterialUV;" : "") + (normalMap ? "vTangent=aTangent;" : "")
-			+ (lit ? "vNormal=aNormal;vWorldPosition=aPosition;" : "")
-			+ (fog ? "vFogPosition=(aPosition-uFogOriginScale.xyz)*uFogOriginScale.w;" : "") + "}";
+		vertex += "void main(){vec3 worldPosition=(uModel*vec4(aPosition,1.0)).xyz;gl_Position=uViewProjection*vec4(worldPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
+			+ (mapped ? "vMaterialUV=aMaterialUV;" : "")
+			+ (lit ? "vNormal=normalize((uNormalMatrix*vec4(aNormal,0.0)).xyz);vWorldPosition=worldPosition;" : "")
+			+ (normalMap ? "vec3 transformedTangent=mat3(uModel)*aTangent.xyz;transformedTangent-=vNormal*dot(vNormal,transformedTangent);if(dot(transformedTangent,transformedTangent)<0.000000000001){transformedTangent=abs(vNormal.y)<0.9?vec3(vNormal.z,0.0,-vNormal.x):vec3(0.0,-vNormal.z,vNormal.y);}vTangent=vec4(normalize(transformedTangent),aTangent.w*uModelSign);" : "")
+			+ (fog ? "vFogPosition=(worldPosition-uFogOriginScale.xyz)*uFogOriginScale.w;" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
 		for (name in textureNames) fragment += "uniform sampler2D " + name + ";uniform vec4 " + name + "Rect;uniform vec4 " + name + "Clamp;\n";
 		if (mapped) {

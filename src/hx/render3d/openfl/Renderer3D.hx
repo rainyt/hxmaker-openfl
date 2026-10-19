@@ -31,6 +31,9 @@ class Renderer3D {
 	private var gl:WebGLRenderContext;
 	private var vertexBuffer:GLBuffer;
 	private var indexBuffer:GLBuffer;
+	private var mainGeometry:MainGeometryCache3D;
+	private var streamGeometry:MainGeometryBuffer3D;
+	private var identityMatrix:Matrix3D = new Matrix3D();
 	private var composite:Program3DInfo;
 	private var bloomComposite:Program3DInfo;
 	private var capabilitiesReady:Bool = false;
@@ -94,9 +97,10 @@ class Renderer3D {
 		var reduction = Math.min(1, Math.min(maxTargetWidth / w, maxTargetHeight / h));
 		var width = Std.int(Math.max(1, Math.floor(w * reduction))), height = Std.int(Math.max(1, Math.floor(h * reduction)));
 		var targetChanged = target == null || target.width != width || target.height != height;
-		var settingValues:Array<Dynamic> = [scene.multiTextureEnabled ? 1 : 0, scene.backgroundColor, scene.backgroundAlpha,
+		var settingValues:Array<Dynamic> = [scene.geometryCacheEnabled ? 1 : 0, scene.multiTextureEnabled ? 1 : 0, scene.backgroundColor, scene.backgroundAlpha,
 			scene.camera == null ? 0 : scene.camera.fieldOfView, scene.camera == null ? 0 : scene.camera.near, scene.camera == null ? 0 : scene.camera.far, scene.lightingKey(), scene.bloom.settingsKey()];
 		var settings = settingValues.join(":") + ":sky:" + scene.skyboxKey() + ":fog:" + scene.fog.settingsKey();
+		scene.updateMobility();
 		var needsRedraw = targetChanged || lastVersion != scene.contentVersion || settings != lastSettings;
 		// 缓存合成不遍历网格，也不触及主通道和阴影的 GL 状态。
 		var meshes:Array<MeshObject> = [];
@@ -120,7 +124,9 @@ class Renderer3D {
 			}
 			scene.stats.targetWidth = width; scene.stats.targetHeight = height;
 			if (needsRedraw) {
-				redrawn = true; scene.stats.reset(); frameLights = scene.getActiveLights(); scene.stats.targetBytes = width * height * 6;
+				redrawn = true; scene.stats.reset();
+				if(mainGeometry==null)mainGeometry=new MainGeometryCache3D(gl);
+				mainGeometry.beginFrame(); frameLights = scene.getActiveLights(); scene.stats.targetBytes = width * height * 6;
 				if (timed) mark = profileClock();
 				frameShadow = scene.camera != null && shadowPass.render(scene, meshes, supportedSlots, guard, renderer.__context3D, white, mipmaps);
 				if (timed) { shadowTime = profileClock() - mark; mark = profileClock(); }
@@ -138,6 +144,7 @@ class Renderer3D {
 				gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 				drawSkybox(scene, renderer, guard);
 				if (scene.camera != null) drawScene(scene, meshes, renderer, guard);
+				mainGeometry.endFrame(scene);
 				if (timed) { mainTime = profileClock() - mark; mark = profileClock(); }
 				prepareBloom(scene, guard, width, height);
 				if (timed) postTime = profileClock() - mark;
@@ -405,7 +412,21 @@ class Renderer3D {
 		info = new Program3DInfo(gl, program, slots, true, textureNames, lightSlots); programs.set(key, info); return info;
 	}
 
-	private function drawScene(scene:Scene3D, meshes:Array<MeshObject>, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
+	/** 标准不透明物体走持久缓存；透明物体继续逐帧按原规则排序。 */
+	private function drawScene(scene:Scene3D,meshes:Array<MeshObject>,renderer:OpenGLRenderer,guard:RenderStateGuard3D):Void {
+		var fallback=!scene.geometryCacheEnabled;
+		for(mesh in meshes)if(mesh.material.alphaMode!=AlphaMode3D.BLEND && (!mesh.material.depthTest||!mesh.material.depthWrite||mesh.material.fragmentCode!=""||mesh.material.fragmentUVCode!=""||mesh.geometry.positions.length/3>MeshBatch3D.MAX_VERTICES||mesh.geometry.indices.length>196605))fallback=true;
+		if(fallback){drawSceneLegacy(scene,meshes,renderer,guard);return;}
+		var opaque=meshes.filter(mesh->mesh.material.alphaMode!=AlphaMode3D.BLEND),projection=scene.camera.getViewProjection(scene.width/scene.height);
+		var visible=new haxe.ds.ObjectMap<MeshObject,Bool>();
+		for(mesh in opaque){if(mesh.frustumCulling&&!mesh.getWorldBounds().inFrustum(projection))scene.stats.culledMeshes++;else{visible.set(mesh,true);scene.stats.visibleMeshes++;}}
+		guard.bindVertexArray("main");
+		var draws=mainGeometry.prepare(scene,opaque,visible,guard,renderer.__context3D,white,mesh->getProgram(mesh.material,scene.multiTextureEnabled).slots);
+		for(draw in draws){var model=draw.owner==null?identityMatrix:draw.owner.getWorldMatrix();for(range in draw.ranges)submit(draw.batch,projection,scene,renderer,guard,draw.buffer,model,range.start,range.count);}
+		var transparent=meshes.filter(mesh->mesh.material.alphaMode==AlphaMode3D.BLEND);
+		if(transparent.length>0)drawSceneLegacy(scene,transparent,renderer,guard);
+	}
+	private function drawSceneLegacy(scene:Scene3D, meshes:Array<MeshObject>, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
 		var view = scene.camera.getViewMatrix(), projection = scene.camera.getViewProjection(scene.width / scene.height);
 		var items:Array<DrawItem3D> = [], order = 0;
 		for (mesh in meshes) {
@@ -474,11 +495,17 @@ class Renderer3D {
 			hardware ? Std.int(sampling[2]) : 33071, hardware ? Std.int(sampling[3]) : 33071];
 	}
 
-	private function submit(batch:MeshBatch3D, projection:Matrix3D, scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
-		if (batch.indices.length == 0) return;
+	private function submit(batch:MeshBatch3D, projection:Matrix3D, scene:Scene3D, renderer:OpenGLRenderer, guard:RenderStateGuard3D, cached:MainGeometryBuffer3D=null, model:Matrix3D=null, indexStart:Int=0, indexCount:Int=-1):Void {
+		var count=indexCount>=0?indexCount:batch.indices.length;
+		if (count == 0) return;
+		if(model==null)model=identityMatrix;
+		var normal=model.clone();if(!normal.invert())throw "模型矩阵不可逆";normal.transpose();
 		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0, batch.pbr);
 		var info = programs.get(key);
 		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
+		gl.uniformMatrix4fv(info.location("uModel"),false,floatData(model.rawData));
+		gl.uniformMatrix4fv(info.location("uNormalMatrix"),false,floatData(normal.rawData));
+		gl.uniform1f(info.location("uModelSign"),model.determinant<0?-1:1);
 		gl.uniform1f(info.location("uAlphaMode"), batch.alphaMode);
 		gl.uniform1f(info.location("uAlphaCutoff"), batch.alphaCutoff);
 		if (!batch.lit) gl.uniform1f(info.location("uLinearBaseColor"), batch.colorMultiplyLinear ? 1 : 0);
@@ -561,7 +588,7 @@ class Renderer3D {
 		gl.depthFunc(gl.LEQUAL); gl.depthMask(batch.depthWrite);
 		if (batch.cullMode == CullMode3D.NONE) gl.disable(gl.CULL_FACE);
 		else { gl.enable(gl.CULL_FACE); gl.cullFace(batch.cullMode == CullMode3D.BACK ? gl.BACK : gl.FRONT); }
-		gl.frontFace(batch.mirrored ? gl.CW : gl.CCW);
+		gl.frontFace((batch.mirrored != (model.determinant < 0)) ? gl.CW : gl.CCW);
 		if (batch.alphaMode == AlphaMode3D.BLEND) {
 			gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD);
 			// 加法只累加预乘 RGB，保留目标 alpha，使透明离屏目标正确叠加到二维背景。
@@ -570,8 +597,14 @@ class Renderer3D {
 		}
 		else gl.disable(gl.BLEND);
 		guard.bindVertexArray("main");
-		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, floatData(batch.vertices), gl.STREAM_DRAW);
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData(batch.indices), gl.STREAM_DRAW);
+		if(cached!=null)cached.bind();else{
+			// 回退合批在同一帧多次覆写缓冲，沿用流式替换，避免等待先前绘制。
+			if(streamGeometry==null)streamGeometry=new MainGeometryBuffer3D(gl);
+			streamGeometry.reserve(batch.vertices.length,batch.indices.length);
+			for(i in 0...batch.vertices.length)streamGeometry.vertices[i]=batch.vertices[i];
+			for(i in 0...batch.indices.length)streamGeometry.indices[i]=batch.indices[i];
+			scene.stats.uploadedBytes+=streamGeometry.uploadVertices(true)+streamGeometry.uploadIndices(true);streamGeometry.bind();
+		}
 		for (i in 0...4) gl.enableVertexAttribArray(i);
 		var stride = batch.floatsPerVertex*4;
 		gl.vertexAttribPointer(0, 3, gl.FLOAT, false, stride, 0); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, stride, 12);
@@ -582,11 +615,10 @@ class Renderer3D {
 		else if (frameAttributes >= 7 || guard.isolatedVertexArray && maxAttributes >= 7) gl.disableVertexAttribArray(6);
 		if (batch.normalMapped) { gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 4, gl.FLOAT, false, stride, 60); }
 		else if (frameAttributes >= 7 || guard.isolatedVertexArray && maxAttributes >= 7) gl.disableVertexAttribArray(5);
-		gl.drawElements(gl.TRIANGLES, batch.indices.length, gl.UNSIGNED_SHORT, 0);
-		scene.stats.drawCalls++; scene.stats.triangles += Std.int(batch.indices.length / 3);
-		scene.stats.uploadedBytes += batch.vertices.length * 4 + batch.indices.length * 2;
+		gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, indexStart*2);
+		scene.stats.drawCalls++; scene.stats.triangles += Std.int(count / 3);
 		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length + (frameIbl && batch.pbr ? 1 : 0) + (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0 ? 1 : 0)));
-		ContextStats.statsDrawCall(); ContextStats.statsVertexCount(batch.indices.length);
+		ContextStats.statsDrawCall(); ContextStats.statsVertexCount(count);
 	}
 
 	/** 返回区域起点、大小和半像素内缩边界，兼容图集与底层填充。 */
@@ -708,6 +740,8 @@ class Renderer3D {
 	/** 上下文已失效时仅丢弃句柄，不能在新上下文删除旧句柄。 */
 	public function abandonContext():Void {
 		mipmaps.clear();
+		if(mainGeometry!=null)mainGeometry.dispose(true);mainGeometry=null;
+		if(streamGeometry!=null)streamGeometry.dispose(true);streamGeometry=null;
 		if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null;
 		frameLights = [];
 		if (shadowPass != null) shadowPass.abandonContext(); shadowPass = null;
@@ -732,6 +766,8 @@ class Renderer3D {
 		removeContextListeners();
 		#end
 		if (gl != null && !gl.isContextLost()) {
+			if(mainGeometry!=null)mainGeometry.dispose();
+			if(streamGeometry!=null)streamGeometry.dispose();
 			if (vertexArrays != null) vertexArrays.dispose();
 			if (shadowPass != null) shadowPass.dispose();
 			if (target != null) target.dispose();
