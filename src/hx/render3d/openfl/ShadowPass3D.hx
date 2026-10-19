@@ -2,6 +2,11 @@ package hx.render3d.openfl;
 
 import hx.display.Scene3D;
 import hx.display3d.MeshObject;
+import hx.display3d.Node3D;
+import hx.display3d.Model3D;
+import hx.render3d.Math3D;
+import hx.render3d.ShadowMobility3D;
+import haxe.ds.ObjectMap;
 import hx.light.DirectionalLight3D;
 import hx.geom.Matrix3D;
 import hx.material.AlphaMode3D;
@@ -15,6 +20,12 @@ import lime.graphics.opengl.GLTexture;
 import lime.graphics.opengl.GLProgram;
 import lime.graphics.opengl.GLUniformLocation;
 import lime.utils.Float32Array;
+
+private typedef DynamicShadowGeometry3D = {
+	var snapshot:Array<Dynamic>;
+	var batches:Array<ShadowGeometryBuffer3D>;
+	var rebuilt:Bool;
+}
 
 /** 绘制不透明及标准 MASK 投射物；从场景全体可见网格筛选，不沿用主相机剔除结果。 */
 class ShadowPass3D {
@@ -56,6 +67,7 @@ class ShadowPass3D {
 	private var lastRequest:Int = -1;
 	private var geometrySnapshots:Array<Array<Dynamic>> = [];
 	private var geometryBatches:Array<Array<ShadowGeometryBuffer3D>> = [];
+	private var dynamicGeometry:ObjectMap<Node3D, DynamicShadowGeometry3D> = new ObjectMap();
 	public function new(gl:WebGLRenderContext, available:Bool, sizedDepth:Bool, maximum:Int) {
 		this.gl = gl; this.available = available; this.sizedDepth = sizedDepth; this.maximum = maximum;
 	}
@@ -128,7 +140,7 @@ class ShadowPass3D {
 			candidates.push(active);
 			var snapshot:Array<Dynamic> = [for (value in projection.rawData) value];
 			for (mesh in active) {
-				snapshot.push(mesh); snapshot.push(mesh.geometry); snapshot.push(mesh.geometry.version);
+				snapshot.push(mesh.shadowMobility); snapshot.push(mesh); snapshot.push(mesh.geometry); snapshot.push(mesh.geometry.version);
 				// 不透明材质的粗糙度、颜色等变化不影响投影；MASK 继续跟踪纹理像素失效。
 				var material = mesh.material;
 				snapshot.push(material.alphaMode); snapshot.push(material.cullMode);
@@ -170,6 +182,9 @@ class ShadowPass3D {
 			maskSampler = gl.getUniformLocation(maskProgram, "uMask");
 			maskCutoff = gl.getUniformLocation(maskProgram, "uCutoff"); maskOpacity = gl.getUniformLocation(maskProgram, "uOpacity");
 		}
+		// 动态几何每次重绘只准备一次，由所有级联共享。
+		guard.bindVertexArray("shadow");
+		prepareDynamic(scene, casters, candidates, guard, context, white);
 		// 只清理并重绘失效级联；一个图集仍只占用一个公共纹理槽位。
 		gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
 		gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.enable(gl.SCISSOR_TEST);
@@ -218,13 +233,72 @@ class ShadowPass3D {
 		scene.stats.shadowSlopeBiases = slopeBiases.slice(0, target.cascades);
 	}
 
+	/** 使用局部矩阵连乘，根节点移动不会引入逆矩阵舍入误差导致几何失效。 */
+	private function geometryMatrix(mesh:MeshObject, owner:Node3D):Matrix3D {
+		if(owner==null)return mesh.getWorldMatrix();
+		var result=new Matrix3D(), node:Node3D=mesh;
+		while(node!=owner){result=Math3D.multiply(node.getLocalMatrix(),result);node=node.parent;}
+		return result;
+	}
+	private function dynamicOwner(mesh:MeshObject):Node3D {
+		var node:Node3D=mesh.parent;
+		while(node!=null){if(Std.isOfType(node,Model3D))return node;node=node.parent;}
+		return mesh;
+	}
+	private function prepareDynamic(scene:Scene3D, casters:Array<MeshObject>, candidates:Array<Array<MeshObject>>, guard:RenderStateGuard3D,
+		context:openfl.display3D.Context3D, white:openfl.display.BitmapData):Void {
+		var active:ObjectMap<Node3D,Bool>=new ObjectMap(), groups:ObjectMap<Node3D,Array<MeshObject>>=new ObjectMap();
+		for(cascade in candidates)for(mesh in cascade)if(mesh.shadowMobility==ShadowMobility3D.DYNAMIC)active.set(dynamicOwner(mesh),true);
+		for(owner in [for(owner in dynamicGeometry.keys())owner])if(!active.exists(owner)){
+			for(batch in dynamicGeometry.get(owner).batches)batch.dispose();dynamicGeometry.remove(owner);
+		}
+		for(mesh in casters)if(mesh.shadowMobility==ShadowMobility3D.DYNAMIC){
+			var owner=dynamicOwner(mesh);if(!active.exists(owner))continue;
+			if(!groups.exists(owner))groups.set(owner,[]);groups.get(owner).push(mesh);
+		}
+		for(owner in groups.keys()){
+			var cache=dynamicGeometry.get(owner);
+			if(cache==null){cache={snapshot:null,batches:[],rebuilt:false};dynamicGeometry.set(owner,cache);}
+			// 异常后不得把部分上传的数据误认为有效缓存。
+			var previous=cache.snapshot;cache.snapshot=null;
+			var result=prepareGeometry(scene,groups.get(owner),owner,previous,cache.batches,guard,context,white);
+			cache.snapshot=result.snapshot;cache.rebuilt=result.changed;
+			if(result.changed)scene.stats.shadowDynamicGeometryRebuilds++;
+			scene.stats.shadowDynamicUploadedBytes+=result.uploaded;
+		}
+	}
 	private function drawCascade(scene:Scene3D, cascade:Int, casters:Array<MeshObject>, matrix:Matrix3D, guard:RenderStateGuard3D,
 		context:openfl.display3D.Context3D, white:openfl.display.BitmapData, mipmaps:MipmapCache3D):Void {
 		guard.bindVertexArray("shadow");
-		for (i in 1...4) gl.disableVertexAttribArray(i);
+		for(i in 1...4)gl.disableVertexAttribArray(i);
+		var batches=cascade<geometryBatches.length?geometryBatches[cascade]:null;
+		if(batches==null){batches=[];geometryBatches[cascade]=batches;}
+		var previous=cascade<geometrySnapshots.length?geometrySnapshots[cascade]:null;
+		geometrySnapshots[cascade]=null;
+		var result=prepareGeometry(scene,casters.filter(mesh->mesh.shadowMobility==ShadowMobility3D.STATIC),null,previous,batches,guard,context,white);
+		geometrySnapshots[cascade]=result.snapshot;
+		if(result.changed)scene.stats.shadowStaticGeometryRebuilds++;
+		scene.stats.shadowStaticUploadedBytes+=result.uploaded;
+		var rebuilt=result.changed;
+		drawBatches(scene,batches,matrix,false,guard,context,white,mipmaps);
+		var drawn:ObjectMap<Node3D,Bool>=new ObjectMap();
+		for(mesh in casters)if(mesh.shadowMobility==ShadowMobility3D.DYNAMIC){
+			var owner=dynamicOwner(mesh);if(drawn.exists(owner))continue;drawn.set(owner,true);
+			var cache=dynamicGeometry.get(owner), world=owner.getWorldMatrix();
+			rebuilt=rebuilt||cache.rebuilt;
+			drawBatches(scene,cache.batches,Math3D.multiply(matrix,world),world.determinant<0,guard,context,white,mipmaps);
+		}
+		if(rebuilt)scene.stats.shadowGeometryRebuilds++;else scene.stats.shadowGeometryCacheHits++;
+	}
+	private function prepareGeometry(scene:Scene3D, casters:Array<MeshObject>, owner:Node3D, previous:Array<Dynamic>, batches:Array<ShadowGeometryBuffer3D>,
+		guard:RenderStateGuard3D, context:openfl.display3D.Context3D, white:openfl.display.BitmapData):{snapshot:Array<Dynamic>,changed:Bool,uploaded:Int} {
 		var materialIds = new haxe.ds.ObjectMap<hx.material.Material3D, Int>(), nextMaterialId = 0;
-		for (mesh in casters) if (!materialIds.exists(mesh.material)) materialIds.set(mesh.material, nextMaterialId++);
-		function stateKey(mesh:MeshObject):String { return (mesh.material.alphaMode == AlphaMode3D.MASK ? "遮罩:" + materialIds.get(mesh.material) : "不透明") + ":" + Std.string(mesh.material.cullMode) + ":" + (mesh.getWorldMatrix().determinant < 0 ? "负" : "正"); }
+		var transforms:ObjectMap<MeshObject,Matrix3D>=new ObjectMap();
+		for (mesh in casters) {
+			if (!materialIds.exists(mesh.material)) materialIds.set(mesh.material, nextMaterialId++);
+			transforms.set(mesh,geometryMatrix(mesh,owner));
+		}
+		function stateKey(mesh:MeshObject):String { return (mesh.material.alphaMode == AlphaMode3D.MASK ? "遮罩:" + materialIds.get(mesh.material) : "不透明") + ":" + Std.string(mesh.material.cullMode) + ":" + (transforms.get(mesh).determinant < 0 ? "负" : "正"); }
 		casters.sort(function(a,b) return Reflect.compare(stateKey(a),stateKey(b)));
 		// 几何快照不包含阴影投影矩阵和采样参数；移动相机仍能复用静态几何。
 		var snapshot:Array<Dynamic> = [], regions = new haxe.ds.ObjectMap<MeshObject,Array<Float>>();
@@ -232,7 +306,7 @@ class ShadowPass3D {
 			var material=mesh.material;
 			snapshot.push(mesh);snapshot.push(mesh.geometry);snapshot.push(mesh.geometry.version);
 			snapshot.push(material);snapshot.push(material.alphaMode);snapshot.push(material.cullMode);
-			for (value in mesh.getWorldMatrix().rawData) snapshot.push(value);
+			for (value in transforms.get(mesh).rawData) snapshot.push(value);
 			if (material.alphaMode == AlphaMode3D.MASK) {
 				var bitmap=material.texture,image=TextureBridge3D.source(bitmap,white);
 				guard.activateTexture(0);TextureBridge3D.resolve(image,context);
@@ -241,13 +315,10 @@ class ShadowPass3D {
 				regions.set(mesh,region);for (value in region) snapshot.push(value);
 			}
 		}
-		var previous=cascade<geometrySnapshots.length?geometrySnapshots[cascade]:null;
 		var changed=previous==null||previous.length!=snapshot.length;
 		if(!changed)for(i in 0...snapshot.length)if(snapshot[i]!=previous[i]){changed=true;break;}
-		var batches=cascade<geometryBatches.length?geometryBatches[cascade]:null;
-		if(batches==null){batches=[];geometryBatches[cascade]=batches;}
+		var uploaded=0;
 		if(changed) {
-			geometrySnapshots[cascade]=null;
 			var positions:Array<Float>=[],elements:Array<Int>=[],key:String=null,batchIndex=0;
 			var material:hx.material.Material3D=null,mirrored=false,masked=false,stride=3;
 			function flush():Void {
@@ -255,13 +326,27 @@ class ShadowPass3D {
 				var batch=batchIndex<batches.length?batches[batchIndex]:null;
 				if(batch==null){batch=new ShadowGeometryBuffer3D(gl);batches.push(batch);}
 				batchIndex++;batch.material=material;batch.mirrored=mirrored;batch.masked=masked;batch.stride=stride;
-				scene.stats.shadowUploadedBytes+=batch.update(positions,elements);
+				uploaded+=batch.update(positions,elements);
 				positions=[];elements=[];
 			}
 			for(mesh in casters) {
 				var nextKey=stateKey(mesh);
-				if(key!=nextKey){flush();key=nextKey;material=mesh.material;mirrored=mesh.getWorldMatrix().determinant<0;masked=material.alphaMode==AlphaMode3D.MASK;stride=masked?6:3;}
-				var source=mesh.getWorldVertices(),sourceIndices=mesh.geometry.indices,remap:Map<Int,Int>=[],region=regions.get(mesh);
+				if(key!=nextKey){flush();key=nextKey;material=mesh.material;mirrored=transforms.get(mesh).determinant<0;masked=material.alphaMode==AlphaMode3D.MASK;stride=masked?6:3;}
+				var source=owner==null?mesh.getWorldVertices():mesh.geometry.positions;
+				if(owner!=null && mesh!=owner){source=[];transforms.get(mesh).transformVectors(mesh.geometry.positions,source);}
+				var sourceIndices=mesh.geometry.indices,remap:Map<Int,Int>=[],region=regions.get(mesh);
+				// 常见网格一次打包全部顶点，避免每个三角形建立索引映射。
+				var vertexCount=Std.int(source.length/3);
+				if(vertexCount<=MeshBatch3D.MAX_VERTICES && sourceIndices.length<=196605){
+					if(Std.int(positions.length/stride)+vertexCount>MeshBatch3D.MAX_VERTICES || elements.length+sourceIndices.length>196605)flush();
+					var base=Std.int(positions.length/stride);
+					for(index in 0...vertexCount){
+						positions.push(source[index*3]);positions.push(source[index*3+1]);positions.push(source[index*3+2]);
+						if(masked){positions.push(region[0]+mesh.geometry.uvs[index*2]*region[2]);positions.push(region[1]+mesh.geometry.uvs[index*2+1]*region[3]);positions.push(mesh.geometry.colors.length==0?1.:mesh.geometry.colors[index*4+3]);}
+					}
+					for(index in sourceIndices)elements.push(base+index);
+					continue;
+				}
 				for(triangle in 0...Std.int(sourceIndices.length/3)) {
 					if(Std.int(positions.length/stride)+3>MeshBatch3D.MAX_VERTICES||elements.length+3>196605){flush();remap.clear();}
 					for(corner in 0...3) {
@@ -276,8 +361,12 @@ class ShadowPass3D {
 				}
 			}
 			flush();while(batches.length>batchIndex)batches.pop().dispose();
-			geometrySnapshots[cascade]=snapshot;scene.stats.shadowGeometryRebuilds++;
-		}else scene.stats.shadowGeometryCacheHits++;
+		}
+		scene.stats.shadowUploadedBytes+=uploaded;
+		return {snapshot:snapshot,changed:changed,uploaded:uploaded};
+	}
+	private function drawBatches(scene:Scene3D,batches:Array<ShadowGeometryBuffer3D>,matrix:Matrix3D,ownerMirrored:Bool,guard:RenderStateGuard3D,
+		context:openfl.display3D.Context3D,white:openfl.display.BitmapData,mipmaps:MipmapCache3D):Void {
 		for(batch in batches) {
 			var material=batch.material;
 			gl.useProgram(batch.masked?maskProgram:program);
@@ -294,7 +383,7 @@ class ShadowPass3D {
 			}
 			if(material.cullMode==CullMode3D.NONE)gl.disable(gl.CULL_FACE);
 			else{gl.enable(gl.CULL_FACE);gl.cullFace(material.cullMode==CullMode3D.BACK?gl.BACK:gl.FRONT);}
-			gl.frontFace(batch.mirrored?gl.CW:gl.CCW);batch.bind();
+			gl.frontFace((batch.mirrored!=ownerMirrored)?gl.CW:gl.CCW);batch.bind();
 			gl.drawElements(gl.TRIANGLES,batch.count,gl.UNSIGNED_SHORT,0);
 			scene.stats.shadowDrawCalls++;scene.stats.shadowTriangles+=Std.int(batch.count/3);
 			ContextStats.statsDrawCall();ContextStats.statsVertexCount(batch.count);
@@ -303,10 +392,12 @@ class ShadowPass3D {
 	private function updateGeometryStats(scene:Scene3D):Void {
 		scene.stats.shadowGeometryBytes=0;
 		for(batches in geometryBatches)for(batch in batches)scene.stats.shadowGeometryBytes+=batch.bytes;
+		for(cache in dynamicGeometry)for(batch in cache.batches)scene.stats.shadowGeometryBytes+=batch.bytes;
 	}
 	private function releaseGeometry(lost:Bool=false):Void {
 		for(batches in geometryBatches)for(batch in batches)batch.dispose(lost);
-		geometryBatches=[];geometrySnapshots=[];
+		for(cache in dynamicGeometry)for(batch in cache.batches)batch.dispose(lost);
+		dynamicGeometry=new ObjectMap();geometryBatches=[];geometrySnapshots=[];
 	}
 
 	private static function floats(values:Array<Float>):Float32Array {
