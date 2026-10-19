@@ -17,29 +17,52 @@ class ShadowGeometryBuffer3D {
 	private var gl:WebGLRenderContext;
 	private var vertices:GLBuffer;
 	private var indices:GLBuffer;
-	private var vertexData:Float32Array;
+	public var vertexData(default, null):Float32Array;
 	private var indexData:UInt16Array;
 	private function get_bytes():Int { return (vertexData == null ? 0 : vertexData.length*4)+(indexData == null ? 0 : indexData.length*2); }
 	public function new(gl:WebGLRenderContext) { this.gl=gl; }
 	private static function capacity(wanted:Int):Int { var result=64; while(result<wanted)result*=2; return result; }
-	/** 返回本次实际写入的几何字节数；缓冲只在容量不足时增长。 */
-	public function update(positions:Array<Float>, elements:Array<Int>):Int {
+	private var vertexFloats:Int = 0;
+	private var growVertices:Bool = false;
+	private var growIndices:Bool = false;
+	private var indicesChanged:Bool = false;
+	public var indexUploadedBytes(default, null):Int = 0;
+	/** 先确定本批布局，常见路径直接填写持久数组，避免临时顶点数组及二次复制。 */
+	public function reserve(floats:Int, elements:Int):Void {
 		if(vertices==null)vertices=gl.createBuffer();
 		if(indices==null)indices=gl.createBuffer();
 		if(vertices==null||indices==null)throw "无法创建阴影几何缓冲";
+		growVertices=vertexData==null||vertexData.length<floats;
+		growIndices=indexData==null||indexData.length<elements;
+		if(growVertices)vertexData=new Float32Array(capacity(floats));
+		if(growIndices)indexData=new UInt16Array(capacity(elements));
+		indicesChanged=growIndices||count!=elements;
+		vertexFloats=floats;count=elements;indexUploadedBytes=0;
+	}
+	/** 比较持久索引内容，兼容调用方原地修改索引后仅递增几何版本。 */
+	public inline function writeIndex(offset:Int,value:Int):Void {
+		if(indexData[offset]!=value)indicesChanged=true;
+		indexData[offset]=value;
+	}
+	/** 顶点与索引独立提交，返回实际上传字节数。 */
+	public function commit():Int {
 		gl.bindBuffer(gl.ARRAY_BUFFER,vertices);
-		var growVertices=vertexData==null||vertexData.length<positions.length;
-		if(growVertices)vertexData=new Float32Array(capacity(positions.length));
-		for(i in 0...positions.length)vertexData[i]=positions[i];
 		if(growVertices)gl.bufferData(gl.ARRAY_BUFFER,vertexData,gl.DYNAMIC_DRAW);
-		else gl.bufferSubData(gl.ARRAY_BUFFER,0,vertexData.subarray(0,positions.length));
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);
-		var growIndices=indexData==null||indexData.length<elements.length;
-		if(growIndices)indexData=new UInt16Array(capacity(elements.length));
-		for(i in 0...elements.length)indexData[i]=elements[i];
-		if(growIndices)gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,indexData,gl.DYNAMIC_DRAW);
-		else gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,indexData.subarray(0,elements.length));
-		count=elements.length;return (growVertices?vertexData.length:positions.length)*4+(growIndices?indexData.length:elements.length)*2;
+		else gl.bufferSubData(gl.ARRAY_BUFFER,0,vertexData.subarray(0,vertexFloats));
+		if(indicesChanged){
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);
+			if(growIndices)gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,indexData,gl.DYNAMIC_DRAW);
+			else gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,indexData.subarray(0,count));
+			indexUploadedBytes=(growIndices?indexData.length:count)*2;
+		}
+		return (growVertices?vertexData.length:vertexFloats)*4+indexUploadedBytes;
+	}
+	/** 超大网格拆分回退仍复用同一套缓冲与索引比较规则。 */
+	public function update(positions:Array<Float>, elements:Array<Int>):Int {
+		reserve(positions.length,elements.length);
+		for(i in 0...positions.length)vertexData[i]=positions[i];
+		for(i in 0...elements.length)writeIndex(i,elements[i]);
+		return commit();
 	}
 	public function bind():Void {
 		gl.bindBuffer(gl.ARRAY_BUFFER,vertices);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);

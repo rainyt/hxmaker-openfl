@@ -290,6 +290,44 @@ class ShadowPass3D {
 		}
 		if(rebuilt)scene.stats.shadowGeometryRebuilds++;else scene.stats.shadowGeometryCacheHits++;
 	}
+	/** 常见容量内网格先规划批次，再直接写持久数组；只在超大网格时回退三角形拆分。 */
+	private function packGeometry(scene:Scene3D,casters:Array<MeshObject>,transforms:ObjectMap<MeshObject,Matrix3D>,
+		regions:ObjectMap<MeshObject,Array<Float>>,batches:Array<ShadowGeometryBuffer3D>,stateKey:MeshObject->String):Int {
+		var groups:Array<{meshes:Array<MeshObject>,key:String,vertices:Int,elements:Int}> = [];
+		for(mesh in casters){
+			var vertices=Std.int(mesh.geometry.positions.length/3),elements=mesh.geometry.indices.length,key=stateKey(mesh);
+			var group=groups.length==0?null:groups[groups.length-1];
+			if(group==null||group.key!=key||group.vertices+vertices>MeshBatch3D.MAX_VERTICES||group.elements+elements>196605){
+				group={meshes:[],key:key,vertices:0,elements:0};groups.push(group);
+			}
+			group.meshes.push(mesh);group.vertices+=vertices;group.elements+=elements;
+		}
+		var uploaded=0;
+		for(i in 0...groups.length){
+			var group=groups[i],first=group.meshes[0],batch=i<batches.length?batches[i]:null;
+			if(batch==null){batch=new ShadowGeometryBuffer3D(gl);batches.push(batch);}
+			batch.material=first.material;batch.masked=first.material.alphaMode==AlphaMode3D.MASK;
+			batch.mirrored=transforms.get(first).determinant<0;batch.stride=batch.masked?6:3;
+			batch.reserve(group.vertices*batch.stride,group.elements);
+			var data=batch.vertexData,offset=0,indexOffset=0,base=0;
+			for(mesh in group.meshes){
+				var geometry=mesh.geometry,source=geometry.positions,m=transforms.get(mesh).rawData,region=regions.get(mesh);
+				var unit=true;for(k in 0...16)if(m[k]!=(k%5==0?1:0)){unit=false;break;}
+				for(v in 0...Std.int(source.length/3)){
+					var x=source[v*3],y=source[v*3+1],z=source[v*3+2];
+					data[offset++]=unit?x:x*m[0]+y*m[4]+z*m[8]+m[12];
+					data[offset++]=unit?y:x*m[1]+y*m[5]+z*m[9]+m[13];
+					data[offset++]=unit?z:x*m[2]+y*m[6]+z*m[10]+m[14];
+					if(batch.masked){data[offset++]=region[0]+geometry.uvs[v*2]*region[2];data[offset++]=region[1]+geometry.uvs[v*2+1]*region[3];data[offset++]=geometry.colors.length==0?1.:geometry.colors[v*4+3];}
+				}
+				for(index in geometry.indices)batch.writeIndex(indexOffset++,base+index);
+				base+=Std.int(source.length/3);
+			}
+			uploaded+=batch.commit();scene.stats.shadowIndexUploadedBytes+=batch.indexUploadedBytes;
+		}
+		while(batches.length>groups.length)batches.pop().dispose();
+		return uploaded;
+	}
 	private function prepareGeometry(scene:Scene3D, casters:Array<MeshObject>, owner:Node3D, previous:Array<Dynamic>, batches:Array<ShadowGeometryBuffer3D>,
 		guard:RenderStateGuard3D, context:openfl.display3D.Context3D, white:openfl.display.BitmapData):{snapshot:Array<Dynamic>,changed:Bool,uploaded:Int} {
 		var materialIds = new haxe.ds.ObjectMap<hx.material.Material3D, Int>(), nextMaterialId = 0;
@@ -317,8 +355,10 @@ class ShadowPass3D {
 		}
 		var changed=previous==null||previous.length!=snapshot.length;
 		if(!changed)for(i in 0...snapshot.length)if(snapshot[i]!=previous[i]){changed=true;break;}
-		var uploaded=0;
-		if(changed) {
+		var uploaded=0,packed=true;
+		for(mesh in casters)if(mesh.geometry.positions.length/3>MeshBatch3D.MAX_VERTICES||mesh.geometry.indices.length>196605){packed=false;break;}
+		if(changed&&packed)uploaded=packGeometry(scene,casters,transforms,regions,batches,stateKey);
+		else if(changed) {
 			var positions:Array<Float>=[],elements:Array<Int>=[],key:String=null,batchIndex=0;
 			var material:hx.material.Material3D=null,mirrored=false,masked=false,stride=3;
 			function flush():Void {
@@ -326,7 +366,7 @@ class ShadowPass3D {
 				var batch=batchIndex<batches.length?batches[batchIndex]:null;
 				if(batch==null){batch=new ShadowGeometryBuffer3D(gl);batches.push(batch);}
 				batchIndex++;batch.material=material;batch.mirrored=mirrored;batch.masked=masked;batch.stride=stride;
-				uploaded+=batch.update(positions,elements);
+				uploaded+=batch.update(positions,elements);scene.stats.shadowIndexUploadedBytes+=batch.indexUploadedBytes;
 				positions=[];elements=[];
 			}
 			for(mesh in casters) {
