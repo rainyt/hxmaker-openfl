@@ -58,6 +58,7 @@ class Renderer3D {
 	private var bloomFailure:String = "";
 	private var white:openfl.display.BitmapData;
 	private var programs:Map<String, Program3DInfo> = [];
+	private var framePrograms:haxe.ds.ObjectMap<Material3D,Map<String,Program3DInfo>> = new haxe.ds.ObjectMap();
 	private var supportedSlots:Int = 1;
 	private var frameSlots:Int = 1;
 	private var frameNormals:Bool = false;
@@ -69,6 +70,9 @@ class Renderer3D {
 	private var frameEnvironment:hx.light.Environment3D;
 	private var sceneShadowFilter:Int = 0;
 	private var maxAttributes:Int = 4;
+	private var maxSkinJoints:Int = 0;
+	private var skinAttributesUsed:Bool = false;
+	private var failedSkinCounts:Map<Int,Bool> = [];
 	private var depthTextures:Bool = false;
 	private var sizedDepth:Bool = false;
 	private var shadowPass:ShadowPass3D;
@@ -106,10 +110,14 @@ class Renderer3D {
 		var meshes:Array<MeshObject> = [];
 		if (needsRedraw) {
 			meshes = collectMeshes(scene.root);
+			configureSkinning(scene,meshes);
 			frameNormals = false; frameAttributes = 4;
 			for (mesh in meshes) if (mesh.material.lightingEnabled) {
 				frameNormals = true; frameAttributes = Std.int(Math.max(frameAttributes, mesh.material.pbrEnabled && mesh.material.pbrMapMask != 0 ? 7 : MeshBatch3D.supportsVertexPbr(mesh.material) ? 6 : 5));
 			}
+			for(mesh in meshes)if(mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled)skinAttributesUsed=true;
+			// 回退帧也需关闭此前使用的属性，并在无 VAO 设备上保护这些状态。
+			if(skinAttributesUsed)frameAttributes=8;
 			if (frameAttributes > maxAttributes) throw "当前设备不支持所需的 PBR UV 或切线顶点属性";
 		}
 		mipmaps.prune();
@@ -124,7 +132,7 @@ class Renderer3D {
 			}
 			scene.stats.targetWidth = width; scene.stats.targetHeight = height;
 			if (needsRedraw) {
-				redrawn = true; scene.stats.reset();
+				redrawn = true; scene.stats.reset();framePrograms=new haxe.ds.ObjectMap();
 				if(mainGeometry==null)mainGeometry=new MainGeometryCache3D(gl);
 				mainGeometry.beginFrame(); frameLights = scene.getActiveLights(); scene.stats.targetBytes = width * height * 6;
 				if (timed) mark = profileClock();
@@ -180,6 +188,12 @@ class Renderer3D {
 		var count:Int = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
 		supportedSlots = Std.int(Math.min(16, Math.min(count, gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS))));
 		maxAttributes = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
+		#if (js && html5)
+		maxSkinJoints=Std.int(Math.max(0,Math.floor((cast(gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),Int)-32)/4)));
+		#else
+		// 当前只协商经过验证的 WebGL 路径，其他后端保留 CPU 蒙皮。
+		maxSkinJoints=0;
+		#end
 		if (supportedSlots < 1 || maxAttributes < 4) throw "当前设备不支持基础三维顶点或纹理输入";
 		maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 		var size = Math.min(maxTextureSize, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
@@ -371,8 +385,8 @@ class Renderer3D {
 		shadowPass = new ShadowPass3D(gl, depthTextures, sizedDepth, Std.int(Math.min(maxTargetWidth, maxTargetHeight)));
 	}
 
-	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool, pbr:Bool, vertexPbr:Bool = false):String {
-		return Json.stringify([vertexPbr, frameFog ? 1 : 0, pbr && frameIbl ? 1 : 0, pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
+	private function programKey(declarations:String, code:String, multi:Bool, lit:Bool, uvCode:String, textureNames:Array<String>, soft:Bool, pbr:Bool, vertexPbr:Bool = false,skinCount:Int = 0):String {
+		return Json.stringify([skinCount,vertexPbr, frameFog ? 1 : 0, pbr && frameIbl ? 1 : 0, pbr ? 1 : 0, soft ? 1 : 0, uvCode, textureNames.join(","), declarations, code, Std.string(frameSlots), Std.string(multi ? frameSlots : 1), Std.string(lit), Std.string(lit && frameShadow), Std.string(frameShadow ? sceneShadowFilter : 0)]);
 	}
 
 	private function collectMeshes(root:Node3D):Array<MeshObject> {
@@ -388,16 +402,20 @@ class Renderer3D {
 		visit(root); return meshes;
 	}
 
-	private function getProgram(material:Material3D, multi:Bool, vertexPbr:Bool = false):Program3DInfo {
-		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames(), frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, material.lightingEnabled && material.pbrEnabled, vertexPbr);
+	private function getProgram(material:Material3D, multi:Bool, vertexPbr:Bool = false,skinCount:Int = 0):Program3DInfo {
+		var flags=(frameSlots<<12)|(sceneShadowFilter<<8)|(frameSoft?64:0)|(frameIbl?32:0)|(frameFog?16:0)|(frameShadow?8:0)|(vertexPbr?2:0)|(multi?1:0);
+		var option=flags+":"+skinCount,lookup=framePrograms.get(material);
+		if(lookup==null){lookup=[];framePrograms.set(material,lookup);}
+		var cached=lookup.get(option);if(cached!=null)return cached;
+		var key = programKey(material.fragmentDeclarations, material.fragmentCode, multi, material.lightingEnabled, material.fragmentUVCode, material.textureUniformNames(), frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, material.lightingEnabled && material.pbrEnabled, vertexPbr,skinCount);
 		var info = programs.get(key);
-		if (info != null) return info;
+		if (info != null) {lookup.set(option,info);return info;}
 		var textureNames = material.textureUniformNames();
 		var slots = Std.int(Math.min(multi ? frameSlots : 1, frameSlots - textureNames.length));
 		if (slots < 1) throw "当前三维材质的辅助纹理超出设备可用槽位";
 		var program:GLProgram = null, lightSlots = material.lightingEnabled ? Scene3D.MAX_LIGHTS : 0;
 		while (program == null) {
-			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter > 0, lightSlots, material.pbrEnabled, frameIbl, sceneShadowFilter, frameFog, vertexPbr); }
+			try { program = MultiTextureShader3D.create(gl, slots, material.fragmentDeclarations, material.fragmentCode, material.lightingEnabled, frameShadow, material.fragmentUVCode, textureNames, frameSoft && material.alphaMode == AlphaMode3D.BLEND && material.softParticleDistance > 0, sceneShadowFilter > 0, lightSlots, material.pbrEnabled, frameIbl, sceneShadowFilter, frameFog, vertexPbr,skinCount); }
 			catch (error:Dynamic) {
 				if (slots <= 1) {
 					if (lightSlots <= 1) throw error;
@@ -409,7 +427,24 @@ class Renderer3D {
 				slots = Std.int(Math.max(1, Math.floor(slots / 2)));
 			}
 		}
-		info = new Program3DInfo(gl, program, slots, true, textureNames, lightSlots); programs.set(key, info); return info;
+		info = new Program3DInfo(gl, program, slots, true, textureNames, lightSlots); programs.set(key, info);lookup.set(option,info); return info;
+	}
+
+	/** 默认不开启；仅为满足属性、uniform、材质和绑定空间约束的显式请求启用。 */
+	private function configureSkinning(scene:Scene3D,meshes:Array<MeshObject>):Void {
+		var fallback=!scene.geometryCacheEnabled;
+		for(mesh in meshes)if(mesh.material.alphaMode!=AlphaMode3D.BLEND&&(!mesh.material.depthTest||!mesh.material.depthWrite||mesh.material.fragmentCode!=""||mesh.material.fragmentUVCode!=""||mesh.geometry.positions.length/3>MeshBatch3D.MAX_VERTICES||mesh.geometry.indices.length>196605))fallback=true;
+		for(mesh in meshes){
+			var binding=mesh.skinBinding;if(binding==null)continue;
+			var count=binding.palette==null?0:binding.palette.length;
+			var enabled=!fallback&&binding.requested&&maxAttributes>=8&&count>0&&count<=maxSkinJoints&&!failedSkinCounts.exists(count)&&(shadowPass==null||shadowPass.supportsSkin(count))
+				&&binding.geometry==mesh.geometry&&binding.dataVersion==mesh.geometry.dataVersion
+				&&(binding.source.tangents==null||binding.source.tangents.length==0)
+				&&mesh.geometryMobility!=hx.render3d.GeometryMobility3D.STATIC&&mesh.shadowMobility!=hx.render3d.ShadowMobility3D.STATIC
+				&&Std.isOfType(mesh.parent,hx.display3d.Model3D)&&MeshBatch3D.supportsVertexPbr(mesh.material)&&mesh.material.alphaMode==AlphaMode3D.OPAQUE;
+			if(enabled){var local=mesh.getLocalMatrix().rawData;for(i in 0...16)if(local[i]!=(i%5==0?1:0)){enabled=false;break;}}
+			binding.gpuEnabled=enabled;
+		}
 	}
 
 	/** 标准不透明物体走持久缓存；透明物体继续逐帧按原规则排序。 */
@@ -417,11 +452,17 @@ class Renderer3D {
 		var fallback=!scene.geometryCacheEnabled;
 		for(mesh in meshes)if(mesh.material.alphaMode!=AlphaMode3D.BLEND && (!mesh.material.depthTest||!mesh.material.depthWrite||mesh.material.fragmentCode!=""||mesh.material.fragmentUVCode!=""||mesh.geometry.positions.length/3>MeshBatch3D.MAX_VERTICES||mesh.geometry.indices.length>196605))fallback=true;
 		if(fallback){drawSceneLegacy(scene,meshes,renderer,guard);return;}
+		// 编译失败时回退 CPU；主、影仍读取同一姿态，不把设备差异变成场景异常。
+		for(mesh in meshes)if(mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled){
+			try{getProgram(mesh.material,scene.multiTextureEnabled,true,mesh.skinBinding.palette.length);}
+			catch(error:Dynamic){failedSkinCounts.set(mesh.skinBinding.palette.length,true);mesh.skinBinding.gpuEnabled=false;trace("GPU 蒙皮回退 CPU："+Std.string(error));}
+		}
+		for(mesh in meshes)if(mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled)scene.stats.gpuSkinMeshes++;
 		var opaque=meshes.filter(mesh->mesh.material.alphaMode!=AlphaMode3D.BLEND),projection=scene.camera.getViewProjection(scene.width/scene.height);
 		var visible=new haxe.ds.ObjectMap<MeshObject,Bool>();
 		for(mesh in opaque){if(mesh.frustumCulling&&!mesh.getWorldBounds().inFrustum(projection))scene.stats.culledMeshes++;else{visible.set(mesh,true);scene.stats.visibleMeshes++;}}
 		guard.bindVertexArray("main");
-		var draws=mainGeometry.prepare(scene,opaque,visible,guard,renderer.__context3D,white,mesh->getProgram(mesh.material,scene.multiTextureEnabled,MeshBatch3D.supportsVertexPbr(mesh.material)).slots);
+		var draws=mainGeometry.prepare(scene,opaque,visible,guard,renderer.__context3D,white,mesh->getProgram(mesh.material,scene.multiTextureEnabled,MeshBatch3D.supportsVertexPbr(mesh.material),mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled?mesh.skinBinding.palette.length:0).slots);
 		for(draw in draws){var model=draw.owner==null?identityMatrix:draw.owner.getWorldMatrix();for(range in draw.ranges)submit(draw.batch,projection,scene,renderer,guard,draw.buffer,model,range.start,range.count);}
 		var transparent=meshes.filter(mesh->mesh.material.alphaMode==AlphaMode3D.BLEND);
 		if(transparent.length>0)drawSceneLegacy(scene,transparent,renderer,guard);
@@ -500,9 +541,10 @@ class Renderer3D {
 		if (count == 0) return;
 		if(model==null)model=identityMatrix;
 		var normal=model.clone();if(!normal.invert())throw "模型矩阵不可逆";normal.transpose();
-		var key = programKey(batch.declarations, batch.fragmentCode, scene.multiTextureEnabled, batch.lit, batch.uvCode, batch.textureNames, frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0, batch.pbr, batch.vertexPbr);
-		var info = programs.get(key);
-		gl.useProgram(info.program); gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
+		var info=getProgram(batch.material,scene.multiTextureEnabled,batch.vertexPbr,batch.skinBinding==null?0:batch.skinBinding.palette.length);
+		gl.useProgram(info.program);
+		if(batch.skinBinding!=null){batch.skinPalette=SkinShader3D.palette(batch.skinBinding,batch.skinPalette);gl.uniformMatrix4fv(info.location("uSkin[0]"),false,batch.skinPalette);scene.stats.skinPaletteUploadedBytes+=batch.skinPalette.length*4;}
+		gl.uniformMatrix4fv(info.location("uViewProjection"), false, floatData(projection.rawData));
 		gl.uniformMatrix4fv(info.location("uModel"),false,floatData(model.rawData));
 		gl.uniformMatrix4fv(info.location("uNormalMatrix"),false,floatData(normal.rawData));
 		gl.uniform1f(info.location("uModelSign"),model.determinant<0?-1:1);
@@ -616,6 +658,8 @@ class Renderer3D {
 		if(batch.vertexPbr){gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,4,gl.FLOAT,false,stride,(batch.floatsPerVertex-4)*4);}
 		else if (batch.normalMapped) { gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 4, gl.FLOAT, false, stride, 60); }
 		else if (frameAttributes >= 6 || guard.isolatedVertexArray && maxAttributes >= 6) gl.disableVertexAttribArray(5);
+		if (cached != null && cached.split) cached.bindSplitAttributes(batch);
+		if(batch.skinBinding!=null)cached.bindSkin();else if(frameAttributes>=8||guard.isolatedVertexArray&&maxAttributes>=8)gl.disableVertexAttribArray(7);
 		gl.drawElements(gl.TRIANGLES, count, gl.UNSIGNED_SHORT, indexStart*2);
 		scene.stats.drawCalls++; scene.stats.triangles += Std.int(count / 3);
 		scene.stats.textureSlots = Std.int(Math.max(scene.stats.textureSlots, batch.textures.length + batch.textureNames.length + (frameIbl && batch.pbr ? 1 : 0) + (frameSoft && batch.alphaMode == AlphaMode3D.BLEND && batch.softParticleDistance > 0 ? 1 : 0)));
@@ -751,7 +795,7 @@ class Renderer3D {
 		frameShadow = false; frameSlots = 1; frameSoft = false; frameIbl = false; frameEnvironment = null;
 		skyboxPass = null; skyboxFailure = "";
 		softDepth = null; softFailure = ""; bloomPass = null; bloomReady = false; bloomFailure = "";
-		capabilitiesReady = false; gl = null; vertexBuffer = null; indexBuffer = null; composite = null; bloomComposite = null; target = null; programs.clear(); lastVersion = -1;
+		framePrograms=new haxe.ds.ObjectMap();failedSkinCounts.clear();maxSkinJoints=0;skinAttributesUsed=false;capabilitiesReady = false; gl = null; vertexBuffer = null; indexBuffer = null; composite = null; bloomComposite = null; target = null; programs.clear(); lastVersion = -1;
 		if (white != null) white.dispose(); white = null;
 	}
 	#if (js && html5)

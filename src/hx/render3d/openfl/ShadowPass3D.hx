@@ -50,12 +50,15 @@ class ShadowPass3D {
 	public var texture(get, never):GLTexture;
 	private function get_texture():GLTexture { return target == null ? null : target.texture; }
 	private var gl:WebGLRenderContext;
+	private var gpuAttributes:Bool = false;
 	private var available:Bool;
 	private var sizedDepth:Bool;
 	private var maximum:Int;
 	private var allocationFallback:{light:DirectionalLight3D, key:String, size:Int, count:Int} = null;
 	private var target:ShadowMap3D;
 	private var program:GLProgram;
+	private var skinPrograms:Map<Int,{program:GLProgram,matrix:GLUniformLocation,palette:GLUniformLocation}> = [];
+	private var failedSkinCounts:Map<Int,Bool> = [];
 	private var location:GLUniformLocation;
 	private var maskProgram:GLProgram;
 	private var maskMatrix:GLUniformLocation;
@@ -71,7 +74,9 @@ class ShadowPass3D {
 	public function new(gl:WebGLRenderContext, available:Bool, sizedDepth:Bool, maximum:Int) {
 		this.gl = gl; this.available = available; this.sizedDepth = sizedDepth; this.maximum = maximum;
 	}
+	public function supportsSkin(count:Int):Bool { return !failedSkinCounts.exists(count); }
 	public function render(scene:Scene3D, meshes:Array<MeshObject>, textureUnits:Int, guard:RenderStateGuard3D, context:openfl.display3D.Context3D, white:openfl.display.BitmapData, mipmaps:MipmapCache3D):Bool {
+		for(mesh in meshes)if(mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled)gpuAttributes=true;
 		var light = scene.light;
 		if (light == null || light.isDisposed || light.scene != scene || !light.isWorldVisible() || !light.shadowEnabled || light.intensity <= 0) {
 			releaseTarget(); scene.stats.shadowStatus = "关闭"; return false;
@@ -86,6 +91,14 @@ class ShadowPass3D {
 		}
 		if (casters.length == 0 || receivers.length == 0 || maximum < 16) {
 			releaseTarget(); scene.stats.shadowStatus = maximum < 16 ? "设备阴影尺寸不足" : casters.length == 0 ? "无可用投射物" : "无接收阴影材质"; return false;
+		}
+		for(mesh in casters)if(mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled){
+			var count=mesh.skinBinding.palette.length;
+			if(failedSkinCounts.exists(count)){mesh.skinBinding.gpuEnabled=false;continue;}
+			if(!skinPrograms.exists(count))try{
+				var skinProgram=MultiTextureShader3D.compile(gl,"attribute vec3 aPosition;uniform mat4 uLightViewProjection;"+SkinShader3D.declarations(count)+"void main(){gl_Position=uLightViewProjection*vec4((skinMatrix()*vec4(aPosition,1.0)).xyz,1.0);}","precision mediump float;void main(){gl_FragColor=vec4(1.0);}");
+				skinPrograms.set(count,{program:skinProgram,matrix:gl.getUniformLocation(skinProgram,"uLightViewProjection"),palette:gl.getUniformLocation(skinProgram,"uSkin[0]")});
+			}catch(error:Dynamic){failedSkinCounts.set(count,true);mesh.skinBinding.gpuEnabled=false;trace("GPU 阴影蒙皮回退 CPU："+Std.string(error));}
 		}
 		var settings = new DirectionalShadowSettings3D(light);
 		filter = settings.filter; filterRadius = settings.radius;
@@ -292,7 +305,7 @@ class ShadowPass3D {
 	}
 	/** 常见容量内网格先规划批次，再直接写持久数组；只在超大网格时回退三角形拆分。 */
 	private function packGeometry(scene:Scene3D,casters:Array<MeshObject>,transforms:ObjectMap<MeshObject,Matrix3D>,
-		regions:ObjectMap<MeshObject,Array<Float>>,batches:Array<ShadowGeometryBuffer3D>,stateKey:MeshObject->String):Int {
+		regions:ObjectMap<MeshObject,Array<Float>>,batches:Array<ShadowGeometryBuffer3D>,stateKey:MeshObject->String,stream:Bool,force:Bool):Int {
 		var groups:Array<{meshes:Array<MeshObject>,key:String,vertices:Int,elements:Int}> = [];
 		for(mesh in casters){
 			var vertices=Std.int(mesh.geometry.positions.length/3),elements=mesh.geometry.indices.length,key=stateKey(mesh);
@@ -307,23 +320,37 @@ class ShadowPass3D {
 			var group=groups[i],first=group.meshes[0],batch=i<batches.length?batches[i]:null;
 			if(batch==null){batch=new ShadowGeometryBuffer3D(gl);batches.push(batch);}
 			batch.material=first.material;batch.masked=first.material.alphaMode==AlphaMode3D.MASK;
-			batch.mirrored=transforms.get(first).determinant<0;batch.stride=batch.masked?6:3;
+			batch.mirrored=transforms.get(first).determinant<0;batch.skinBinding=first.skinBinding!=null&&first.skinBinding.gpuEnabled?first.skinBinding:null;
+			batch.stride=batch.skinBinding!=null?11:batch.masked?6:3;
+			// 同一个模型的刚性关节仍可能变化；只重建受影响的批次，保留 GPU 蒙皮源几何。
+			var snapshot:Array<Dynamic>=[batch.stride,batch.masked,batch.mirrored,batch.skinBinding];
+			for(mesh in group.meshes){
+				snapshot.push(mesh);snapshot.push(mesh.geometry);snapshot.push(mesh.material);
+				snapshot.push(batch.skinBinding==null?mesh.geometry.version:mesh.geometry.dataVersion);
+				for(value in transforms.get(mesh).rawData)snapshot.push(value);
+				if(batch.masked)for(value in regions.get(mesh))snapshot.push(value);
+			}
+			var previous=batch.sourceSnapshot,changed=force||previous==null||previous.length!=snapshot.length;
+			if(!changed)for(k in 0...snapshot.length)if(previous[k]!=snapshot[k]){changed=true;break;}
+			if(!changed)continue;
+			batch.sourceSnapshot=null;
 			batch.reserve(group.vertices*batch.stride,group.elements);
 			var data=batch.vertexData,offset=0,indexOffset=0,base=0;
 			for(mesh in group.meshes){
-				var geometry=mesh.geometry,source=geometry.positions,m=transforms.get(mesh).rawData,region=regions.get(mesh);
+				var geometry=mesh.geometry,skin=batch.skinBinding==null?null:mesh.skinBinding,source=skin==null?geometry.positions:skin.source.positions,m=transforms.get(mesh).rawData,region=regions.get(mesh);
 				var unit=true;for(k in 0...16)if(m[k]!=(k%5==0?1:0)){unit=false;break;}
 				for(v in 0...Std.int(source.length/3)){
 					var x=source[v*3],y=source[v*3+1],z=source[v*3+2];
 					data[offset++]=unit?x:x*m[0]+y*m[4]+z*m[8]+m[12];
 					data[offset++]=unit?y:x*m[1]+y*m[5]+z*m[9]+m[13];
 					data[offset++]=unit?z:x*m[2]+y*m[6]+z*m[10]+m[14];
+					if(skin!=null){for(k in 0...4)data[offset++]=skin.source.joints[v*4+k];for(k in 0...4)data[offset++]=skin.source.weights[v*4+k];}
 					if(batch.masked){data[offset++]=region[0]+geometry.uvs[v*2]*region[2];data[offset++]=region[1]+geometry.uvs[v*2+1]*region[3];data[offset++]=geometry.colors.length==0?1.:geometry.colors[v*4+3];}
 				}
 				for(index in geometry.indices)batch.writeIndex(indexOffset++,base+index);
 				base+=Std.int(source.length/3);
 			}
-			uploaded+=batch.commit();scene.stats.shadowIndexUploadedBytes+=batch.indexUploadedBytes;
+			uploaded+=batch.commit(stream);batch.sourceSnapshot=snapshot;scene.stats.shadowIndexUploadedBytes+=batch.indexUploadedBytes;
 		}
 		while(batches.length>groups.length)batches.pop().dispose();
 		return uploaded;
@@ -336,13 +363,13 @@ class ShadowPass3D {
 			if (!materialIds.exists(mesh.material)) materialIds.set(mesh.material, nextMaterialId++);
 			transforms.set(mesh,geometryMatrix(mesh,owner));
 		}
-		function stateKey(mesh:MeshObject):String { return (mesh.material.alphaMode == AlphaMode3D.MASK ? "遮罩:" + materialIds.get(mesh.material) : "不透明") + ":" + Std.string(mesh.material.cullMode) + ":" + (transforms.get(mesh).determinant < 0 ? "负" : "正"); }
+		function stateKey(mesh:MeshObject):String { return (mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled?"GPU:"+mesh.skinBinding.skinId+":":"CPU:")+(mesh.material.alphaMode == AlphaMode3D.MASK ? "遮罩:" + materialIds.get(mesh.material) : "不透明") + ":" + Std.string(mesh.material.cullMode) + ":" + (transforms.get(mesh).determinant < 0 ? "负" : "正"); }
 		casters.sort(function(a,b) return Reflect.compare(stateKey(a),stateKey(b)));
 		// 几何快照不包含阴影投影矩阵和采样参数；移动相机仍能复用静态几何。
 		var snapshot:Array<Dynamic> = [], regions = new haxe.ds.ObjectMap<MeshObject,Array<Float>>();
 		for (mesh in casters) {
 			var material=mesh.material;
-			snapshot.push(mesh);snapshot.push(mesh.geometry);snapshot.push(mesh.geometry.version);
+			snapshot.push(mesh);snapshot.push(mesh.geometry);snapshot.push(mesh.skinBinding!=null&&mesh.skinBinding.gpuEnabled?mesh.geometry.dataVersion:mesh.geometry.version);
 			snapshot.push(material);snapshot.push(material.alphaMode);snapshot.push(material.cullMode);
 			for (value in transforms.get(mesh).rawData) snapshot.push(value);
 			if (material.alphaMode == AlphaMode3D.MASK) {
@@ -357,7 +384,7 @@ class ShadowPass3D {
 		if(!changed)for(i in 0...snapshot.length)if(snapshot[i]!=previous[i]){changed=true;break;}
 		var uploaded=0,packed=true;
 		for(mesh in casters)if(mesh.geometry.positions.length/3>MeshBatch3D.MAX_VERTICES||mesh.geometry.indices.length>196605){packed=false;break;}
-		if(changed&&packed)uploaded=packGeometry(scene,casters,transforms,regions,batches,stateKey);
+		if(changed&&packed)uploaded=packGeometry(scene,casters,transforms,regions,batches,stateKey,owner!=null,previous==null);
 		else if(changed) {
 			var positions:Array<Float>=[],elements:Array<Int>=[],key:String=null,batchIndex=0;
 			var material:hx.material.Material3D=null,mirrored=false,masked=false,stride=3;
@@ -413,8 +440,11 @@ class ShadowPass3D {
 		context:openfl.display3D.Context3D,white:openfl.display.BitmapData,mipmaps:MipmapCache3D):Void {
 		for(batch in batches) {
 			var material=batch.material;
-			gl.useProgram(batch.masked?maskProgram:program);
-			gl.uniformMatrix4fv(batch.masked?maskMatrix:location,false,floats(matrix.rawData));
+			var skin=batch.skinBinding==null?null:skinPrograms.get(batch.skinBinding.palette.length);
+			gl.useProgram(skin!=null?skin.program:batch.masked?maskProgram:program);
+			gl.uniformMatrix4fv(skin!=null?skin.matrix:batch.masked?maskMatrix:location,false,floats(matrix.rawData));
+			if(skin!=null){batch.skinPalette=SkinShader3D.palette(batch.skinBinding,batch.skinPalette);gl.uniformMatrix4fv(skin.palette,false,batch.skinPalette);scene.stats.skinPaletteUploadedBytes+=batch.skinPalette.length*4;}
+			else if(gpuAttributes){gl.disableVertexAttribArray(6);gl.disableVertexAttribArray(7);}
 			if(batch.masked) {
 				var source=TextureBridge3D.source(material.texture,white);
 				TextureBridge3D.validateWrap(material,source);guard.activateTexture(0);
@@ -456,12 +486,12 @@ class ShadowPass3D {
 	public function abandonContext():Void {
 		releaseGeometry(true);
 		allocationFallback = null; matrices = []; worldTexels = [0., 0.]; target = null;
-		program = null; maskProgram = null; lastSnapshots = []; lastLight = null; lastResourceRequest = null;
+		skinPrograms.clear();failedSkinCounts.clear();gpuAttributes=false;program = null; maskProgram = null; lastSnapshots = []; lastLight = null; lastResourceRequest = null;
 		location = null; failedKey = null; failedLight = null; planner.reset();
 	}
 	public function dispose():Void {
 		if (gl != null && !gl.isContextLost()) {
-			releaseTarget(); if (program != null) gl.deleteProgram(program); if (maskProgram != null) gl.deleteProgram(maskProgram);
+			releaseTarget();for(skin in skinPrograms)gl.deleteProgram(skin.program); if (program != null) gl.deleteProgram(program); if (maskProgram != null) gl.deleteProgram(maskProgram);
 		}
 		abandonContext(); gl = null;
 	}

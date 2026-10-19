@@ -12,6 +12,9 @@ class ShadowGeometryBuffer3D {
 	public var mirrored:Bool;
 	public var masked:Bool;
 	public var stride:Int;
+	public var skinBinding:hx.animation3d.Skin3D.SkinBinding3D;
+	public var skinPalette:Float32Array;
+	public var sourceSnapshot:Array<Dynamic>;
 	public var count(default, null):Int = 0;
 	public var bytes(get, never):Int;
 	private var gl:WebGLRenderContext;
@@ -45,9 +48,10 @@ class ShadowGeometryBuffer3D {
 		indexData[offset]=value;
 	}
 	/** 顶点与索引独立提交，返回实际上传字节数。 */
-	public function commit():Int {
+	public function commit(stream:Bool = false):Int {
 		gl.bindBuffer(gl.ARRAY_BUFFER,vertices);
-		if(growVertices)gl.bufferData(gl.ARRAY_BUFFER,vertexData,gl.DYNAMIC_DRAW);
+		if(stream)gl.bufferData(gl.ARRAY_BUFFER,vertexData.subarray(0,vertexFloats),gl.STREAM_DRAW);
+		else if(growVertices)gl.bufferData(gl.ARRAY_BUFFER,vertexData,gl.DYNAMIC_DRAW);
 		else gl.bufferSubData(gl.ARRAY_BUFFER,0,vertexData.subarray(0,vertexFloats));
 		if(indicesChanged){
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);
@@ -55,10 +59,11 @@ class ShadowGeometryBuffer3D {
 			else gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,indexData.subarray(0,count));
 			indexUploadedBytes=(growIndices?indexData.length:count)*2;
 		}
-		return (growVertices?vertexData.length:vertexFloats)*4+indexUploadedBytes;
+		return (!stream&&growVertices?vertexData.length:vertexFloats)*4+indexUploadedBytes;
 	}
 	/** 超大网格拆分回退仍复用同一套缓冲与索引比较规则。 */
 	public function update(positions:Array<Float>, elements:Array<Int>):Int {
+		sourceSnapshot=null;skinBinding=null;
 		reserve(positions.length,elements.length);
 		for(i in 0...positions.length)vertexData[i]=positions[i];
 		for(i in 0...elements.length)writeIndex(i,elements[i]);
@@ -67,6 +72,10 @@ class ShadowGeometryBuffer3D {
 	public function bind():Void {
 		gl.bindBuffer(gl.ARRAY_BUFFER,vertices);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);
 		gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,stride*4,0);
+		if(skinBinding!=null){
+			gl.enableVertexAttribArray(6);gl.vertexAttribPointer(6,4,gl.FLOAT,false,stride*4,12);
+			gl.enableVertexAttribArray(7);gl.vertexAttribPointer(7,4,gl.FLOAT,false,stride*4,28);
+		}
 		if(masked) {
 			gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);
 			gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);
@@ -75,6 +84,6 @@ class ShadowGeometryBuffer3D {
 	/** 设备丢失时只丢弃句柄，普通释放才执行 GL 删除。 */
 	public function dispose(lost:Bool=false):Void {
 		if(!lost){if(vertices!=null)gl.deleteBuffer(vertices);if(indices!=null)gl.deleteBuffer(indices);}
-		vertices=null;indices=null;vertexData=null;indexData=null;material=null;count=0;
+		vertices=null;indices=null;vertexData=null;indexData=null;material=null;skinBinding=null;skinPalette=null;sourceSnapshot=null;count=0;
 	}
 }

@@ -11,6 +11,7 @@ import haxe.Json;
 @:access(hx.material.Material3D)
 class MeshBatch3D {
 	public static inline var MAX_VERTICES:Int = 65535;
+	public var material(default,null):Material3D;
 	public var vertices:Array<Float> = [];
 	public var indices:Array<Int> = [];
 	public var textures:Array<openfl.display.BitmapData> = [];
@@ -40,6 +41,8 @@ class MeshBatch3D {
 	public var lit:Bool;
 	public var pbr:Bool;
 	public var vertexPbr:Bool = false;
+	public var skinBinding:hx.animation3d.Skin3D.SkinBinding3D;
+	public var skinPalette:lime.utils.Float32Array;
 	public var mapped:Bool;
 	public var normalMapped:Bool;
 	public var receiveShadow:Bool;
@@ -52,6 +55,7 @@ class MeshBatch3D {
 	public var floatsPerVertex(get, never):Int;
 	private function get_floatsPerVertex():Int { return (lit ? 13 : 10) + (mapped ? 2 : 0) + (normalMapped ? 4 : 0) + (vertexPbr ? 4 : 0); }
 	public function new(material:Material3D, mirrored:Bool, slots:Int, receiveShadow:Bool = true, vertexPbr:Bool = false) {
+		this.material=material;
 		this.vertexPbr = vertexPbr;
 		uvCode = material.fragmentUVCode; textureNames = material.textureUniformNames();
 		textureUniforms = material.getTextureUniforms(); baseTexture = material.texture;

@@ -7,7 +7,7 @@ import hx.material.Material3D;
 
 /** 根据实际槽位数生成采样声明与分支，不依赖固定八纹理程序。 */
 class MultiTextureShader3D {
-	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false, ibl:Bool = false, shadowFilter:Int = -1, fog:Bool = false, vertexPbr:Bool = false):GLProgram {
+	public static function create(gl:WebGLRenderContext, slots:Int, declarations:String = "", fragmentCode:String = "", lit:Bool = false, shadow:Bool = false, uvCode:String = "", textureNames:Array<String> = null, soft:Bool = false, shadowPCF:Bool = false, lightSlots:Int = 4, pbr:Bool = false, ibl:Bool = false, shadowFilter:Int = -1, fog:Bool = false, vertexPbr:Bool = false, skinCount:Int = 0):GLProgram {
 		var filter = shadowFilter < 0 ? (shadowPCF ? 1 : 0) : shadowFilter;
 		shadow = shadow && lit;
 		pbr = pbr && lit;
@@ -129,10 +129,11 @@ class MultiTextureShader3D {
 					+ "return vec2(mix(mix(a,b,weight.x),mix(c,d,weight.x),weight.y),1.0); }\n";
 			} else fragment += "return vec2(shadowCompare(p.xy,tile,referenceDepth),1.0); }\n";
 		}
-		vertex += "void main(){vec3 worldPosition=(uModel*vec4(aPosition,1.0)).xyz;gl_Position=uViewProjection*vec4(worldPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
+		if(skinCount>0)vertex+=SkinShader3D.declarations(skinCount);
+		vertex += "void main(){"+(skinCount>0?"mat4 deformation=skinMatrix();vec3 localPosition=(deformation*vec4(aPosition,1.0)).xyz;":"vec3 localPosition=aPosition;")+"vec3 worldPosition=(uModel*vec4(localPosition,1.0)).xyz;gl_Position=uViewProjection*vec4(worldPosition,1.0);vUV=aUV;vTextureId=aTextureId;vColor=aColor;"
 			+ (vertexPbr ? "vPbrParameters=aPbrParameters;" : "")
 			+ (mapped ? "vMaterialUV=aMaterialUV;" : "")
-			+ (lit ? "vNormal=normalize((uNormalMatrix*vec4(aNormal,0.0)).xyz);vWorldPosition=worldPosition;" : "")
+			+ (lit ? "vNormal=normalize((uNormalMatrix*vec4("+(skinCount>0?"skinNormal(deformation,aNormal)":"aNormal")+",0.0)).xyz);vWorldPosition=worldPosition;" : "")
 			+ (normalMap ? "vec3 transformedTangent=mat3(uModel)*aTangent.xyz;transformedTangent-=vNormal*dot(vNormal,transformedTangent);if(dot(transformedTangent,transformedTangent)<0.000000000001){transformedTangent=abs(vNormal.y)<0.9?vec3(vNormal.z,0.0,-vNormal.x):vec3(0.0,-vNormal.z,vNormal.y);}vTangent=vec4(normalize(transformedTangent),aTangent.w*uModelSign);" : "")
 			+ (fog ? "vFogPosition=(worldPosition-uFogOriginScale.xyz)*uFogOriginScale.w;" : "") + "}";
 		for (i in 0...slots) fragment += "uniform sampler2D uSampler" + i + ";\n";
@@ -245,6 +246,7 @@ class MultiTextureShader3D {
 			if (vertex.indexOf("attribute vec4 aTangent") >= 0) gl.bindAttribLocation(program, 5, "aTangent");
 			if (vertex.indexOf("attribute vec4 aPbrParameters") >= 0) gl.bindAttribLocation(program, 5, "aPbrParameters");
 			if (vertex.indexOf("attribute vec2 aMaterialUV") >= 0) gl.bindAttribLocation(program, 6, "aMaterialUV");
+			if(vertex.indexOf("attribute vec4 aJoints")>=0){gl.bindAttribLocation(program,6,"aJoints");gl.bindAttribLocation(program,7,"aWeights");}
 			gl.linkProgram(program);
 			var linked:Dynamic = gl.getProgramParameter(program, gl.LINK_STATUS);
 			if (linked == false || linked == 0) throw "三维 Shader 链接失败：" + gl.getProgramInfoLog(program);
