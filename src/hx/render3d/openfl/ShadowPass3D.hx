@@ -14,9 +14,7 @@ import lime.graphics.WebGLRenderContext;
 import lime.graphics.opengl.GLTexture;
 import lime.graphics.opengl.GLProgram;
 import lime.graphics.opengl.GLUniformLocation;
-import lime.graphics.opengl.GLBuffer;
 import lime.utils.Float32Array;
-import lime.utils.UInt16Array;
 
 /** 绘制不透明及标准 MASK 投射物；从场景全体可见网格筛选，不沿用主相机剔除结果。 */
 class ShadowPass3D {
@@ -56,8 +54,8 @@ class ShadowPass3D {
 	private var lastSnapshots:Array<Array<Dynamic>> = [];
 	private var lastLight:DirectionalLight3D;
 	private var lastRequest:Int = -1;
-	private var vertices:GLBuffer;
-	private var indices:GLBuffer;
+	private var geometrySnapshots:Array<Array<Dynamic>> = [];
+	private var geometryBatches:Array<Array<ShadowGeometryBuffer3D>> = [];
 	public function new(gl:WebGLRenderContext, available:Bool, sizedDepth:Bool, maximum:Int) {
 		this.gl = gl; this.available = available; this.sizedDepth = sizedDepth; this.maximum = maximum;
 	}
@@ -134,7 +132,14 @@ class ShadowPass3D {
 				// 不透明材质的粗糙度、颜色等变化不影响投影；MASK 继续跟踪纹理像素失效。
 				var material = mesh.material;
 				snapshot.push(material.alphaMode); snapshot.push(material.cullMode);
-				if (material.alphaMode == AlphaMode3D.MASK) { snapshot.push(material); snapshot.push(material.version); }
+				if (material.alphaMode == AlphaMode3D.MASK) {
+					snapshot.push(material); snapshot.push(material.version);
+					// 图集区域可以直接修改；它改变 MASK 轮廓，也必须使深度贴图失效。
+					var bitmap=material.texture, source=TextureBridge3D.source(bitmap,white), rect=bitmap==null?null:bitmap.rect;
+					snapshot.push(source);snapshot.push(source.width);snapshot.push(source.height);
+					snapshot.push(rect==null?null:rect.x);snapshot.push(rect==null?null:rect.y);
+					snapshot.push(rect==null?null:rect.width);snapshot.push(rect==null?null:rect.height);
+				}
 				for (value in mesh.getWorldMatrix().rawData) snapshot.push(value);
 			}
 			snapshots.push(snapshot);
@@ -155,7 +160,7 @@ class ShadowPass3D {
 			program = MultiTextureShader3D.compile(gl,
 				"attribute vec3 aPosition;uniform mat4 uLightViewProjection;void main(){gl_Position=uLightViewProjection*vec4(aPosition,1.0);}",
 				"precision mediump float;void main(){gl_FragColor=vec4(1.0);}");
-			location = gl.getUniformLocation(program, "uLightViewProjection"); vertices = gl.createBuffer(); indices = gl.createBuffer();
+			location = gl.getUniformLocation(program, "uLightViewProjection");
 		}
 		if (maskProgram == null && Lambda.exists(casters, function(mesh) return mesh.material.alphaMode == AlphaMode3D.MASK)) {
 			maskProgram = MultiTextureShader3D.compile(gl,
@@ -175,10 +180,12 @@ class ShadowPass3D {
 			// 先丢弃该级缓存，异常后不可复用部分写入的深度。
 			lastSnapshots[i] = null;
 			gl.viewport(i * size, 0, size, size); gl.scissor(i * size, 0, size, size); gl.clear(gl.DEPTH_BUFFER_BIT);
-			drawCascade(scene, candidates[i], matrices[i], guard, context, white, mipmaps);
+			drawCascade(scene, i, candidates[i], matrices[i], guard, context, white, mipmaps);
 			lastSnapshots[i] = snapshots[i];
 		}
 		gl.disable(gl.SCISSOR_TEST);
+		while (geometryBatches.length > count) { for (batch in geometryBatches.pop()) batch.dispose(); geometrySnapshots.pop(); }
+		updateGeometryStats(scene);
 		lastLight = light; lastRequest = light.shadowUpdateVersion; lastResourceRequest = resourceRequest;
 		return true;
 	}
@@ -199,6 +206,7 @@ class ShadowPass3D {
 	}
 
 	private function updateStats(scene:Scene3D):Void {
+		updateGeometryStats(scene);
 		scene.stats.shadowStatus = "开启";
 		scene.stats.shadowMapSize = target.size; scene.stats.shadowMapBytes = target.bytes;
 		scene.stats.shadowCascades = target.cascades; scene.stats.shadowDepthBits = target.depthBits;
@@ -210,95 +218,115 @@ class ShadowPass3D {
 		scene.stats.shadowSlopeBiases = slopeBiases.slice(0, target.cascades);
 	}
 
-	private function drawCascade(scene:Scene3D, casters:Array<MeshObject>, matrix:Matrix3D, guard:RenderStateGuard3D,
+	private function drawCascade(scene:Scene3D, cascade:Int, casters:Array<MeshObject>, matrix:Matrix3D, guard:RenderStateGuard3D,
 		context:openfl.display3D.Context3D, white:openfl.display.BitmapData, mipmaps:MipmapCache3D):Void {
-		gl.useProgram(program); gl.uniformMatrix4fv(location, false, floats(matrix.rawData));
 		guard.bindVertexArray("shadow");
 		for (i in 1...4) gl.disableVertexAttribArray(i);
-		var positions:Array<Float> = [], elements:Array<Int> = [], key:String = null;
-		var masked = false, stride = 3;
-		function flush():Void {
-			if (elements.length == 0) return;
-			gl.bindBuffer(gl.ARRAY_BUFFER, vertices); gl.bufferData(gl.ARRAY_BUFFER, floats(positions), gl.STREAM_DRAW);
-			var indexData = new UInt16Array(elements.length); for (i in 0...elements.length) indexData[i] = elements[i];
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STREAM_DRAW);
-			gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, stride*4, 0);
-			if (masked) {
-				gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 24, 12);
-				gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 24, 20);
-			} else { gl.disableVertexAttribArray(1); gl.disableVertexAttribArray(2); }
-			gl.drawElements(gl.TRIANGLES, elements.length, gl.UNSIGNED_SHORT, 0);
-			scene.stats.shadowDrawCalls++; scene.stats.shadowTriangles += Std.int(elements.length / 3);
-			scene.stats.shadowUploadedBytes += positions.length*4 + elements.length*2;
-			ContextStats.statsDrawCall(); ContextStats.statsVertexCount(elements.length);
-			positions = []; elements = [];
-		}
 		var materialIds = new haxe.ds.ObjectMap<hx.material.Material3D, Int>(), nextMaterialId = 0;
 		for (mesh in casters) if (!materialIds.exists(mesh.material)) materialIds.set(mesh.material, nextMaterialId++);
 		function stateKey(mesh:MeshObject):String { return (mesh.material.alphaMode == AlphaMode3D.MASK ? "遮罩:" + materialIds.get(mesh.material) : "不透明") + ":" + Std.string(mesh.material.cullMode) + ":" + (mesh.getWorldMatrix().determinant < 0 ? "负" : "正"); }
-		casters.sort(function(a, b) { return Reflect.compare(stateKey(a), stateKey(b)); });
+		casters.sort(function(a,b) return Reflect.compare(stateKey(a),stateKey(b)));
+		// 几何快照不包含阴影投影矩阵和采样参数；移动相机仍能复用静态几何。
+		var snapshot:Array<Dynamic> = [], regions = new haxe.ds.ObjectMap<MeshObject,Array<Float>>();
 		for (mesh in casters) {
-			if (!mesh.getWorldBounds().inFrustum(matrix)) continue;
-			var nextKey = stateKey(mesh);
-			if (nextKey != key) {
-				flush(); key = nextKey;
-				masked = mesh.material.alphaMode == AlphaMode3D.MASK; stride = masked ? 6 : 3;
-				gl.useProgram(masked ? maskProgram : program);
-				gl.uniformMatrix4fv(masked ? maskMatrix : location, false, floats(matrix.rawData));
-				if (masked) {
-					var material = mesh.material, source = TextureBridge3D.source(material.texture, white);
-					TextureBridge3D.validateWrap(material, source); guard.activateTexture(0);
-					var texture = TextureBridge3D.resolve(source, context);
-					gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture)); guard.rememberTexture(texture);
-					var requested = hx.material.TextureMinFilter3D.resolve(material.textureMinFilter, material.textureMinSmoothing == null ? material.smoothing : material.textureMinSmoothing);
-					var filter = mipmaps.prepare(material.texture, source, texture, requested);
-					TextureBridge3D.applySampler(texture, material.smoothing, material.textureWrapU, material.textureWrapV, material.textureMinSmoothing, filter);
-					gl.uniform1i(maskSampler, 0); gl.uniform1f(maskCutoff, material.alphaCutoff); gl.uniform1f(maskOpacity, material.opacity);
-				}
-				if (mesh.material.cullMode == CullMode3D.NONE) gl.disable(gl.CULL_FACE);
-				else { gl.enable(gl.CULL_FACE); gl.cullFace(mesh.material.cullMode == CullMode3D.BACK ? gl.BACK : gl.FRONT); }
-				gl.frontFace(mesh.getWorldMatrix().determinant < 0 ? gl.CW : gl.CCW);
-			}
-			var source = mesh.getWorldVertices(), sourceIndices = mesh.geometry.indices, remap:Map<Int, Int> = [];
-			var region = [0., 0., 1., 1.];
-			if (masked) {
-				var bitmap = mesh.material.texture, image = TextureBridge3D.source(bitmap, white), size = TextureBridge3D.uvSize(image);
-				region = bitmap != null && bitmap.rect != null
-					? [bitmap.rect.x/size[0], bitmap.rect.y/size[1], bitmap.rect.width/size[0], bitmap.rect.height/size[1]]
-					: [0., 0., image.width/size[0], image.height/size[1]];
-			}
-			for (triangle in 0...Std.int(sourceIndices.length / 3)) {
-				if (Std.int(positions.length / stride) + 3 > MeshBatch3D.MAX_VERTICES || elements.length + 3 > 196605) { flush(); remap.clear(); }
-				for (corner in 0...3) {
-					var index = sourceIndices[triangle*3+corner], mapped = remap.get(index);
-					if (mapped == null) {
-						mapped = Std.int(positions.length / stride); remap.set(index, mapped);
-						positions.push(source[index*3]); positions.push(source[index*3+1]); positions.push(source[index*3+2]);
-						if (masked) { positions.push(region[0]+mesh.geometry.uvs[index*2]*region[2]); positions.push(region[1]+mesh.geometry.uvs[index*2+1]*region[3]); positions.push(mesh.geometry.colors.length == 0 ? 1.0 : mesh.geometry.colors[index*4+3]); }
-					}
-					elements.push(mapped);
-				}
+			var material=mesh.material;
+			snapshot.push(mesh);snapshot.push(mesh.geometry);snapshot.push(mesh.geometry.version);
+			snapshot.push(material);snapshot.push(material.alphaMode);snapshot.push(material.cullMode);
+			for (value in mesh.getWorldMatrix().rawData) snapshot.push(value);
+			if (material.alphaMode == AlphaMode3D.MASK) {
+				var bitmap=material.texture,image=TextureBridge3D.source(bitmap,white);
+				guard.activateTexture(0);TextureBridge3D.resolve(image,context);
+				var size=TextureBridge3D.uvSize(image),rect=bitmap==null?null:bitmap.rect;
+				var region=rect==null?[0.,0.,image.width/size[0],image.height/size[1]]:[rect.x/size[0],rect.y/size[1],rect.width/size[0],rect.height/size[1]];
+				regions.set(mesh,region);for (value in region) snapshot.push(value);
 			}
 		}
-		flush();
+		var previous=cascade<geometrySnapshots.length?geometrySnapshots[cascade]:null;
+		var changed=previous==null||previous.length!=snapshot.length;
+		if(!changed)for(i in 0...snapshot.length)if(snapshot[i]!=previous[i]){changed=true;break;}
+		var batches=cascade<geometryBatches.length?geometryBatches[cascade]:null;
+		if(batches==null){batches=[];geometryBatches[cascade]=batches;}
+		if(changed) {
+			geometrySnapshots[cascade]=null;
+			var positions:Array<Float>=[],elements:Array<Int>=[],key:String=null,batchIndex=0;
+			var material:hx.material.Material3D=null,mirrored=false,masked=false,stride=3;
+			function flush():Void {
+				if(elements.length==0)return;
+				var batch=batchIndex<batches.length?batches[batchIndex]:null;
+				if(batch==null){batch=new ShadowGeometryBuffer3D(gl);batches.push(batch);}
+				batchIndex++;batch.material=material;batch.mirrored=mirrored;batch.masked=masked;batch.stride=stride;
+				scene.stats.shadowUploadedBytes+=batch.update(positions,elements);
+				positions=[];elements=[];
+			}
+			for(mesh in casters) {
+				var nextKey=stateKey(mesh);
+				if(key!=nextKey){flush();key=nextKey;material=mesh.material;mirrored=mesh.getWorldMatrix().determinant<0;masked=material.alphaMode==AlphaMode3D.MASK;stride=masked?6:3;}
+				var source=mesh.getWorldVertices(),sourceIndices=mesh.geometry.indices,remap:Map<Int,Int>=[],region=regions.get(mesh);
+				for(triangle in 0...Std.int(sourceIndices.length/3)) {
+					if(Std.int(positions.length/stride)+3>MeshBatch3D.MAX_VERTICES||elements.length+3>196605){flush();remap.clear();}
+					for(corner in 0...3) {
+						var index=sourceIndices[triangle*3+corner],mapped=remap.get(index);
+						if(mapped==null) {
+							mapped=Std.int(positions.length/stride);remap.set(index,mapped);
+							positions.push(source[index*3]);positions.push(source[index*3+1]);positions.push(source[index*3+2]);
+							if(masked){positions.push(region[0]+mesh.geometry.uvs[index*2]*region[2]);positions.push(region[1]+mesh.geometry.uvs[index*2+1]*region[3]);positions.push(mesh.geometry.colors.length==0?1.:mesh.geometry.colors[index*4+3]);}
+						}
+						elements.push(mapped);
+					}
+				}
+			}
+			flush();while(batches.length>batchIndex)batches.pop().dispose();
+			geometrySnapshots[cascade]=snapshot;scene.stats.shadowGeometryRebuilds++;
+		}else scene.stats.shadowGeometryCacheHits++;
+		for(batch in batches) {
+			var material=batch.material;
+			gl.useProgram(batch.masked?maskProgram:program);
+			gl.uniformMatrix4fv(batch.masked?maskMatrix:location,false,floats(matrix.rawData));
+			if(batch.masked) {
+				var source=TextureBridge3D.source(material.texture,white);
+				TextureBridge3D.validateWrap(material,source);guard.activateTexture(0);
+				var texture=TextureBridge3D.resolve(source,context);
+				gl.bindTexture(gl.TEXTURE_2D,TextureBridge3D.handle(texture));guard.rememberTexture(texture);
+				var requested=hx.material.TextureMinFilter3D.resolve(material.textureMinFilter,material.textureMinSmoothing==null?material.smoothing:material.textureMinSmoothing);
+				var filter=mipmaps.prepare(material.texture,source,texture,requested);
+				TextureBridge3D.applySampler(texture,material.smoothing,material.textureWrapU,material.textureWrapV,material.textureMinSmoothing,filter);
+				gl.uniform1i(maskSampler,0);gl.uniform1f(maskCutoff,material.alphaCutoff);gl.uniform1f(maskOpacity,material.opacity);
+			}
+			if(material.cullMode==CullMode3D.NONE)gl.disable(gl.CULL_FACE);
+			else{gl.enable(gl.CULL_FACE);gl.cullFace(material.cullMode==CullMode3D.BACK?gl.BACK:gl.FRONT);}
+			gl.frontFace(batch.mirrored?gl.CW:gl.CCW);batch.bind();
+			gl.drawElements(gl.TRIANGLES,batch.count,gl.UNSIGNED_SHORT,0);
+			scene.stats.shadowDrawCalls++;scene.stats.shadowTriangles+=Std.int(batch.count/3);
+			ContextStats.statsDrawCall();ContextStats.statsVertexCount(batch.count);
+		}
 	}
+	private function updateGeometryStats(scene:Scene3D):Void {
+		scene.stats.shadowGeometryBytes=0;
+		for(batches in geometryBatches)for(batch in batches)scene.stats.shadowGeometryBytes+=batch.bytes;
+	}
+	private function releaseGeometry(lost:Bool=false):Void {
+		for(batches in geometryBatches)for(batch in batches)batch.dispose(lost);
+		geometryBatches=[];geometrySnapshots=[];
+	}
+
 	private static function floats(values:Array<Float>):Float32Array {
 		var result = new Float32Array(values.length); for (i in 0...values.length) result[i] = values[i]; return result;
 	}
 	private function releaseTarget():Void {
+		releaseGeometry();
 		matrices = []; worldTexels = [0., 0.]; lastSnapshots = []; lastLight = null; lastResourceRequest = null;
 		if (target != null) target.dispose(); target = null; failedKey = null; failedLight = null;
 	}
 	/** 上下文丢失只丢弃句柄，不在新上下文删除旧资源。 */
 	public function abandonContext():Void {
+		releaseGeometry(true);
 		allocationFallback = null; matrices = []; worldTexels = [0., 0.]; target = null;
 		program = null; maskProgram = null; lastSnapshots = []; lastLight = null; lastResourceRequest = null;
-		location = null; vertices = null; indices = null; failedKey = null; failedLight = null; planner.reset();
+		location = null; failedKey = null; failedLight = null; planner.reset();
 	}
 	public function dispose():Void {
 		if (gl != null && !gl.isContextLost()) {
 			releaseTarget(); if (program != null) gl.deleteProgram(program); if (maskProgram != null) gl.deleteProgram(maskProgram);
-			if (vertices != null) gl.deleteBuffer(vertices); if (indices != null) gl.deleteBuffer(indices);
 		}
 		abandonContext(); gl = null;
 	}
