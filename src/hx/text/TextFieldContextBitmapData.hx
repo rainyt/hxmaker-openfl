@@ -23,6 +23,10 @@ class TextFieldContextBitmapData {
 	 * 缓存版本号
 	 */
 	public var version:Int = 0;
+	/** 正常路径仍使用 GPU 图集；HTML5 恢复后切换到可重新上传的 CPU 图集。 */
+	public var cpuAtlasEnabled(default, null):Bool = false;
+	public var recoverWithCpuAtlas:Bool = #if (js && html5) true #else false #end;
+	public var glyphWrites(default, null):Int = 0;
 
 	/**
 	 * 图集，使用列表储存，如果满了图集后，则自动追加
@@ -75,7 +79,7 @@ class TextFieldContextBitmapData {
 	 * 创建新的精灵图集
 	 */
 	private function createNewAtlas() {
-		var atlas = new TextFieldAtlas(__textureWidth, __textureHeight);
+		var atlas = new TextFieldAtlas(__textureWidth, __textureHeight, cpuAtlasEnabled);
 		atlas.fontSize = fontSize + __offestY / 2;
 		__atlasList.push(atlas);
 	}
@@ -182,6 +186,7 @@ class TextFieldContextBitmapData {
 			untyped __textField.__graphics.__context.clearRect(0, 0, __textField.__graphics.__canvas.width, __textField.__graphics.__canvas.height);
 		#end
 		__atlas.texture.draw(__textField, m, null, null, null, true);
+		glyphWrites++;
 		#if !cpp
 		emoj = "";
 		#end
@@ -223,6 +228,15 @@ class TextFieldContextBitmapData {
 			__atlas.texture.draw(spr);
 			#end
 		}
+	}
+
+	/** 保留字体配置；恢复后的 CPU 图集可复用像素，手动诊断可强制重建全部字形。 */
+	public function onContextRestored(forceRedraw:Bool = false):Void {
+		var retained = cpuAtlasEnabled;
+		if (recoverWithCpuAtlas) cpuAtlasEnabled = true;
+		if (retained && !forceRedraw) return;
+		dispose(); version++;
+		__textField = new TextField(); __redrawing = false; emoj = "";
 	}
 
 	/**

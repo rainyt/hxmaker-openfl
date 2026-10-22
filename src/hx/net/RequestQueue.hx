@@ -177,6 +177,19 @@ class RequestQueue {
 		loadNext();
 	}
 
+	/** 内嵌图片与普通图片复用队列、缓存去重和释放协议；key 必须是稳定的内容标识。 */
+	public static function decodeBitmapData(key:String, bytes:Bytes, cb:BitmapData->FutureErrorEvent->Void):Void {
+		var callback = cb;
+		if (enableCache) {
+			lazySweep();
+			var entry = ensureCacheEntry(key, cb);
+			if (entry == null) return;
+			callback = function(data, error) { resolveCacheEntry(key, entry, data, error); cb(data, error); };
+		}
+		__requestQueue.push(new BitmapDataBytesRequest(key, bytes, callback));
+		if (CURRENT_REQUEST_COUNT < MAX_REQUEST_COUNT) loadNext();
+	}
+
 	// ---------------------------------------------------------------------------
 	// 队列控制
 	// ---------------------------------------------------------------------------
@@ -186,8 +199,8 @@ class RequestQueue {
 			return;
 		}
 		var request = __requestQueue.shift();
-		request.request();
 		CURRENT_REQUEST_COUNT++;
+		request.request();
 	}
 
 	public static function loadComplete():Void {

@@ -79,6 +79,12 @@ class StageBitmapData extends BitmapData {
 		__pool = __pool.slice(0, __cacheSize);
 	}
 
+	/** 恢复后丢弃全部失效目标；保留池容量配置，实际目标在下次 clear 时创建。 */
+	public static function onContextRestored():Void {
+		for (bitmap in __pool) if (bitmap != null) bitmap.dispose();
+		__pool = []; __poolIndex = 0; __lastUpdateTime = 0;
+	}
+
 	public function new() {
 		super();
 	}

@@ -17,6 +17,9 @@ import hx.text.TextFieldQueue;
  * 文本渲染器，需要支持纹理渲染
  */
 class TextFieldRender {
+	/** 离屏文本不一定驻留舞台，也必须能察觉字形设备代次变化。 */
+	public static var contextGeneration(default, null):Int = 0;
+	public static var preparedLabels(default, null):Int = 0;
 	/**
 	 * 文本渲染纹理缓存
 	 */
@@ -62,6 +65,35 @@ class TextFieldRender {
 		TextFieldQueue.invalidateAll();
 	}
 
+	/** 保留外部设置的图集对象及其配置，只重建已失效的字形。 */
+	public static function onContextRestored(forceRedraw:Bool = false):Void {
+		contextGeneration++;
+		if (__contextBitmapData != null) __contextBitmapData.onContextRestored(forceRedraw);
+		for (label in TextFieldQueue.getResident()) {
+			var text = getText(label);
+			@:privateAccess text.__building = false;
+			text.prepared = false;
+		}
+		TextFieldQueue.invalidateAll();
+	}
+
+	/** 只读取 CPU 诊断数据，不创建图集、不执行 GPU 查询或像素读回。 */
+	public static function contextStats():Dynamic {
+		var current = 0, stale = 0;
+		for (label in TextFieldQueue.getResident()) {
+			if (label.root != null) {
+				var text = getText(label);
+				if (text.prepared && text.preparedGeneration == contextGeneration) current++; else stale++;
+			} else stale++;
+		}
+		return {generation:contextGeneration,resident:TextFieldQueue.residentCount,pending:TextFieldQueue.pendingCount,
+			prepared:current,stale:stale,prepareTotal:preparedLabels,
+			atlasCount:__contextBitmapData == null ? 0 : __contextBitmapData.atlasCount,
+			glyphCount:__contextBitmapData == null ? 0 : __contextBitmapData.glyphCount,
+			glyphWrites:__contextBitmapData == null ? 0 : __contextBitmapData.glyphWrites,
+			cpuPixels:__contextBitmapData != null && __contextBitmapData.cpuAtlasEnabled};
+	}
+
 	/**
 	 * 预写文本，由`TextFieldQueue`在正式渲染之前调用。
 	 * 与`render`的区别是只重建渲染数据，不提交绘制，这样字形写入只会发生在渲染遍历之前，
@@ -84,6 +116,7 @@ class TextFieldRender {
 		rebuildText(textField, label, context);
 		textField.drawText(context, null, true);
 		@:privateAccess textField.__building = false;
+		preparedLabels++;
 		// 预写完成后消费掉脏标记。叶子显示对象的`__dirty`在渲染遍历中不会被清除
 		// （渲染遍历只清除舞台与容器自身），不清掉的话`Label.getTextWidth/Height`
 		// 每次调用都会重新走一遍完整重建。任何内容/格式变更都会重新置脏，这里清除不会漏建
@@ -95,7 +128,7 @@ class TextFieldRender {
 			return;
 		var textField = getText(label);
 		var context = getTextFieldContextBitmapData();
-		if (!@:privateAccess textField.__building && (!textField.prepared || TextFieldQueue.isPending(label))) {
+		if (!@:privateAccess textField.__building && (!textField.prepared || textField.preparedGeneration != contextGeneration || TextFieldQueue.isPending(label))) {
 			if (TextFieldQueue.isRendering()) {
 				// 渲染遍历中禁止写图集：本帧只构建布局，缺字形的地方退化成空格，
 				// 字形留给下一帧的`prepare`补写
@@ -138,6 +171,7 @@ class TextFieldRender {
 		else
 			context.drawText(textField.text);
 		textField.prepared = true;
+		textField.preparedGeneration = contextGeneration;
 	}
 }
 
@@ -204,6 +238,7 @@ class Text implements ITextFieldLayoutProvider {
 	 * 字形是否已经写入图集。为`false`时只能先构建布局，绘制会缺失字形
 	 */
 	public var prepared:Bool = false;
+	public var preparedGeneration:Int = -1;
 
 	/**
 	 * 是否正在构建渲染数据，用于阻止构建过程中的重入
