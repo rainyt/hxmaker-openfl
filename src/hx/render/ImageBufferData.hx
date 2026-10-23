@@ -9,6 +9,7 @@ import hx.core.OpenFlBitmapData;
 import hx.geom.Matrix;
 import hx.display.Graphics;
 import hx.core.Render;
+import hx.core.Hxmaker;
 import openfl.display.BitmapData;
 import hx.display.Image;
 import openfl.Vector;
@@ -185,7 +186,30 @@ class ImageBufferData {
 				// 当命令为空时，则意味着渲染已结束
 				break;
 			}
+			// 路径网格在最终屏幕变换下生成过渡带，复用原有三角形提交与着色器。
+			var coverage:Array<Float> = null;
 			switch command {
+				case DRAW_PATH(mesh, alpha, colorTransform):
+					var resolved = mesh;
+					if (graphic.antialiasing) {
+						var world:Matrix = graphic.__worldTransform;
+						var root = render.stage.transform.concatenatedMatrix;
+						var pixelRatio = Hxmaker.engine == null ? 1. : Hxmaker.engine.devicePixelRatio;
+						if (!Math.isFinite(pixelRatio) || pixelRatio <= 0) pixelRatio = 1;
+						resolved = mesh.getAntialiased(
+							(world.a * root.a + world.b * root.c) * pixelRatio,
+							(world.a * root.b + world.b * root.d) * pixelRatio,
+							(world.c * root.a + world.d * root.c) * pixelRatio,
+							(world.c * root.b + world.d * root.d) * pixelRatio,
+							graphic.antialiasWidth);
+					}
+					coverage = resolved.coverage;
+					command = DRAW_TRIANGLE(resolved.vertices, resolved.indices, resolved.uvs, alpha, colorTransform, false);
+				default:
+			}
+			switch command {
+				case DRAW_PATH(_, _, _):
+					// 已在上面的归一化步骤转换为普通三角形命令。
 				case BEGIN_FILL(color):
 					data.currentBitmapData = px1bitmapData;
 					data.smoothing = true;
@@ -237,7 +261,8 @@ class ImageBufferData {
 						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
 						for (i in 0...len) {
 							ids[dataPerVertex4 + i] = id;
-							alphas[dataPerVertex4 + i] = graphic.__worldAlpha * alpha;
+							// 覆盖率在颜色变换之后生效，透明边缘同时衰减预乘颜色和透明度。
+							alphas[dataPerVertex4 + i] = graphic.__worldAlpha * alpha * (coverage == null ? 1 : coverage[i]);
 							addBlendModes[dataPerVertex4 + i] = applyBlendAddMode ? 1 : 0;
 							if (enabledColorTransform) {
 								if (colorTransform != null) {
