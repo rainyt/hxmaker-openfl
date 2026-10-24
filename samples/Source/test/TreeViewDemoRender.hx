@@ -1,19 +1,19 @@
 package test;
 
-import hx.display.ArrayCollection;
 import hx.display.Button;
 import hx.display.FPS;
 import hx.display.Label;
 import hx.display.Scene;
 import hx.display.TextFormat;
-import hx.display.TreeView;
+import hx.display.Tree;
+import hx.display.TreeItem;
 import hx.events.Event;
 import hx.events.MouseEvent;
 
 /**
- * TreeView演示场景，类似VSCode资源管理器的树形列表
+ * Tree演示场景，类似VSCode资源管理器的树形列表
  *
- * 生成的节点树有数千个节点，TreeView只渲染可见行，可以感受滚动与展开/收起时的复用性能。
+ * 生成的节点树有数千个节点，Tree只渲染可见行，可以感受滚动与展开/收起时的复用性能。
  */
 class TreeViewDemoRender extends Scene {
 	/**
@@ -24,33 +24,37 @@ class TreeViewDemoRender extends Scene {
 	/**
 	 * 一个位于深层的节点，用于演示`scrollToItem()`自动展开祖先链并定位
 	 */
-	private static var __deepNode:Dynamic = null;
+	private static var __deepNode:TreeItem = null;
 
 	override function onInit() {
 		super.onInit();
 
 		// 布局整体从x=560开始，避开样例工程左侧的用例菜单
-		var title = new Label("TreeView 演示 — 数千节点只渲染可见行");
+		var title = new Label("Tree 演示 — 数千节点只渲染可见行");
 		title.x = 560;
 		title.y = 14;
 		title.textFormat = new TextFormat(null, 16, 0xffffff);
 		this.addChild(title);
 
-		var tree = new TreeView();
+		var tree = new Tree();
 		tree.x = 560;
 		tree.y = 50;
 		tree.width = 420;
 		tree.height = 520;
 		tree.backgroundColor = 0x1e1e1e;
 		tree.backgroundAlpha = 1;
-		tree.data = new ArrayCollection(makeRoots());
+		tree.data = makeRoots();
 		tree.addEventListener(Event.CHANGE, function(e:Event) {
 			var node = tree.selectedItem;
-			log(node != null ? '选中：${Reflect.field(node, "name")}' : "取消选中");
+			log(node != null ? '选中：${node.label}' : "取消选中");
 		});
-		tree.addEventListener(TreeView.ITEM_TOGGLE, function(e:Event) {
-			var name = Reflect.field(e.data, "name");
-			log('${tree.isExpanded(e.data) ? "展开" : "收起"}：$name');
+		tree.addEventListener(Tree.ITEM_EXPANDED, function(e:Event) {
+			var node:TreeItem = e.data;
+			log('展开：${node.label}');
+		});
+		tree.addEventListener(Tree.ITEM_COLLAPSED, function(e:Event) {
+			var node:TreeItem = e.data;
+			log('收起：${node.label}');
 		});
 		this.addChild(tree);
 
@@ -65,7 +69,7 @@ class TreeViewDemoRender extends Scene {
 		createButton("定位深层文件", 1040, 150, function() {
 			if (__deepNode != null) {
 				tree.scrollToItem(__deepNode, 0.3);
-				log('定位：${Reflect.field(__deepNode, "name")}');
+				log('定位：${__deepNode.label}');
 			}
 		});
 
@@ -106,19 +110,19 @@ class TreeViewDemoRender extends Scene {
 	/**
 	 * 生成演示用的目录树，目录与文件交错，前两层初始展开
 	 */
-	private static function makeRoots():Array<Dynamic> {
+	private static function makeRoots():Array<TreeItem> {
 		__counter = 0;
 		__deepNode = null;
-		var roots:Array<Dynamic> = [];
+		var roots:Array<TreeItem> = [];
 		for (i in 0...6) {
 			roots.push(makeFolder(0, 4, 'project_${i + 1}'));
 		}
 		return roots;
 	}
 
-	private static function makeFolder(depth:Int, maxDepth:Int, name:String):Dynamic {
+	private static function makeFolder(depth:Int, maxDepth:Int, name:String):TreeItem {
 		__counter++;
-		var children:Array<Dynamic> = [];
+		var children:Array<TreeItem> = [];
 		if (depth < maxDepth) {
 			var folderCount = 2 + (__counter + depth) % 3;
 			for (i in 0...folderCount) {
@@ -128,12 +132,12 @@ class TreeViewDemoRender extends Scene {
 		var fileCount = 2 + (__counter * 3 + depth) % 4;
 		for (i in 0...fileCount) {
 			__counter++;
-			var file = {name: 'file_${__counter}.hx'};
+			var file = new TreeItem('file_${__counter}.hx');
 			children.push(file);
 			if (depth == maxDepth) {
 				__deepNode = file;
 			}
 		}
-		return {name: name, expanded: depth < 2, children: children};
+		return new TreeItem(name, children, depth < 2);
 	}
 }
