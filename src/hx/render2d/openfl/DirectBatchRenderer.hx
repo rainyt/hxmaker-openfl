@@ -97,9 +97,11 @@ class DirectBatchRenderer {
 						var quads = 64;
 						while (quads * 6 < batch.indexCount) quads *= 2;
 						quads = Std.int(Math.min(quads, DirectBatchDisplay.MAX_QUADS));
-						batch.prepareFixedIndices(quads);
-						gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, batch.indices, gl.STATIC_DRAW);
-						batch.gpuIndexCapacity = batch.indices.length;
+						var fixedData = batch.prepareFixedIndices(quads);
+						gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fixedData, gl.STATIC_DRAW);
+						// 有效容量取自已完整生成的固定索引，不能使用旧通用网格的数组容量。
+						batch.gpuIndexCapacity = fixedData.length;
+						batch.gpuIndexStride = 2;
 					}
 				} else {
 					var indexData:Dynamic = batch.wide ? cast batch.wideIndices : cast batch.indices;

@@ -17,6 +17,8 @@ class DirectBatchDisplay extends Sprite {
 	public static inline var MAX_QUADS:Int = 16383;
 	public var vertices:Float32Array;
 	public var indices:UInt16Array;
+	// 固定四边形索引不与通用网格共享，数组中的全部元素始终已经初始化。
+	private var fixedIndexData:UInt16Array;
 	public var wideIndices:UInt32Array;
 	public var wide:Bool = false;
 	public var gpuIndexStride:Int = 2;
@@ -125,14 +127,18 @@ class DirectBatchDisplay extends Sprite {
 		image.__transformDirty = image.__colorTransformDirty = image.__uvsDirty = false;
 	}
 
-	/** 固定四边形索引只在 GPU 容量增长时生成。 */
-	public function prepareFixedIndices(quads:Int):Void {
-		if (indices == null || indices.length < quads * 6) indices = new UInt16Array(quads * 6);
-		for (i in 0...quads) {
-			var v = i * 4, offset = i * 6;
-			indices[offset] = v; indices[offset + 1] = v + 1; indices[offset + 2] = v + 2;
-			indices[offset + 3] = v + 1; indices[offset + 4] = v + 2; indices[offset + 5] = v + 3;
+	/** 固定四边形索引仅在专用缓存增长时生成，返回完整有效的索引范围。 */
+	public function prepareFixedIndices(quads:Int):UInt16Array {
+		if (quads < 0 || quads > MAX_QUADS) throw "四边形数量超出 16 位索引范围";
+		if (fixedIndexData == null || fixedIndexData.length < quads * 6) {
+			fixedIndexData = new UInt16Array(quads * 6);
+			for (i in 0...quads) {
+				var v = i * 4, offset = i * 6;
+				fixedIndexData[offset] = v; fixedIndexData[offset + 1] = v + 1; fixedIndexData[offset + 2] = v + 2;
+				fixedIndexData[offset + 3] = v + 1; fixedIndexData[offset + 4] = v + 2; fixedIndexData[offset + 5] = v + 3;
+			}
 		}
+		return fixedIndexData;
 	}
 
 	public function abandon():Void {
@@ -142,5 +148,5 @@ class DirectBatchDisplay extends Sprite {
 		if (shaderBuffer != null) { shaderBuffer.paramDataBuffer = null; shaderBuffer.paramDataContext = null; }
 	}
 
-	public function dispose():Void { renderer.release(this); textures.resize(0); vertices = null; indices = null; wideIndices = null; shaderBuffer = null; }
+	public function dispose():Void { renderer.release(this); textures.resize(0); vertices = null; indices = null; fixedIndexData = null; wideIndices = null; shaderBuffer = null; }
 }

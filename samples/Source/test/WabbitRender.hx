@@ -51,12 +51,13 @@ class WabbitRender extends Scene {
 
 	override function onAddToStage() {
 		super.onAddToStage();
-		this.stage.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
+		// 只响应本场景的命中路径，避免按下外部菜单或切换按钮时先新增兔子。
+		this.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
 	}
 
 	override function onRemoveToStage() {
 		super.onRemoveToStage();
-		this.stage.removeEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
+		this.removeEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
 	}
 
 	private function onMouseDown(e:MouseEvent):Void {
