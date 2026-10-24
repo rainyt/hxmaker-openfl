@@ -148,15 +148,8 @@ class DirectBatchRenderer {
 		var buffer = batch.shaderBuffer, shader = buffer.shader;
 		shader.__setContext(renderer.__context3D);
 		gl.useProgram(shader.program.__glProgram);
-		for (slot in 0...buffer.inputCount) {
-			if (buffer.inputs[slot] == null) continue;
-			guard.activateTexture(slot);
-			var texture = TextureBridge3D.resolve(buffer.inputs[slot], renderer.__context3D);
-			guard.rememberTexture(texture);
-			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture));
-			texture.__setSamplerState(new openfl.display._internal.SamplerState(buffer.inputWrap[slot], buffer.inputFilter[slot], buffer.inputMipFilter[slot]));
-		}
 		shader.__enable();
+		bindNativeTextures(buffer, renderer, guard);
 		buffer.clearOverride();
 		buffer.addFloatOverride("openfl_Matrix", renderer.__getMatrix(batch.__renderTransform, AUTO));
 		nativeAlpha[0] = renderer.__worldAlpha;
@@ -181,6 +174,28 @@ class DirectBatchRenderer {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, batch.indexBuffer);
 		gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.depthMask(false);
 		gl.drawElements(gl.TRIANGLES, batch.indexCount, batch.wide ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
+	}
+
+	/** 与 Shader.__enableGL 共用活动输入的排列规则，快照下标不等于纹理单元。 */
+	private function bindNativeTextures(buffer:openfl.display._internal.ShaderBuffer, renderer:OpenGLRenderer,
+		guard:RenderStateGuard3D):Void {
+		var textureUnit = 0;
+		for (i in 0...buffer.inputCount) {
+			var input = buffer.inputRefs[i];
+			// 未使用的 sampler 没有有效位置，不能占用活动输入的连续编号。
+			if (input.index == null || input.index < 0) continue;
+			var slot = textureUnit++;
+			guard.activateTexture(slot);
+			if (buffer.inputs[i] == null) {
+				// 活动输入仍占一个单元；清理历史绑定，避免采样上一批次或离屏目标。
+				gl.bindTexture(gl.TEXTURE_2D, null);
+				continue;
+			}
+			var texture = TextureBridge3D.resolve(buffer.inputs[i], renderer.__context3D);
+			guard.rememberTexture(texture);
+			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture));
+			texture.__setSamplerState(new openfl.display._internal.SamplerState(buffer.inputWrap[i], buffer.inputFilter[i], buffer.inputMipFilter[i]));
+		}
 	}
 
 	public function release(batch:DirectBatchDisplay):Void {
