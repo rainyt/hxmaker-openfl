@@ -87,7 +87,8 @@ class DirectBatchRenderer {
 			gl.bindBuffer(gl.ARRAY_BUFFER, batch.vertexBuffer);
 			if (batch.uploadedRevision != batch.revision) {
 				if (batch.gpuVertexCapacity < batch.vertices.length) {
-					gl.bufferData(gl.ARRAY_BUFFER, batch.vertices.length * 4, gl.DYNAMIC_DRAW);
+					// 传入类型化数组，使缓冲分配同时兼容 WebGL 和原生 OpenGL。
+					gl.bufferData(gl.ARRAY_BUFFER, batch.vertices, gl.DYNAMIC_DRAW);
 					batch.gpuVertexCapacity = batch.vertices.length;
 				}
 				gl.bufferSubData(gl.ARRAY_BUFFER, 0, batch.vertices.subarray(0, batch.vertexCount * 7));
@@ -107,7 +108,7 @@ class DirectBatchRenderer {
 					var indexData:Dynamic = batch.wide ? cast batch.wideIndices : cast batch.indices;
 					var stride = batch.wide ? 4 : 2;
 					if (batch.gpuIndexCapacity < indexData.length || batch.gpuIndexStride != stride) {
-						gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData.length * stride, gl.DYNAMIC_DRAW);
+						gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.DYNAMIC_DRAW);
 						batch.gpuIndexCapacity = indexData.length; batch.gpuIndexStride = stride;
 					}
 					gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, indexData.subarray(0, batch.indexCount));
