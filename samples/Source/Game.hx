@@ -74,7 +74,7 @@ class Game extends Stage {
 		ImageRender,
 		LabelRender,
 		MoreLabelRender,
-		TreeViewDemoRender,
+		TreeViewDemoRender
 		TreeRender,
 		FinderRender,
 		TextAtlasOverflowRender

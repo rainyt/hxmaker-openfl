@@ -1,8 +1,6 @@
 package hx.core;
 
 import hx.display.Scene3D;
-import hx.render2d.openfl.DirectBatchDisplay;
-import hx.render2d.openfl.DirectBatchRenderer;
 import hx.render3d.IScene3DRenderer;
 import hx.render3d.openfl.Scene3DDisplay;
 import haxe.ds.ObjectMap;
@@ -42,38 +40,8 @@ using Reflect;
  */
 @:keep
 @:access(hx.display.DisplayObject)
-@:access(hx.display.Image)
-@:access(hx.render.ImageBufferData)
 @:access(openfl.geom.Matrix)
 class Render implements IRender implements IScene3DRenderer {
-	private var directGpu:DirectBatchRenderer = new DirectBatchRenderer();
-	private var directDisplays:Array<DirectBatchDisplay> = [];
-	private var directUsed:Int = 0;
-	private var directPending:DirectBatchDisplay;
-	/** 当前帧直接提交批次数，包含普通图片与通用网格。 */
-	public var directBatches(default, null):Int = 0;
-
-	private function obtainDirectBatch():DirectBatchDisplay {
-		if (directUsed == directDisplays.length) directDisplays.push(new DirectBatchDisplay(directGpu));
-		return directDisplays[directUsed++];
-	}
-	private function flushDirectImages():Void {
-		if (directPending == null) return;
-		var shape = directPending;
-		directPending = null;
-		statsDrawCall(); ContextStats.statsVertexCount(shape.indexCount); directBatches++;
-		stage.addChild(shape);
-	}
-
-	/** 显式销毁渲染器时释放持久 GPU 资源；普通 clear 只拆离显示节点。 */
-	public function dispose():Void {
-		for (display in directDisplays) {
-			if (display.parent != null) display.parent.removeChild(display);
-			display.dispose();
-		}
-		directDisplays.resize(0); directPending = null; directGpu.dispose();
-	}
-
 	private var __scene3DDisplays:ObjectMap<Scene3D, Scene3DDisplay> = new ObjectMap();
 	private var __contextGeneration:Int = 0;
 	/** 离屏与 MakerDisplay 渲染器也按需追随引擎设备代次，不用全局强引用登记表。 */
@@ -84,7 +52,6 @@ class Render implements IRender implements IScene3DRenderer {
 		}
 	}
 	public function onContextRestored(generation:Int):Void {
-		directGpu.abandon(); for (display in directDisplays) display.abandon();
 		__contextGeneration = generation;
 		currentShader = null; imageBufferData = []; drawImageBuffDataIndex = 0;
 		if (__cacheBitmap != null) {
@@ -228,84 +195,6 @@ class Render implements IRender implements IScene3DRenderer {
 	 * @param data 
 	 */
 	public function renderImageBuffData(data:ImageBufferData):Sprite {
-		flushDirectImages();
-		if (openfl.Lib.current.stage.context3D == null) return renderSoftwareBuffData(data);
-		if (data.index > 0) {
-			// 图形绘制
-			data.endFill();
-			var shape = obtainDirectBatch();
-			var isDefaultShader:Bool = currentShader == null || currentShader == defaultShader || currentShader == defaultFastShader;
-			if (isDefaultShader) {
-				currentShader = !data.enabledColorTransform ? defaultFastShader : defaultShader;
-				if (!data.smoothing) {
-					currentShader = !data.enabledColorTransform ? defaultUnSmootingFastShader : defaultUnSmoothingShader;
-				}
-			}
-			var openfl_TextureId:ShaderParameter<Float> = currentShader.data.openfl_TextureId;
-			var openfl_Alpha:ShaderParameter<Float> = currentShader.data.openfl_Alpha_multi;
-			var openfl_ColorMultiplier:ShaderParameter<Float> = currentShader.data.openfl_ColorMultiplier_muti;
-			var openfl_ColorOffer:ShaderParameter<Float> = currentShader.data.openfl_ColorOffset_muti;
-			var openfl_HasColorTransform:ShaderParameter<Float> = currentShader.data.openfl_HasColorTransform_muti;
-			var openfl_blendMode_add:ShaderParameter<Float> = currentShader.data.openfl_blendMode_add;
-			for (index => data2 in data.bitmapDatas) {
-				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
-				sampler.input = data2;
-				sampler.filter = data.smoothing ? LINEAR : NEAREST;
-			}
-			if (openfl_ColorOffer != null)
-				openfl_ColorOffer.value = data.colorOffset;
-			if (openfl_ColorMultiplier != null)
-				openfl_ColorMultiplier.value = data.colorMultiplier;
-			if (openfl_HasColorTransform != null)
-				openfl_HasColorTransform.value = data.hasColorTransform;
-			openfl_TextureId.value = data.ids;
-			openfl_Alpha.value = data.alphas;
-			openfl_blendMode_add.value = data.addBlendModes;
-			// 图形尺寸，暂永远设定为舞台大小
-			var openfl_TextureSize:ShaderParameter<Float> = currentShader.data.openfl_TextureSize;
-			openfl_TextureSize.value = [Hxmaker.engine.stageWidth, Hxmaker.engine.stageHeight];
-			// 开始渲染图形
-			shape.copyFrom(data); directBatches++;
-			// 颜色变换及自定义着色器沿用参数快照协议，直接绑定 GL 属性，不构造 Graphics 命令。
-			if (data.enabledColorTransform || (currentShader != defaultFastShader && currentShader != defaultUnSmootingFastShader)) {
-				shape.captureShader(currentShader);
-			}
-			drawImageBuffDataIndex++;
-			createImageBufferData(drawImageBuffDataIndex);
-			ContextStats.statsVertexCount(data.indices.length);
-			this.statsDrawCall();
-			switch data.blendMode {
-				case ADD:
-					// shape.blendMode = ADD;
-				case NORMAL:
-					shape.blendMode = NORMAL;
-				case SCREEN:
-					shape.blendMode = SCREEN;
-				default:
-			}
-
-			if (cacheAsBitmap) {
-				if (__maskSprite != null) {
-					__maskSprite.addChild(shape);
-				} else {
-					__drawMatrix.identity();
-					if (highDpi)
-						__drawMatrix.scale(2, 2);
-					__cacheBitmap.bitmapData.draw(shape, __drawMatrix, null, null, null, true);
-					if (shape.parent != null) shape.parent.removeChild(shape);
-				}
-			} else {
-				stage.addChild(shape);
-			}
-			// if (currentShader == defaultUnSmoothingShader) {
-			currentShader = null;
-			// }
-			return shape;
-		}
-		return null;
-	}
-
-	private function renderSoftwareBuffData(data:ImageBufferData):Sprite {
 		if (data.index > 0) {
 			// 图形绘制
 			data.endFill();
@@ -516,7 +405,6 @@ class Render implements IRender implements IScene3DRenderer {
 
 	public function clear():Void {
 		prepareContext();
-		directPending = null; directUsed = 0; directBatches = 0;
 		// 先拆离整棵绘制树，防止仍在旧容器延迟队列中的对象提前被复用。
 		var sprites:Array<EngineSprite> = [];
 		while (__stage.numChildren > 0) {
@@ -699,24 +587,6 @@ class Render implements IRender implements IScene3DRenderer {
 	}
 
 	public function renderImage(image:Image):Void {
-		// 普通图片直接写入最终布局；复杂材质与离屏场景继续使用通用批次生产器。
-		if (openfl.Lib.current.stage.context3D != null && !cacheAsBitmap && currentShader == null
-			&& image.__colorTransform == null && image.scale9Grid == null && !image.__repeat
-			&& (image.blendMode == NORMAL || image.blendMode == ADD)) {
-			if (image.data == null) return;
-			if (imageBufferData[drawImageBuffDataIndex].index > 0) renderImageBuffData(imageBufferData[drawImageBuffDataIndex]);
-			var texture:BitmapData = cast image.data.data.getTexture();
-			var id = directPending == null ? -1 : directPending.textures.indexOf(texture);
-			if (directPending != null && (directPending.smoothing != image.smoothing
-				|| directPending.vertexCount >= DirectBatchDisplay.MAX_QUADS * 4
-				|| (id < 0 && directPending.textures.length >= MultiTextureShader.supportedMultiTextureUnits))) {
-				flushDirectImages(); id = -1;
-			}
-			if (directPending == null) { directPending = obtainDirectBatch(); directPending.begin(image.smoothing, true); }
-			if (id < 0) { id = directPending.textures.length; directPending.textures.push(texture); }
-			directPending.append(image, id); ContextStats.statsVisibleDisplayCounts(); return;
-		}
-		flushDirectImages();
 		if (image.scale9Grid != null || image.__repeat) {
 			renderGraphics(image.getGraphic());
 		} else {
@@ -736,7 +606,6 @@ class Render implements IRender implements IScene3DRenderer {
 	 * @param image 
 	 */
 	public function renderLabel(label:Label, offScreenRender:Bool = false):Void {
-		flushDirectImages();
 		TextFieldRender.render(label, offScreenRender ? null : this);
 		ContextStats.statsVisibleDisplayCounts();
 	}
@@ -746,7 +615,6 @@ class Render implements IRender implements IScene3DRenderer {
 	 * @param graphics 
 	 */
 	public function renderGraphics(graphics:Graphics):Void {
-		flushDirectImages();
 		GraphicRender.render(graphics, this);
 		ContextStats.statsVisibleDisplayCounts();
 	}
@@ -763,7 +631,7 @@ class Render implements IRender implements IScene3DRenderer {
 	 */
 	public function endFill():Void {
 		this.renderImageBuffData(this.imageBufferData[this.drawImageBuffDataIndex]);
-		// 保留批次容量，避免逐帧 splice 创建新数组。
+		this.imageBufferData = this.imageBufferData.splice(0, this.drawImageBuffDataIndex + 1);
 	}
 
 	/**

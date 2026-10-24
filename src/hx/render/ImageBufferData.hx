@@ -257,7 +257,6 @@ class ImageBufferData {
 						}
 						// 根据顶点设置数据
 						var len = Std.int(vertices.length / 2);
-							if (dataPerVertex4 + len > 65532 && index > 0) return false;
 						// 顶点坐标
 						var tileTransform:Matrix = @:privateAccess graphic.__worldTransform;
 						for (i in 0...len) {
@@ -335,8 +334,6 @@ class ImageBufferData {
 	 * @param image 
 	 */
 	public function draw(image:Image, render:Render):Bool {
-		// 16 位索引最多容纳 65532 个四边形顶点，超限前先提交已有批次。
-		if (dataPerVertex4 + 4 > 65532) return false;
 		var texture = image.data.data.getTexture();
 		var id = mapIds.get(texture);
 		if (id == null && bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {

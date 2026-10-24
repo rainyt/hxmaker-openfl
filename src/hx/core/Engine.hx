@@ -691,8 +691,6 @@ class Engine extends EventDispatcher implements IEngine {
 				current.openedContextMenu.close();
 		// 删除所有跟stage有关的事件
 		__removeStageEvent();
-		// 释放直接提交路径持有的 GPU 缓冲及程序。
-		if (renderer is Render) cast(renderer, Render).dispose();
 		// 清空文本渲染队列，避免静态队列继续持有已销毁的文本对象
 		TextFieldQueue.reset();
 	}
