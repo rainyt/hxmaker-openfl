@@ -59,7 +59,8 @@ class ShadowPass3D {
 	private var program:GLProgram;
 	private var skinPrograms:Map<Int,{program:GLProgram,matrix:GLUniformLocation,palette:GLUniformLocation}> = [];
 	private var failedSkinCounts:Map<Int,Bool> = [];
-	private var location:GLUniformLocation;
+	// 原生目标的 uniform 位置是 Int，显式允许上下文丢失时清空。
+	private var location:Null<GLUniformLocation>;
 	private var maskProgram:GLProgram;
 	private var maskMatrix:GLUniformLocation;
 	private var maskSampler:GLUniformLocation;

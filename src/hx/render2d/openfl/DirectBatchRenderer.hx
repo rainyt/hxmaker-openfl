@@ -3,6 +3,7 @@ package hx.render2d.openfl;
 import lime.graphics.WebGLRenderContext;
 import lime.graphics.opengl.GLProgram;
 import lime.graphics.opengl.GLUniformLocation;
+import lime.utils.ArrayBufferView;
 import lime.utils.Float32Array;
 import openfl.display.OpenGLRenderer;
 import openfl.events.RenderEvent;
@@ -105,13 +106,17 @@ class DirectBatchRenderer {
 						batch.gpuIndexStride = 2;
 					}
 				} else {
-					var indexData:Dynamic = batch.wide ? cast batch.wideIndices : cast batch.indices;
+					var indexData:ArrayBufferView = batch.wide ? cast batch.wideIndices : cast batch.indices;
+					var indexCapacity = batch.wide ? batch.wideIndices.length : batch.indices.length;
 					var stride = batch.wide ? 4 : 2;
-					if (batch.gpuIndexCapacity < indexData.length || batch.gpuIndexStride != stride) {
+					if (batch.gpuIndexCapacity < indexCapacity || batch.gpuIndexStride != stride) {
 						gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.DYNAMIC_DRAW);
-						batch.gpuIndexCapacity = indexData.length; batch.gpuIndexStride = stride;
+						batch.gpuIndexCapacity = indexCapacity; batch.gpuIndexStride = stride;
 					}
-					gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, indexData.subarray(0, batch.indexCount));
+					// 原生端的 subarray 是类型化泛型方法，不能通过 Dynamic 查找调用。
+					var activeIndices:ArrayBufferView = batch.wide ? cast batch.wideIndices.subarray(0, batch.indexCount)
+						: cast batch.indices.subarray(0, batch.indexCount);
+					gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, activeIndices);
 				}
 				batch.uploadedRevision = batch.revision;
 			} else gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, batch.indexBuffer);
