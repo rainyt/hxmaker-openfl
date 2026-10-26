@@ -126,7 +126,7 @@ class DirectBatchRenderer {
 			gl.useProgram(info.program);
 			for (slot in 0...batch.textures.length) {
 				guard.activateTexture(slot);
-				var texture = TextureBridge3D.resolve(batch.textures[slot], renderer.__context3D);
+				var texture = TextureBridge3D.resolve(batch.textures[slot], renderer.__context3D, '二维批次纹理槽 $slot');
 				guard.rememberTexture(texture);
 				gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture));
 				TextureBridge3D.applySampler(texture, batch.smoothing);
@@ -197,7 +197,7 @@ class DirectBatchRenderer {
 				gl.bindTexture(gl.TEXTURE_2D, null);
 				continue;
 			}
-			var texture = TextureBridge3D.resolve(buffer.inputs[i], renderer.__context3D);
+			var texture = TextureBridge3D.resolve(buffer.inputs[i], renderer.__context3D, '二维着色器输入 ${input.name}（纹理槽 $slot）');
 			guard.rememberTexture(texture);
 			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture));
 			texture.__setSamplerState(new openfl.display._internal.SamplerState(buffer.inputWrap[i], buffer.inputFilter[i], buffer.inputMipFilter[i]));

@@ -223,6 +223,19 @@ class Render implements IRender implements IScene3DRenderer {
 		}
 	}
 
+	/** 默认着色器的空余槽也绑定本批次纹理，避免快照继续引用已释放的旧目标。 */
+	private function setBatchTextures(data:ImageBufferData, isDefaultShader:Bool):Void {
+		var fallback:BitmapData = data.bitmapDatas.length > 0 ? data.bitmapDatas[0] : null;
+		// 内置着色器最多声明十六个采样器；运行时关闭多纹理也不会删掉已编译的声明。
+		var slotCount:Int = isDefaultShader ? 16 : data.bitmapDatas.length;
+		for (index in 0...slotCount) {
+			var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
+			if (sampler == null) continue;
+			sampler.input = index < data.bitmapDatas.length ? data.bitmapDatas[index] : fallback;
+			sampler.filter = data.smoothing ? LINEAR : NEAREST;
+		}
+	}
+
 	/**
 	 * 绘制图片缓存数据
 	 * @param data 
@@ -247,11 +260,7 @@ class Render implements IRender implements IScene3DRenderer {
 			var openfl_ColorOffer:ShaderParameter<Float> = currentShader.data.openfl_ColorOffset_muti;
 			var openfl_HasColorTransform:ShaderParameter<Float> = currentShader.data.openfl_HasColorTransform_muti;
 			var openfl_blendMode_add:ShaderParameter<Float> = currentShader.data.openfl_blendMode_add;
-			for (index => data2 in data.bitmapDatas) {
-				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
-				sampler.input = data2;
-				sampler.filter = data.smoothing ? LINEAR : NEAREST;
-			}
+			setBatchTextures(data, isDefaultShader);
 			if (openfl_ColorOffer != null)
 				openfl_ColorOffer.value = data.colorOffset;
 			if (openfl_ColorMultiplier != null)
@@ -324,14 +333,7 @@ class Render implements IRender implements IScene3DRenderer {
 			var openfl_ColorOffer:ShaderParameter<Float> = currentShader.data.openfl_ColorOffset_muti;
 			var openfl_HasColorTransform:ShaderParameter<Float> = currentShader.data.openfl_HasColorTransform_muti;
 			var openfl_blendMode_add:ShaderParameter<Float> = currentShader.data.openfl_blendMode_add;
-			var offests:Array<Float> = [];
-			var mapIds:Map<BitmapData, Int> = [];
-			for (index => data2 in data.bitmapDatas) {
-				mapIds.set(data2, index);
-				var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
-				sampler.input = data2;
-				sampler.filter = data.smoothing ? LINEAR : NEAREST;
-			}
+			setBatchTextures(data, isDefaultShader);
 			if (openfl_ColorOffer != null)
 				openfl_ColorOffer.value = data.colorOffset;
 			if (openfl_ColorMultiplier != null)

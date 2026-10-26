@@ -1,6 +1,5 @@
 package hx.filters;
 
-import hx.utils.ContextStats;
 import openfl.Lib;
 import hx.core.OpenFlBitmapData;
 import hx.display.IBitmapData;
@@ -52,31 +51,28 @@ class StageBitmapData extends BitmapData {
 	private static var __lastUpdateTime:Float = 0;
 
 	/**
-	 * 更新位图数据池，持续6秒，超过6秒未被使用的位图数据会被释放
+	 * 每六秒回收闲置尾部；上次渲染占用的前缀在画面静止时仍被显示树引用。
 	 * @param dt 时间间隔
 	 */
 	public static function update(dt:Float):Void {
 		__lastUpdateTime += dt;
-		if (ContextStats.blendModeFilterDrawCall > 0)
-			__lastUpdateTime = 0;
 		if (__lastUpdateTime > 6) {
 			disposeAll();
 		}
 	}
 
 	/**
-	 * 释放所有位图数据
+	 * 普通回收保留当前画面和预设缓存；强制释放必须在旧批次拆除后调用。
 	 */
 	public static function disposeAll(force:Bool = false):Void {
-		if (__pool.length == 0 || __cacheSize >= __pool.length)
-			return;
-		for (index => bitmapData in __pool) {
-			if (bitmapData != null) {
-				if (force || index >= __cacheSize)
-					bitmapData.dispose();
-			}
+		var keepCount:Int = force ? 0 : Std.int(Math.min(__pool.length, Math.max(__cacheSize, __poolIndex)));
+		for (index in keepCount...__pool.length) {
+			var bitmapData:IBitmapData = __pool[index];
+			if (bitmapData != null) bitmapData.dispose();
 		}
-		__pool = __pool.slice(0, __cacheSize);
+		__pool.resize(keepCount);
+		if (force) __poolIndex = 0;
+		__lastUpdateTime = 0;
 	}
 
 	/** 恢复后丢弃全部失效目标；保留池容量配置，实际目标在下次 clear 时创建。 */

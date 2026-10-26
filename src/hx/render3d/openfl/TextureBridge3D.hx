@@ -25,9 +25,13 @@ class TextureBridge3D {
 		if (bitmap.frameRect != null) throw "三维首版暂不支持带裁边还原信息的图集帧";
 		return result;
 	}
-	public static function resolve(source:openfl.display.BitmapData, context:Context3D):TextureBase {
-		var texture = source.getTexture(context);
-		if (texture == null || texture.__alphaTexture != null) throw "三维首版不支持无效纹理或分离 Alpha 压缩纹理";
+	public static function resolve(source:openfl.display.BitmapData, context:Context3D, usage:String = "三维材质纹理"):TextureBase {
+		if (source == null) throw usage + "：缺少纹理位图";
+		if (!source.__isValid || source.width <= 0 || source.height <= 0) throw usage + "：纹理位图已经释放或尺寸无效";
+		if (context == null) throw usage + "：缺少渲染上下文";
+		var texture:TextureBase = source.getTexture(context);
+		if (texture == null) throw usage + "：无法获取 GPU 纹理，请检查位图生命周期";
+		if (texture.__alphaTexture != null) throw usage + "：当前渲染路径不支持分离 Alpha 压缩纹理";
 		return texture;
 	}
 	public static function handle(texture:TextureBase):GLTexture { return texture.__textureID; }

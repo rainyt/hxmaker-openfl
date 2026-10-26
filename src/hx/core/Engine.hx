@@ -48,6 +48,22 @@ class Engine extends EventDispatcher implements IEngine {
 	public var contextRecoveryPending(default, null):Bool = false;
 	public var contextRecoveryCount(default, null):Int = 0;
 	private var __contextWindow:Window;
+	private var __stageBitmapResetPending:Bool = false;
+
+	/** 尺寸事件可能发生在两帧之间，旧批次拆除前只记录失效请求。 */
+	public function requestStageBitmapReset():Void {
+		__stageBitmapResetPending = true;
+	}
+
+	/** 按拆除旧批次、释放旧纹理、重建目标的顺序开始新画面。 */
+	public function beginRenderFrame():Void {
+		renderer.clear();
+		if (!__stageBitmapResetPending) return;
+		__stageBitmapResetPending = false;
+		StageBitmapData.disposeAll(true);
+		cast(renderer, Render).onStageSizeChange();
+		for (current in stages) __invalidateContextTree(current);
+	}
 
 	private function __onRenderContextLost():Void {
 		contextLost = true; contextRecoveryPending = false;
@@ -345,8 +361,7 @@ class Engine extends EventDispatcher implements IEngine {
 			__stageSprite.rotation = 0;
 			__stageSprite.x = 0;
 		}
-		StageBitmapData.disposeAll(true);
-		render.onStageSizeChange();
+		requestStageBitmapReset();
 		trace("[HXMAKER] size changed", ____stageWidth, ____stageHeight, "scaleFactor", scaleFactor);
 	}
 
@@ -444,8 +459,8 @@ class Engine extends EventDispatcher implements IEngine {
 		// 2. 该帧的渲染发生在`ENTER_FRAME`广播之后（引擎的渲染事件监听早于`__enterFrame`），
 		//    所以这里一定早于所有渲染器的清屏，没有已经入队的顶点。
 		TextFieldQueue.prepare();
-		if (__dirty) {
-			renderer.clear();
+		if (__dirty || __stageBitmapResetPending) {
+			beginRenderFrame();
 			// 渲染遍历期间禁止写文本图集，写入全部由上面的`prepare`在渲染前完成
 			TextFieldQueue.beginRender();
 			for (stage in stages) {
