@@ -44,4 +44,6 @@
 
 本次实测覆盖 macOS Electron WebGL 2，不将上述数值推广到其他设备、原生目标或其他地图规模。
 
+HxCpp 的逐批次查询及原生接口适配风险已另行记录在 [HxCpp 二维渲染状态评估（待实测）](hxcpp-render-state-review-20261105.md)，待后续 C++ 目标测试确认。
+
 原始数据：[基准](../artifacts/performance-20261105/baseline-results.json)、[修复版](../artifacts/performance-20261105/fixed-results.json)、[汇总](../artifacts/performance-20261105/comparison.json)。视口截图：[基准](../artifacts/performance-20261105/baseline-gowns-idle.png)、[修复版](../artifacts/performance-20261105/fixed-gowns-idle.png)。

@@ -12,6 +12,8 @@ hxmaker 游戏引擎的 OpenFL 渲染后端。
 
 目前按 OpenFL 9.2 系列已有内部接口适配；升级其他版本时仍需核对这些接口。源码静态对照采用官方 9.2.2，尚未进行官方库的编译和运行验证。
 
+性能记录：[Electron 实测](docs/performance-20261105.md)、[HxCpp 静态评估与待验证项](docs/hxcpp-render-state-review-20261105.md)。HxCpp 相关风险尚待 C++ 目标测试确认。
+
 # 平台
 | 平台 | 说明 |
 | -------- | ----------- |
