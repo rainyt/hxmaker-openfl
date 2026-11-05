@@ -15,6 +15,12 @@ import openfl.events.RenderEvent;
 @:access(hx.geom.Matrix)
 @:access(openfl.geom.Rectangle)
 class DirectBatchDisplay extends Sprite {
+	private static var nextBatchId:Int = 0;
+	public var batchId(default, null):Int = ++nextBatchId;
+	public var consuming(default, null):Bool = false;
+	private var retirePending:Bool = false;
+	private var heldTextures:Array<openfl.display.BitmapData> = [];
+	public var captureError(default, null):TextureInputError;
 	public static inline var MAX_QUADS:Int = 16383;
 	public var vertices:Float32Array;
 	public var indices:UInt16Array;
@@ -68,6 +74,7 @@ class DirectBatchDisplay extends Sprite {
 	}
 
 	public function begin(smoothing:Bool, fixed:Bool):Void {
+		retire();
 		this.smoothing = smoothing;
 		if (fixedIndices != fixed) gpuIndexCapacity = 0;
 		fixedIndices = fixed;
@@ -87,6 +94,19 @@ class DirectBatchDisplay extends Sprite {
 		if (capturedShader != shader) shaderInvalid = true;
 		capturedShader = shader;
 		shaderBuffer.update(cast shader);
+		// OpenFL 的池缓冲只更新前缀；明确裁掉所有旧输入及参数引用尾部。
+		shaderBuffer.inputs.resize(shaderBuffer.inputCount);
+		shaderBuffer.inputRefs.resize(shaderBuffer.inputCount);
+		shaderBuffer.inputFilter.resize(shaderBuffer.inputCount);
+		shaderBuffer.inputMipFilter.resize(shaderBuffer.inputCount);
+		shaderBuffer.inputWrap.resize(shaderBuffer.inputCount);
+		shaderBuffer.paramRefs_Bool.resize(shaderBuffer.paramBoolCount);
+		shaderBuffer.paramRefs_Float.resize(shaderBuffer.paramFloatCount);
+		shaderBuffer.paramRefs_Int.resize(shaderBuffer.paramIntCount);
+		shaderBuffer.paramPositions.resize(shaderBuffer.paramCount);
+		shaderBuffer.paramLengths.resize(shaderBuffer.paramCount);
+		shaderBuffer.paramTypes.resize(shaderBuffer.paramCount);
+		for (bitmap in shaderBuffer.inputs) hold(bitmap);
 	}
 
 	override private function __getBounds(rect:openfl.geom.Rectangle, matrix:openfl.geom.Matrix):Void {
@@ -102,7 +122,7 @@ class DirectBatchDisplay extends Sprite {
 		wide = vertexCount > 65535;
 		reserve(vertexCount * 7, wide ? 0 : indexCount);
 		if (wide && (wideIndices == null || wideIndices.length < indexCount)) wideIndices = new UInt32Array(capacity(indexCount));
-		for (texture in data.bitmapDatas) textures.push(texture);
+		for (texture in data.bitmapDatas) addTexture(texture);
 		for (i in 0...vertexCount) {
 			var offset = i * 7;
 			vertices[offset] = data.vertices[i * 2]; vertices[offset + 1] = data.vertices[i * 2 + 1];
@@ -149,6 +169,56 @@ class DirectBatchDisplay extends Sprite {
 		return fixedIndexData;
 	}
 
+	/** 同一根纹理在一个快照中只持有一次，附加材质槽也参与存活期。 */
+	private function hold(bitmap:openfl.display.BitmapData):Void {
+		if (bitmap == null || heldTextures.indexOf(bitmap) >= 0) return;
+		if (TextureLifetime.acquire(bitmap, batchId)) heldTextures.push(bitmap);
+		else captureError = new TextureInputError(Disposed, TextureLifetime.record(bitmap).resourceId, "捕获输入", "新批次不能取得已经释放或待释放的纹理");
+	}
+
+	/** 写入基础纹理时立即保活，覆盖同帧场景回调发起释放的情况。 */
+	public function addTexture(bitmap:openfl.display.BitmapData):Void {
+		hold(bitmap); textures.push(bitmap);
+	}
+
+	/** 从显示树拆离后退役；消费中发生重入时延迟到本次消费结束。 */
+	public function retire():Void {
+		if (consuming) { retirePending = true; return; }
+		for (bitmap in heldTextures) TextureLifetime.release(bitmap, batchId);
+		heldTextures.resize(0); textures.resize(0); captureError = null;
+		indexCount = vertexCount = 0;
+		if (shaderBuffer != null) {
+			shaderBuffer.update(null);
+			shaderBuffer.inputs.resize(0); shaderBuffer.inputRefs.resize(0);
+			shaderBuffer.inputFilter.resize(0); shaderBuffer.inputMipFilter.resize(0); shaderBuffer.inputWrap.resize(0);
+			shaderBuffer.paramRefs_Bool.resize(0); shaderBuffer.paramRefs_Float.resize(0); shaderBuffer.paramRefs_Int.resize(0);
+			shaderBuffer.overrideBoolValues.resize(0); shaderBuffer.overrideFloatValues.resize(0); shaderBuffer.overrideIntValues.resize(0);
+		}
+		retirePending = false;
+	}
+
+	/** 防止渲染事件重入时同一快照被覆盖。 */
+	public function beginConsumption():Bool {
+		if (consuming || indexCount == 0) return false;
+		consuming = true; return true;
+	}
+	/** 消费结束只处理明确请求退役的快照，持久画面继续持有。 */
+	public function endConsumption():Void {
+		consuming = false;
+		if (retirePending) retire();
+	}
+	/** 故障首报保留资源状态、尺寸及最后释放原因，均为标量。 */
+	public function resourceReport():Array<Dynamic> {
+		var result:Array<Dynamic> = [];
+		for (bitmap in heldTextures) {
+			var state:TextureLifetime.TextureRecord = TextureLifetime.record(bitmap);
+			result.push({resourceId:state.resourceId, width:bitmap.width, height:bitmap.height,
+				label:state.label, entryId:state.entryId, lastBatchId:state.lastBatchId, owners:state.owners, references:state.references, pending:state.pending, disposed:state.disposed,
+				generation:state.generation, releaseReason:state.releaseReason, releaseStack:state.releaseStack});
+		}
+		return result;
+	}
+
 	public function abandon():Void {
 		vertexBuffer = indexBuffer = null;
 		gpuVertexCapacity = gpuIndexCapacity = 0;
@@ -159,5 +229,5 @@ class DirectBatchDisplay extends Sprite {
 		if (shaderBuffer != null) shaderBuffer.paramDataBuffer = null;
 	}
 
-	public function dispose():Void { renderer.release(this); textures.resize(0); vertices = null; indices = null; fixedIndexData = null; wideIndices = null; shaderBuffer = null; capturedShader = null; }
+	public function dispose():Void { retire(); renderer.release(this); textures.resize(0); vertices = null; indices = null; fixedIndexData = null; wideIndices = null; shaderBuffer = null; capturedShader = null; }
 }

@@ -15,12 +15,14 @@ class ImageRender {
 	 * @param render
 	 */
 	public static function render(image:Image, render:Render):Void {
-		if (image.data == null)
+		if (image.data == null || image.data.data == null)
 			return;
 		// 当前渲染的图片缓存数据
 		var dataBuffer = render.imageBufferData[render.drawImageBuffDataIndex];
 		if (!dataBuffer.draw(image, render)) {
+			var shader:openfl.display.Shader = render.currentShader;
 			render.renderImageBuffData(dataBuffer);
+			render.currentShader = shader;
 			ImageRender.render(image, render);
 		}
 	}

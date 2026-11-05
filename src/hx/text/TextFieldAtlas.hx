@@ -43,6 +43,8 @@ class TextFieldAtlas {
 	public var maxHeight:Float = 0;
 
 	public function clear():Void {
+		for (frame in chars) frame.data.dispose();
+		for (frame in emojs) frame.data.dispose();
 		chars = [];
 		emojs = [];
 	}
@@ -51,7 +53,12 @@ class TextFieldAtlas {
 		return chars.get(char);
 	}
 
+	/** 清除切片后才退出根位图所有权，避免字形视图阻止最终回收。 */
+	public function dispose():Void { clear(); bitmapData.dispose(); }
+
 	public function pushChar(char:String, rect:Rectangle, xadvance:Int):Void {
+		var previous:FntFrame = char.length == 2 ? emojs.get(char) : chars.get(char);
+		if (previous != null) previous.data.dispose();
 		var frame = new FntFrame(this);
 		frame.data = bitmapData.sub(rect.x, rect.y, rect.width, rect.height);
 		frame.xadvance = xadvance;

@@ -1,6 +1,8 @@
 package hx.core;
 
 import hx.display.Scene3D;
+import hx.shader.IBatchTextureShader;
+import hx.render2d.openfl.TextureLifetime;
 import hx.render2d.openfl.DirectBatchDisplay;
 import hx.render2d.openfl.DirectBatchRenderer;
 import hx.render2d.openfl.RenderBitmapData;
@@ -57,6 +59,7 @@ class Render implements IRender implements IScene3DRenderer {
 
 	private function obtainDirectBatch():DirectBatchDisplay {
 		if (directUsed == directDisplays.length) directDisplays.push(new DirectBatchDisplay(directGpu));
+		if (directDisplays[directUsed].consuming) directDisplays.insert(directUsed, new DirectBatchDisplay(directGpu));
 		return directDisplays[directUsed++];
 	}
 	private function flushDirectImages():Void {
@@ -104,6 +107,12 @@ class Render implements IRender implements IScene3DRenderer {
 	public var multiTextureEnabled(get, set):Bool;
 
 	private var __multiTextureEnabled:Bool = true;
+	/** 合批上限来自显式槽位协议，材质额外输入不会被几何槽占用。 */
+	public var batchTextureLimit(get, never):Int;
+	private function get_batchTextureLimit():Int {
+		var count:Int = currentShader is IBatchTextureShader ? cast(currentShader, IBatchTextureShader).batchTextureSlots.length : MultiTextureShader.supportedMultiTextureUnits;
+		return Std.int(Math.max(1, Math.min(count, MultiTextureShader.supportedMultiTextureUnits)));
+	}
 
 	private function get_multiTextureEnabled():Bool {
 		return __multiTextureEnabled;
@@ -112,6 +121,7 @@ class Render implements IRender implements IScene3DRenderer {
 	private function set_multiTextureEnabled(value:Bool):Bool {
 		__multiTextureEnabled = value;
 		MultiTextureShader.multiTextureEnabled = value;
+		MultiTextureFastShader.multiTextureEnabled = value;
 		return value;
 	}
 
@@ -231,9 +241,11 @@ class Render implements IRender implements IScene3DRenderer {
 	private function setBatchTextures(data:ImageBufferData, isDefaultShader:Bool):Void {
 		var fallback:BitmapData = data.bitmapDatas.length > 0 ? data.bitmapDatas[0] : null;
 		// 内置着色器最多声明十六个采样器；运行时关闭多纹理也不会删掉已编译的声明。
-		var slotCount:Int = isDefaultShader ? 16 : data.bitmapDatas.length;
-		for (index in 0...slotCount) {
-			var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty('uSampler$index');
+		var slots:Array<String> = currentShader is IBatchTextureShader
+			? cast(currentShader, IBatchTextureShader).batchTextureSlots
+			: [for (index in 0...(isDefaultShader ? 16 : data.bitmapDatas.length)) 'uSampler$index'];
+		for (index in 0...slots.length) {
+			var sampler:ShaderInput<BitmapData> = currentShader.data.getProperty(slots[index]);
 			if (sampler == null) continue;
 			sampler.input = index < data.bitmapDatas.length ? data.bitmapDatas[index] : fallback;
 			sampler.filter = data.smoothing ? LINEAR : NEAREST;
@@ -306,6 +318,7 @@ class Render implements IRender implements IScene3DRenderer {
 						__drawMatrix.scale(2, 2);
 					__cacheBitmap.bitmapData.draw(shape, __drawMatrix, null, null, null, true);
 					if (shape.parent != null) shape.parent.removeChild(shape);
+					shape.retire();
 				}
 			} else {
 				stage.addChild(shape);
@@ -532,6 +545,8 @@ class Render implements IRender implements IScene3DRenderer {
 				collectSpritesForRelease(cast display, sprites);
 		}
 		finishSpriteRelease(sprites, __stage);
+		for (display in directDisplays) display.retire();
+		for (data in imageBufferData) data.reset();
 		__maskStack.resize(0);
 		__maskSprite = null;
 		__drawCallCount = 0;
@@ -586,7 +601,12 @@ class Render implements IRender implements IScene3DRenderer {
 			var isRender = false;
 			if (object.__blendFilter != null) {
 				// this.endFillImageDataBuffer();
-				object.__blendFilter.update(object, Hxmaker.engine.dt);
+				try { object.__blendFilter.update(object, Hxmaker.engine.dt); }
+				catch (error:hx.render2d.openfl.TextureInputError) {
+					hx.render2d.openfl.RenderDiagnostics.reportFilter(object.__blendFilter, error);
+					if (hx.render2d.openfl.RenderDiagnostics.strict) throw error;
+					return;
+				}
 				// 统计混合模式滤镜绘制次数
 				ContextStats.statsBlendModeFilterDrawCall();
 				if (object.__blendFilter.render != null) {
@@ -598,7 +618,12 @@ class Render implements IRender implements IScene3DRenderer {
 				// this.endFillImageDataBuffer();
 				var lastRender:DisplayObject = null;
 				for (filter in object.filters) {
-					filter.update(lastRender == null ? object : lastRender, Hxmaker.engine.dt);
+					try { filter.update(lastRender == null ? object : lastRender, Hxmaker.engine.dt); }
+					catch (error:hx.render2d.openfl.TextureInputError) {
+						hx.render2d.openfl.RenderDiagnostics.reportFilter(filter, error);
+						if (hx.render2d.openfl.RenderDiagnostics.strict) throw error;
+						return;
+					}
 					// 统计混合模式滤镜绘制次数
 					ContextStats.statsBlendModeFilterDrawCall();
 					if (filter.render != null) {
@@ -710,7 +735,7 @@ class Render implements IRender implements IScene3DRenderer {
 		if (openfl.Lib.current.stage.context3D != null && !cacheAsBitmap && currentShader == null
 			&& image.__colorTransform == null && image.scale9Grid == null && !image.__repeat
 			&& (image.blendMode == NORMAL || image.blendMode == ADD)) {
-			if (image.data == null) return;
+			if (image.data == null || image.data.data == null) return;
 			if (imageBufferData[drawImageBuffDataIndex].index > 0) renderImageBuffData(imageBufferData[drawImageBuffDataIndex]);
 			var texture:BitmapData = cast image.data.data.getTexture();
 			var id = directPending == null ? -1 : directPending.textures.indexOf(texture);
@@ -720,7 +745,7 @@ class Render implements IRender implements IScene3DRenderer {
 				flushDirectImages(); id = -1;
 			}
 			if (directPending == null) { directPending = obtainDirectBatch(); directPending.begin(image.smoothing, true); }
-			if (id < 0) { id = directPending.textures.length; directPending.textures.push(texture); }
+			if (id < 0) { id = directPending.textures.length; directPending.addTexture(texture); }
 			directPending.append(image, id); ContextStats.statsVisibleDisplayCounts(); return;
 		}
 		flushDirectImages();
@@ -779,7 +804,7 @@ class Render implements IRender implements IScene3DRenderer {
 	 */
 	public function renderToBitmapData(bitmapData:hx.display.BitmapData):Void {
 		this.endFillImageDataBuffer();
-		var root:BitmapData = cast(bitmapData.data, OpenFlBitmapData).getTexture();
+		var root:BitmapData = bitmapData.data.getTexture();
 		if (root.readable) {
 			root.disposeImage();
 		}

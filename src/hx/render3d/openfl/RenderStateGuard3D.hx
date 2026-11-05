@@ -31,8 +31,10 @@ class RenderStateGuard3D {
 	private var previousVertexArray:Dynamic;
 	private var timed:Bool;
 	private var stateCache:GLStateCache3D;
+	private var deviceGeneration:Int;
 	public function new(renderer:OpenGLRenderer, attributeCount:Int = 4, compositeOnly:Bool = false,
 		vertexArrays:VertexArrayBridge3D = null, timed:Bool = false, saveAttributeValues:Bool = false) {
+		deviceGeneration = hx.render2d.openfl.TextureLifetime.generation();
 		this.timed = timed; this.vertexArrays = vertexArrays;
 		this.compositeOnly = compositeOnly;
 		isolatedVertexArray = vertexArrays != null && vertexArrays.available;
@@ -122,6 +124,7 @@ class RenderStateGuard3D {
 	}
 	private function toggle(key:Int, value:Bool):Void { if (value) gl.enable(key); else gl.disable(key); }
 	public function restoreTarget():Void {
+		if (gl.isContextLost() || deviceGeneration != hx.render2d.openfl.TextureLifetime.generation()) return;
 		if (compositeOnly) return;
 		gl.bindFramebuffer(gl.FRAMEBUFFER, values.get(gl.FRAMEBUFFER_BINDING));
 		#if (js && html5)
@@ -133,6 +136,7 @@ class RenderStateGuard3D {
 		var mask:Dynamic = values.get(gl.COLOR_WRITEMASK); gl.colorMask(mask[0], mask[1], mask[2], mask[3]);
 	}
 	public function restore():Void {
+		if (gl.isContextLost() || deviceGeneration != hx.render2d.openfl.TextureLifetime.generation()) return;
 		var started = timed ? clock() : 0.;
 		if (parameters.length > 0) {
 			// 共享采样恢复临时占用槽位 0；调用方在任何 GL 修改前已保存它。

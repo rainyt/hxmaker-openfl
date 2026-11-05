@@ -18,6 +18,12 @@ class BlendModeFilter extends StageBitmapRenderFilter {
 		displayImage.data = new StageBitmapData();
 	}
 
+	/** 合成源也是池借用视图，销毁时只归还借用。 */
+	override public function dispose():Void {
+		if (displayImage != null && displayImage.data != null) displayImage.data.dispose();
+		super.dispose();
+	}
+
 	override function update(display:DisplayObject, dt:Float) {
 		super.update(display, dt);
 		// 渲染舞台的画面位图

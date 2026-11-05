@@ -33,14 +33,26 @@ class StageBitmapRenderFilter extends RenderFilter {
 		this.render = image;
 	}
 
+	/** 独占缓存被另一个持久快照读取时，先换目标再重绘，旧画面继续读取旧根。 */
+	private function prepareWritableBitmap():Void {
+		if (!keep || bitmapData == null || !(bitmapData.data is hx.display.IBitmapDataLifetime)
+			|| cast(bitmapData.data, hx.display.IBitmapDataLifetime).getRenderReferences() == 0) return;
+		var replacement:BitmapData = OpenFlBitmapData.fromSize(Math.ceil(Hxmaker.engine.stageWidth), Math.ceil(Hxmaker.engine.stageHeight), true, 0);
+		bitmapData.dispose(); bitmapData = replacement; cast(render, Image).data = replacement;
+	}
+
 	override function dispose():Void {
 		super.dispose();
-		bitmapData.dispose();
+		if (bitmapData != null) bitmapData.dispose();
+		bitmapData = null;
 	}
 
 	override function updateStageSize() {
 		super.updateStageSize();
-		if (keep)
-			bitmapData.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0).data;
+		if (keep && bitmapData != null) {
+			var replacement:BitmapData = OpenFlBitmapData.fromSize(Math.ceil(Hxmaker.engine.stageWidth), Math.ceil(Hxmaker.engine.stageHeight), true, 0);
+			bitmapData.dispose(); bitmapData = replacement;
+			cast(render, Image).data = replacement;
+		}
 	}
 }

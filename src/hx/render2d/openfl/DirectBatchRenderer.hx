@@ -66,7 +66,16 @@ class DirectBatchRenderer {
 	}
 
 	public function render(batch:DirectBatchDisplay, event:RenderEvent):Void {
+		if (!batch.beginConsumption()) return;
+		try { renderBatch(batch, event); }
+		catch (error:Dynamic) { batch.endConsumption(); throw error; }
+		batch.endConsumption();
+	}
+
+	/** 整个批次为最小隔离单元；未知异常仍向开发者暴露。 */
+	private function renderBatch(batch:DirectBatchDisplay, event:RenderEvent):Void {
 		if (batch.indexCount == 0) return;
+		if (hx.core.Hxmaker.engine is hx.core.Engine && !cast(hx.core.Hxmaker.engine, hx.core.Engine).applicationVisible) return;
 		var renderer:OpenGLRenderer = cast event.renderer;
 		if (renderer.gl == null || renderer.gl.isContextLost()) return;
 		if (gl != renderer.gl || renderContext != renderer.__context3D.__context) {
@@ -81,9 +90,22 @@ class DirectBatchRenderer {
 			batch.gpuContext = renderContext;
 		}
 		if (batch.wide && !uintIndices) throw "单个网格超过 65535 个顶点，需要 32 位索引扩展";
-		var native = batch.shaderBuffer != null && batch.shaderBuffer.shader != null;
+		var native:Bool = batch.shaderBuffer != null && batch.shaderBuffer.shader != null;
+		try {
+			if (batch.captureError != null) throw batch.captureError;
+			for (index in 0...batch.textures.length) TextureBridge2D.validate(batch.textures[index], '合批槽 $index');
+			if (native) for (index in 0...batch.shaderBuffer.inputCount) {
+				if (batch.shaderBuffer.inputs[index] != null)
+					TextureBridge2D.validate(batch.shaderBuffer.inputs[index], batch.shaderBuffer.inputRefs[index].name);
+			}
+		} catch (error:TextureInputError) {
+			RenderDiagnostics.report(batch, error);
+			if (RenderDiagnostics.strict) throw error;
+			return;
+		}
 		var guard = new RenderStateGuard3D(renderer, native ? maxAttributes : 3, true, vertexArrays, false, native);
-		var cachedArray = renderer.__context3D.__contextState.__currentGLArrayBuffer;
+		var cachedArray:Dynamic = renderer.__context3D.__contextState.__currentGLArrayBuffer;
+		var generation:Int = TextureLifetime.generation();
 		try {
 			guard.activateTexture(0);
 			var info = native ? null : programs.get(batch.textures.length);
@@ -132,7 +154,7 @@ class DirectBatchRenderer {
 			gl.useProgram(info.program);
 			for (slot in 0...batch.textures.length) {
 				guard.activateTexture(slot);
-				var texture = TextureBridge3D.resolve(batch.textures[slot], renderer.__context3D, '二维批次纹理槽 $slot');
+				var texture = TextureBridge2D.resolve(batch.textures[slot], renderer.__context3D, '二维批次纹理槽 $slot');
 				guard.rememberTexture(texture);
 				gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture));
 				TextureBridge3D.applySampler(texture, batch.smoothing);
@@ -150,9 +172,20 @@ class DirectBatchRenderer {
 			// 沿用回调入口已经提交的混合状态，保留 SCREEN 及父级合成语义。
 			gl.drawElements(gl.TRIANGLES, batch.indexCount, batch.wide ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
 			}
-		} catch (error:Dynamic) { guard.restore(); renderer.__context3D.__contextState.__currentGLArrayBuffer = cachedArray; throw error; }
-		guard.restore();
-		renderer.__context3D.__contextState.__currentGLArrayBuffer = cachedArray;
+		} catch (error:Dynamic) {
+			// 清理故障不能覆盖最初错误；丢失设备上不恢复旧句柄。
+			try { if (!gl.isContextLost()) guard.restore(); } catch (cleanupError:Dynamic) {}
+			renderer.__context3D.__contextState.__currentGLArrayBuffer = !gl.isContextLost() && generation == TextureLifetime.generation() ? cachedArray : null;
+			if (error is TextureInputError) {
+				RenderDiagnostics.report(batch, cast error);
+				if (RenderDiagnostics.strict) throw error;
+				return;
+			}
+			throw error;
+		}
+		if (!gl.isContextLost()) guard.restore();
+		RenderDiagnostics.didDraw();
+		renderer.__context3D.__contextState.__currentGLArrayBuffer = !gl.isContextLost() && generation == TextureLifetime.generation() ? cachedArray : null;
 	}
 
 	/** 复用 OpenFL 的 Shader 反射和参数绑定，绕过 Graphics 命令与几何重组。 */
@@ -201,10 +234,9 @@ class DirectBatchRenderer {
 			gl.uniform1i(input.index, slot);
 			if (buffer.inputs[i] == null) {
 				// 活动输入仍占一个单元；清理历史绑定，避免采样上一批次或离屏目标。
-				gl.bindTexture(gl.TEXTURE_2D, null);
-				continue;
+				throw new TextureInputError(NotReady, 0, input.name, "活动采样器缺少必需输入");
 			}
-			var texture = TextureBridge3D.resolve(buffer.inputs[i], renderer.__context3D, '二维着色器输入 ${input.name}（纹理槽 $slot）');
+			var texture = TextureBridge2D.resolve(buffer.inputs[i], renderer.__context3D, '二维着色器输入 ${input.name}（纹理槽 $slot）');
 			guard.rememberTexture(texture);
 			gl.bindTexture(gl.TEXTURE_2D, TextureBridge3D.handle(texture));
 			texture.__setSamplerState(new openfl.display._internal.SamplerState(buffer.inputWrap[i], buffer.inputFilter[i], buffer.inputMipFilter[i]));

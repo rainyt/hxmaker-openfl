@@ -221,7 +221,7 @@ class ImageBufferData {
 					if (data.currentBitmapData != null && data.currentBitmapData.data != null) {
 						var texture = data.currentBitmapData.data.getTexture();
 						if (index == 0 || !mapIds.exists(texture)) {
-							if (bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
+							if (bitmapDatas.length >= render.batchTextureLimit) {
 								return false;
 							}
 						}
@@ -339,7 +339,7 @@ class ImageBufferData {
 		if (dataPerVertex4 + 4 > 65532) return false;
 		var texture = image.data.data.getTexture();
 		var id = mapIds.get(texture);
-		if (id == null && bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
+		if (id == null && bitmapDatas.length >= render.batchTextureLimit) {
 			return false;
 		}
 		// 如果平滑值不同，则产生新的绘制

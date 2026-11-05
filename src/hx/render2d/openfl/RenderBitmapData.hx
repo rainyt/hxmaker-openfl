@@ -23,6 +23,7 @@ import openfl.geom.Rectangle;
 class RenderBitmapData extends BitmapData {
 	private var gpuRenderer:OpenGLRenderer;
 	private var gpuContext:RenderContext;
+	private var gpuGeneration:Int = -1;
 
 	public function new(width:Int, height:Int, transparent:Bool = true, fillColor:UInt = 0xFFFFFFFF) {
 		super(width, height, transparent, fillColor);
@@ -37,9 +38,11 @@ class RenderBitmapData extends BitmapData {
 			return;
 		}
 		if (context.gl.isContextLost()) return;
+		TextureRecovery.prepare(this, context, "离屏输出");
 		var display:DisplayObject = Std.isOfType(source, DisplayObject) ? cast source : null;
 		var visible:Bool = display == null || display.visible;
 		var state:OffscreenRenderState = new OffscreenRenderState(context);
+		RenderPass.push(this);
 		try {
 			if (display != null && !visible) display.visible = true;
 			source.__update(false, true);
@@ -50,9 +53,10 @@ class RenderBitmapData extends BitmapData {
 			colors.__copyFrom(source.__worldColorTransform);
 			colors.__invert();
 			if (colorTransform != null) colors.__combine(colorTransform);
-			if (gpuRenderer == null || gpuContext != context.__context || gpuRenderer.__context3D != context) {
+			if (gpuRenderer == null || gpuContext != context.__context || gpuRenderer.__context3D != context || gpuGeneration != TextureLifetime.generation()) {
 				gpuRenderer = new OpenGLRenderer(context, this);
 				gpuContext = context.__context;
+				gpuGeneration = TextureLifetime.generation();
 				// 同时兼容仍共享默认 Shader 的旧分支，设备判断不依赖库内补丁。
 				BatchShaderBridge.initialize(gpuRenderer.__defaultDisplayShader, context, true);
 				BatchShaderBridge.initialize(gpuRenderer.__defaultGraphicsShader, context, true);
@@ -79,10 +83,12 @@ class RenderBitmapData extends BitmapData {
 			if (clipRect != null) gpuRenderer.__popMaskRect();
 		} catch (error:Dynamic) {
 			if (display != null && !visible) display.visible = false;
-			state.restore();
+			RenderPass.pop();
+			try { state.restore(); } catch (cleanupError:Dynamic) {}
 			throw error;
 		}
 		if (display != null && !visible) display.visible = false;
+		RenderPass.pop();
 		state.restore();
 	}
 
@@ -95,6 +101,7 @@ class RenderBitmapData extends BitmapData {
 			return;
 		}
 		if (context.gl.isContextLost()) return;
+		TextureRecovery.prepare(this, context, "离屏输出");
 		var clipped:Rectangle = this.rect.intersection(rect);
 		if (clipped.isEmpty()) return;
 		var state:OffscreenRenderState = new OffscreenRenderState(context);
@@ -130,9 +137,11 @@ private class OffscreenRenderState {
 	private var context:Context3D;
 	private var previous:Context3DState;
 	private var viewport:Dynamic;
+	private var generation:Int;
 
 	public function new(context:Context3D) {
 		this.context = context;
+		generation = TextureLifetime.generation();
 		context.__flushGL();
 		previous = context.__state;
 		viewport = context.gl.getParameter(context.gl.VIEWPORT);
@@ -140,6 +149,9 @@ private class OffscreenRenderState {
 	}
 
 	public function restore():Void {
+		if (context.gl.isContextLost() || generation != TextureLifetime.generation()) {
+			context.__state = new Context3DState(); return;
+		}
 		context.__state = previous;
 		// OpenFL 会先恢复 Shader 的 sampler 再切换 Program，提前绑定以保证位置属于当前程序。
 		if (previous.program != null) previous.program.__enable();

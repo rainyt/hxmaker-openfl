@@ -53,6 +53,20 @@ class RequestQueue {
 	 * 上次懒清理时间戳，用于节流
 	 */
 	private static var __lastSweepTime:Float = 0;
+	private static var candidates:Array<CacheEntry> = [];
+	private static var nextEntryId:Int = 0;
+	/** 取得当前缓存代号，旧 AssetObject 不得操作相同 URL 的新条目。 */
+	public static function getEntryId(url:String):Int {
+		if (url == null || url == "") return 0;
+		var entry:CacheEntry = __cache.get(url);
+		return entry == null ? 0 : entry.entryId;
+	}
+	/** 主循环安全入口独立于新请求触发维护。 */
+	public static function maintain():Void {
+		var now:Float = Timer.stamp();
+		if (now - __lastSweepTime < 1) return;
+		__lastSweepTime = now; collectUnused(32, 1, 67108864, true);
+	}
 
 	// ---------------------------------------------------------------------------
 	// 加载方法
@@ -69,8 +83,8 @@ class RequestQueue {
 				return; // 缓存命中或等待中，已处理
 
 			var wrappedCb:String->FutureErrorEvent->Void = function(data, err) {
-				resolveCacheEntry(url, entry, data, err);
-				cb(data, err);
+				if (resolveCacheEntry(url, entry, data, err)) cb(data, err);
+				else cb(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "资源请求已被撤销"));
 			};
 			var request = new StringRequest(url, wrappedCb);
 			__requestQueue.push(request);
@@ -99,8 +113,8 @@ class RequestQueue {
 				return;
 
 			var wrappedCb:Sound->FutureErrorEvent->Void = function(data, err) {
-				resolveCacheEntry(url, entry, data, err);
-				cb(data, err);
+				if (resolveCacheEntry(url, entry, data, err)) cb(data, err);
+				else cb(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "资源请求已被撤销"));
 			};
 			var request = new SoundRequest(url, wrappedCb);
 			request.isMusic = isMusic;
@@ -130,8 +144,8 @@ class RequestQueue {
 				return;
 
 			var wrappedCb:BitmapData->FutureErrorEvent->Void = function(data, err) {
-				resolveCacheEntry(url, entry, data, err);
-				cb(data, err);
+				if (resolveCacheEntry(url, entry, data, err)) cb(data, err);
+				else cb(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "资源请求已被撤销"));
 			};
 			var request = new BitmapDataRequest(url, wrappedCb);
 			__requestQueue.push(request);
@@ -159,8 +173,8 @@ class RequestQueue {
 				return;
 
 			var wrappedCb:Bytes->FutureErrorEvent->Void = function(data, err) {
-				resolveCacheEntry(url, entry, data, err);
-				cb(data, err);
+				if (resolveCacheEntry(url, entry, data, err)) cb(data, err);
+				else cb(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "资源请求已被撤销"));
 			};
 			var request = new BytesRequest(url, wrappedCb);
 			__requestQueue.push(request);
@@ -184,7 +198,10 @@ class RequestQueue {
 			lazySweep();
 			var entry = ensureCacheEntry(key, cb);
 			if (entry == null) return;
-			callback = function(data, error) { resolveCacheEntry(key, entry, data, error); cb(data, error); };
+			callback = function(data, error) {
+				if (resolveCacheEntry(key, entry, data, error)) cb(data, error);
+				else cb(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "资源请求已被撤销"));
+			};
 		}
 		__requestQueue.push(new BitmapDataBytesRequest(key, bytes, callback));
 		if (CURRENT_REQUEST_COUNT < MAX_REQUEST_COUNT) loadNext();
@@ -218,13 +235,14 @@ class RequestQueue {
 	 * @param url 资源URL
 	 * @return 当前引用计数，若资源不存在则返回0
 	 */
-	public static function retain(url:String):Int {
+	public static function retain(url:String, entryId:Int = 0):Int {
 		if(url == "" || url == null)
 			return 0;
 		var entry = __cache.get(url);
-		if (entry == null)
+		if (entry == null || (entryId != 0 && entry.entryId != entryId))
 			return 0;
 		entry.refCount++;
+		entry.releaseTimestamp = 0;
 		syncContextStats();
 		#if assets_debug
 		trace("[RequestQueue] Retain resource: " + url + ", new refCount: " + entry.refCount);
@@ -240,12 +258,13 @@ class RequestQueue {
 	 * @param url 资源URL
 	 * @return 当前引用计数，归零后返回0
 	 */
-	public static function release(url:String):Int {
+	public static function release(url:String, entryId:Int = 0):Int {
 		if(url == "" || url == null)
 			return 0;
 		var entry = __cache.get(url);
-		if (entry == null)
+		if (entry == null || (entryId != 0 && entry.entryId != entryId))
 			return 0;
+		if (entry.refCount <= 0) return 0;
 		entry.refCount--;
 		#if assets_debug
 		trace("[RequestQueue] Release resource: " + url + ", new refCount: " + entry.refCount);
@@ -253,6 +272,7 @@ class RequestQueue {
 		if (entry.refCount <= 0) {
 			entry.refCount = 0;
 			entry.releaseTimestamp = Timer.stamp() + RELEASE_DELAY;
+			if (!entry.queued) { entry.queued = true; candidates.push(entry); }
 			syncContextStats();
 			return 0;
 		}
@@ -338,7 +358,7 @@ class RequestQueue {
 	 */
 	public static function hasCache(url:String):Bool {
 		var entry = __cache.get(url);
-		return entry != null && entry.data != null;
+		return entry != null && entry.data != null && isResourceAvailable(entry.data);
 	}
 
 	/**
@@ -347,18 +367,35 @@ class RequestQueue {
 	 * 通常在每帧或场景切换时调用。也会被加载方法自动触发懒清理。
 	 * @return 本次清理的条目数量
 	 */
-	public static function sweepCache():Int {
-		var count = 0;
-		var now = Timer.stamp();
-		for (url => entry in __cache) {
-			if (entry.releaseTimestamp > 0 && now >= entry.releaseTimestamp && entry.refCount <= 0) {
-				disposeResource(entry.data);
-				__cache.remove(url);
-				count++;
+	public static function sweepCache():Int { return collectUnused(64, 2, 8388608, true); }
+
+	/** 只回收无业务及渲染持有的候选；时间、检查次数和字节均有上限。 */
+	public static function collectUnused(maxEntries:Int = 64, maxMilliseconds:Float = 2, maxBytes:Int = 8388608,
+		respectDelay:Bool = false, reason:String = "安全缓存维护"):Int {
+		var started:Float = Timer.stamp();
+		var count:Int = 0;
+		var bytes:Float = 0;
+		var inspected:Int = 0;
+		var available:Int = candidates.length;
+		while (inspected < available && inspected < maxEntries && candidates.length > 0
+			&& (Timer.stamp() - started) * 1000 < maxMilliseconds && bytes < maxBytes) {
+			var entry:CacheEntry = candidates.shift(); inspected++; entry.queued = false;
+			if (__cache.get(entry.url) != entry || entry.refCount > 0 || entry.isLoading) continue;
+			var held:Bool = false;
+			var estimate:Float = 0;
+			if (entry.data is BitmapData) {
+				var bitmap:BitmapData = cast entry.data;
+				estimate = bitmap.width * bitmap.height * 4;
+				if (bitmap.data is hx.display.IBitmapDataLifetime)
+					held = cast(bitmap.data, hx.display.IBitmapDataLifetime).getRenderReferences() > 0;
 			}
+			if (held || (respectDelay && Timer.stamp() < entry.releaseTimestamp) || estimate > maxBytes - bytes) {
+				entry.queued = true; candidates.push(entry); continue;
+			}
+			disposeResource(entry.data); __cache.remove(entry.url); entry.data = null;
+			count++; bytes += estimate;
 		}
-		if (count > 0)
-			syncContextStats();
+		if (count > 0) syncContextStats();
 		return count;
 	}
 
@@ -428,6 +465,9 @@ class RequestQueue {
 	private static function ensureCacheEntry(url:String, cb:Dynamic):CacheEntry {
 		var entry = __cache.get(url);
 
+		if (entry != null && entry.data != null && !isResourceAvailable(entry.data)) {
+			__cache.remove(url); entry = null;
+		}
 		if (entry != null) {
 			// 缓存命中：数据已就绪，直接回调
 			if (entry.data != null) {
@@ -450,7 +490,7 @@ class RequestQueue {
 
 		// 首次加载：创建新条目
 		if (entry == null) {
-			entry = new CacheEntry();
+			entry = new CacheEntry(url, ++nextEntryId);
 			__cache.set(url, entry);
 		}
 		entry.isLoading = true;
@@ -461,17 +501,36 @@ class RequestQueue {
 	/**
 	 * 请求完成后的缓存解析：存储数据、通知等待者
 	 */
-	private static function resolveCacheEntry(url:String, entry:CacheEntry, data:Dynamic, err:FutureErrorEvent):Void {
+	private static function resolveCacheEntry(url:String, entry:CacheEntry, data:Dynamic, err:FutureErrorEvent):Bool {
 		entry.isLoading = false;
+		// 强制删除后到达的旧回调不得改写相同 URL 的新条目。
+		var current:Bool = __cache.get(url) == entry;
+		if (!current) {
+			disposeResource(data);
+			var cancelled:FutureErrorEvent = FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, "资源请求已被撤销");
+			var callbacks:Array<Dynamic->FutureErrorEvent->Void> = entry.pendingCallbacks;
+			entry.pendingCallbacks = [];
+			for (callback in callbacks) callback(null, cancelled);
+			return false;
+		}
 
 		if (err == null && data != null) {
 			entry.data = data;
+			if (data is BitmapData && cast(data, BitmapData).data != null) {
+				var raw:openfl.display.BitmapData = cast(data, BitmapData).data.getTexture();
+				if (raw != null) {
+					var state:hx.render2d.openfl.TextureLifetime.TextureRecord = hx.render2d.openfl.TextureLifetime.record(raw);
+					state.label = hx.render2d.openfl.RenderDiagnostics.sanitize(url); state.entryId = entry.entryId;
+				}
+			}
+			entry.releaseTimestamp = Timer.stamp() + RELEASE_DELAY;
+			if (current && !entry.queued) { entry.queued = true; candidates.push(entry); }
 			syncContextStats();
 		} else {
 			// 加载失败：清理缓存条目，后续请求将重新加载
-			entry.refCount--;
+			entry.refCount = Std.int(Math.max(0, entry.refCount - 1));
 			if (entry.refCount <= 0 && entry.pendingCallbacks.length == 0) {
-				__cache.remove(url);
+				if (__cache.get(url) == entry) __cache.remove(url);
 			}
 			syncContextStats();
 		}
@@ -484,15 +543,25 @@ class RequestQueue {
 		}
 
 		// 如果加载失败且还有等待者，清空缓存让后续请求重新加载
-		if (err != null && entry.data == null) {
+		if (__cache.get(url) == entry && !entry.isLoading && err != null && entry.data == null) {
 			__cache.remove(url);
 			syncContextStats();
 		}
+		// 等待者可以在回调中撤销并重发同名请求，首个回调不得收到已退役结果。
+		return err != null || __cache.get(url) == entry;
 	}
 
 	/**
 	 * 释放底层资源
 	 */
+	/** 缓存命中必须拒绝已失效的公开数据。 */
+	private static function isResourceAvailable(data:Dynamic):Bool {
+		if (!(data is BitmapData)) return data != null;
+		var bitmap:BitmapData = cast data;
+		return bitmap.data != null && (!(bitmap.data is hx.display.IBitmapDataLifetime)
+			|| cast(bitmap.data, hx.display.IBitmapDataLifetime).isAvailable());
+	}
+
 	private static function disposeResource(data:Dynamic):Void {
 		if (data == null)
 			return;
@@ -512,6 +581,9 @@ class RequestQueue {
  * 记录资源的缓存数据、引用计数和加载状态
  */
 private class CacheEntry {
+	public var entryId:Int;
+	public var url:String;
+	public var queued:Bool = false;
 	/** 缓存的数据 */
 	public var data:Dynamic;
 
@@ -527,5 +599,5 @@ private class CacheEntry {
 	/** 等待中的回调列表（相同URL的重复请求） */
 	public var pendingCallbacks:Array<Dynamic->FutureErrorEvent->Void> = [];
 
-	public function new() {}
+	public function new(url:String, entryId:Int) { this.url = url; this.entryId = entryId; }
 }

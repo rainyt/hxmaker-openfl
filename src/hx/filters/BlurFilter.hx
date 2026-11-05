@@ -60,6 +60,11 @@ class BlurFilter extends StageBitmapRenderFilter {
 		if (!__dirty && !forceDirty)
 			return;
 		__dirty = false;
+		prepareWritableBitmap();
+		if (blurImage.data.data is hx.display.IBitmapDataLifetime && cast(blurImage.data.data, hx.display.IBitmapDataLifetime).getRenderReferences() > 0) {
+			var previous:hx.display.BitmapData = blurImage.data;
+			blurImage.data = OpenFlBitmapData.fromSize(Std.int(previous.width), Std.int(previous.height), true, 0); previous.dispose();
+		}
 		this.blurImage.data.clear();
 		this.blurImage.data.draw(display);
 		this.bitmapData.clear();
@@ -86,8 +91,16 @@ class BlurFilter extends StageBitmapRenderFilter {
 		return this;
 	}
 
+	/** 独占模糊中间目标也必须随滤镜退出。 */
+	override public function dispose():Void {
+		Actuate.stop(this);
+		if (blurImage.data != null) blurImage.data.dispose();
+		super.dispose();
+	}
+
 	override function updateStageSize() {
 		super.updateStageSize();
+		if (blurImage.data != null) blurImage.data.dispose();
 		blurImage.data = OpenFlBitmapData.fromSize(Std.int(Hxmaker.engine.stageWidth), Std.int(Hxmaker.engine.stageHeight), true, 0x0);
 	}
 }

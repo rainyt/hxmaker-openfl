@@ -19,7 +19,9 @@ class GraphicRender {
 		}
 		var dataBuffer = renderer.imageBufferData[renderer.drawImageBuffDataIndex];
 		if (!dataBuffer.drawGraphic(graphic, renderer)) {
+			var shader:openfl.display.Shader = renderer.currentShader;
 			renderer.renderImageBuffData(dataBuffer);
+			renderer.currentShader = shader;
 			// 直到图像渲染结束
 			if (graphic.__graphicsDrawData.index < graphic.__graphicsDrawData.draws.length) {
 				render(graphic, renderer);

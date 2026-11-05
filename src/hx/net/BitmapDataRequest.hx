@@ -69,7 +69,7 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 			var bitmap:BitmapData = null;
 			if (error == null) {
 				try {
-					var texture:openfl.display.ASTCBitmapData = ASTCBitmapData.fromBytes(bytes);
+					var texture:openfl.display.BitmapData = hx.render2d.openfl.RecoverableASTCBitmapData.decode(bytes, fallback ? url : null);
 					bitmap = BitmapData.formData(new OpenFlBitmapData(texture));
 				} catch (failure:Dynamic) {
 					error = "ASTC 解码失败：" + Std.string(failure);

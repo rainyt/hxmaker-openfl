@@ -50,8 +50,7 @@ class LayerShaderGLSL extends GLSL {
 		}
 		if (applyAlphav) {
 			var color2:Vec4 = texture2D(uSampler1, gl_openfl_TextureCoordv);
-			if (color2.a > 0)
-				gl_FragColor = color * color2.a;
+			gl_FragColor = color * color2.a * this.gl_openfl_Alphav;
 		} else {
 			gl_FragColor = color * this.gl_openfl_Alphav;
 		}

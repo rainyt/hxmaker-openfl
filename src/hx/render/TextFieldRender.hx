@@ -113,8 +113,8 @@ class TextFieldRender {
 			return;
 		@:privateAccess textField.__building = true;
 		var context = getTextFieldContextBitmapData();
-		rebuildText(textField, label, context);
-		textField.drawText(context, null, true);
+		try { rebuildText(textField, label, context); textField.drawText(context, null, true); }
+		catch (error:Dynamic) { @:privateAccess textField.__building = false; throw error; }
 		@:privateAccess textField.__building = false;
 		preparedLabels++;
 		// 预写完成后消费掉脏标记。叶子显示对象的`__dirty`在渲染遍历中不会被清除

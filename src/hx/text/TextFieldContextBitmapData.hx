@@ -244,7 +244,7 @@ class TextFieldContextBitmapData {
 	 */
 	public function dispose():Void {
 		for (atlas in __atlasList) {
-			atlas.bitmapData.dispose();
+			atlas.dispose();
 		}
 		__atlasList = [];
 		__charsMap = [];

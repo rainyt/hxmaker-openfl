@@ -1,97 +1,112 @@
 package hx.filters;
 
-import openfl.Lib;
+import hx.core.Hxmaker;
 import hx.core.OpenFlBitmapData;
 import hx.display.IBitmapData;
 import hx.display.BitmapData;
-import hx.display.Quad;
-import hx.geom.Matrix;
+import hx.render2d.openfl.TextureLifetime;
 
-/**
- * 舞台位图数据，它们之间会进行共享，以便提高性能
- */
+/** 池拥有目标，借用视图只归还令牌；正在被快照读取的目标不会再次作为输出。 */
 class StageBitmapData extends BitmapData {
-	private static var __pool:Array<IBitmapData> = [];
-	private static var __poolIndex:Int = 0;
-	private static var __cacheSize:Int = 0;
+	private static var pool:Array<StageBitmapEntry> = [];
+	private static var cacheCount:Int = 0;
+	private static var elapsed:Float = 0;
+	private var lease:StageBitmapLease;
+	public static var counts(get, never):Int;
+	private static function get_counts():Int { return pool.length; }
 
-	/**
-	 * 缓存位图数据池的数量
-	 * @param size 
-	 */
+	/** 设定空闲预留数；实际分配使用统一尺寸检查。 */
 	public static function cacheSize(size:Int):Void {
-		__cacheSize = size;
-		// 缓存好了之后，进行一次简易的绘制进行激活
-		var quad = new Quad(10, 10, 0xff0000);
-		for (i in 0...size) {
-			if (__pool[i] == null) {
-				__pool[i] = OpenFlBitmapData.fromSize(Std.int(hx.core.Hxmaker.engine.stageWidth), Std.int(hx.core.Hxmaker.engine.stageHeight), true, 0x0).data;
-				__pool[i].clear();
-				__pool[i].draw(quad, new Matrix());
+		cacheCount = Std.int(Math.max(0, size));
+		while (pool.length < cacheCount) pool.push(createEntry());
+	}
+	/** 帧边界不解除活跃借用，也不让嵌套 Pass 覆写正在读取的目标。 */
+	public static function resetPool():Void {}
+	/** 定期预算回收不再被借用或读取的空闲目标。 */
+	public static function update(dt:Float):Void {
+		elapsed += dt;
+		if (elapsed > 6) disposeAll();
+	}
+	/** 强制清理将目标退出池；实际根释放仍遵守快照存活期。 */
+	public static function disposeAll(force:Bool = false):Void {
+		var index:Int = pool.length;
+		while (index-- > 0) {
+			var entry:StageBitmapEntry = pool[index];
+			if (force || (pool.length > cacheCount && !entry.borrowed && !isRead(entry))) {
+				pool.splice(index, 1); entry.retired = true;
+				if (!entry.borrowed) entry.bitmap.dispose();
 			}
 		}
+		elapsed = 0;
 	}
-
-	/**
-	 * 获取当前缓存的位图数据数量
-	 */
-	public static var counts(get, never):Int;
-
-	private static function get_counts():Int {
-		return __pool.length;
+	/** 旧代次目标退出池，由下一次滤镜绘制生成真实内容。 */
+	public static function onContextRestored():Void { disposeAll(true); }
+	/** 新建与当前舞台大小一致的目标，记录设备代次。 */
+	private static function createEntry():StageBitmapEntry {
+		return new StageBitmapEntry(OpenFlBitmapData.fromSize(Math.ceil(Hxmaker.engine.stageWidth), Math.ceil(Hxmaker.engine.stageHeight), true, 0));
 	}
-
-	/**
-	 * 重置位图数据池
-	 */
-	public static function resetPool():Void {
-		__poolIndex = 0;
+	/** 查询快照读取，不扫描显示树。 */
+	private static function isRead(entry:StageBitmapEntry):Bool {
+		var raw:openfl.display.BitmapData = entry.bitmap.data.getTexture();
+		return raw != null && TextureLifetime.record(raw).references > 0;
 	}
-
-	private static var __lastUpdateTime:Float = 0;
-
-	/**
-	 * 每六秒回收闲置尾部；上次渲染占用的前缀在画面静止时仍被显示树引用。
-	 * @param dt 时间间隔
-	 */
-	public static function update(dt:Float):Void {
-		__lastUpdateTime += dt;
-		if (__lastUpdateTime > 6) {
-			disposeAll();
+	public function new() { super(); }
+	/** 归还上次借用，再借出尺寸、有效性、代次均正确且没有读取者的目标。 */
+	override public function clear():Void {
+		dispose();
+		var width:Int = Math.ceil(Hxmaker.engine.stageWidth);
+		var height:Int = Math.ceil(Hxmaker.engine.stageHeight);
+		var selected:StageBitmapEntry = null;
+		for (entry in pool) {
+			if (entry.borrowed || isRead(entry)) continue;
+			if (entry.generation != TextureLifetime.generation() || entry.bitmap.width != width || entry.bitmap.height != height
+				|| !cast(entry.bitmap.data, OpenFlBitmapData).isAvailable()) continue;
+			selected = entry; break;
 		}
-	}
-
-	/**
-	 * 普通回收保留当前画面和预设缓存；强制释放必须在旧批次拆除后调用。
-	 */
-	public static function disposeAll(force:Bool = false):Void {
-		var keepCount:Int = force ? 0 : Std.int(Math.min(__pool.length, Math.max(__cacheSize, __poolIndex)));
-		for (index in keepCount...__pool.length) {
-			var bitmapData:IBitmapData = __pool[index];
-			if (bitmapData != null) bitmapData.dispose();
+		// 清理无效空闲条目，避免尺寸变化后留下无法复用的池尾部。
+		var index:Int = pool.length;
+		while (index-- > 0) {
+			var entry:StageBitmapEntry = pool[index];
+			if (!entry.borrowed && !isRead(entry) && (entry.generation != TextureLifetime.generation()
+				|| entry.bitmap.width != width || entry.bitmap.height != height || !cast(entry.bitmap.data, OpenFlBitmapData).isAvailable())) {
+				pool.splice(index, 1); entry.bitmap.dispose();
+			}
 		}
-		__pool.resize(keepCount);
-		if (force) __poolIndex = 0;
-		__lastUpdateTime = 0;
-	}
-
-	/** 恢复后丢弃全部失效目标；保留池容量配置，实际目标在下次 clear 时创建。 */
-	public static function onContextRestored():Void {
-		for (bitmap in __pool) if (bitmap != null) bitmap.dispose();
-		__pool = []; __poolIndex = 0; __lastUpdateTime = 0;
-	}
-
-	public function new() {
-		super();
-	}
-
-	override function clear() {
-		if (__pool[__poolIndex] == null) {
-			__pool[__poolIndex] = OpenFlBitmapData.fromSize(Std.int(hx.core.Hxmaker.engine.stageWidth), Std.int(hx.core.Hxmaker.engine.stageHeight), true, 0x0)
-				.data;
-		}
-		this.data = __pool[__poolIndex];
-		__poolIndex++;
+		if (selected == null) { selected = createEntry(); pool.push(selected); }
+		selected.borrowed = true;
+		lease = new StageBitmapLease(selected);
+		data = lease;
 		super.clear();
+	}
+	/** 借用者释放只归还令牌；池拥有者负责最终销毁。 */
+	override public function dispose():Void { super.dispose(); lease = null; }
+}
+
+/** 池条目显式区分借用和退役状态。 */
+private class StageBitmapEntry {
+	public var bitmap:BitmapData;
+	public var borrowed:Bool = false;
+	public var retired:Bool = false;
+	public var generation:Int;
+	public function new(bitmap:BitmapData) { this.bitmap = bitmap; generation = TextureLifetime.generation(); }
+}
+
+/** 不具有底层资源释放权的借用令牌。 */
+private class StageBitmapLease implements IBitmapData {
+	private var entry:StageBitmapEntry;
+	public function new(entry:StageBitmapEntry) { this.entry = entry; }
+	public function getTexture():Dynamic { return entry == null ? null : entry.bitmap.data.getTexture(); }
+	public function getWidth():Int { return entry == null ? 0 : Std.int(entry.bitmap.width); }
+	public function getHeight():Int { return entry == null ? 0 : Std.int(entry.bitmap.height); }
+	public function clear(?rect:hx.geom.Rectangle):Void { if (entry != null) entry.bitmap.data.clear(rect); }
+	public function draw(source:hx.display.DisplayObject, matrix:hx.geom.Matrix, ?blendMode:hx.display.BlendMode, updateTransform:Bool = true):Void {
+		if (entry != null) entry.bitmap.data.draw(source, matrix, blendMode, updateTransform);
+	}
+	/** 最后一个借用视图归还后，退役条目才交还底层所有权。 */
+	public function dispose():Void {
+		if (entry == null) return;
+		entry.borrowed = false;
+		if (entry.retired) entry.bitmap.dispose();
+		entry = null;
 	}
 }

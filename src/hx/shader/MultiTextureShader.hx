@@ -13,7 +13,9 @@ using StringTools;
 #end
 // TODO: Currently this feature needs macro for optimization
 @:build(hx.macro.InstanceMacro.build())
-class MultiTextureShader extends GraphicsShader {
+class MultiTextureShader extends GraphicsShader implements IBatchTextureShader {
+	/** 编译期引擎槽；GLSL 材质默认只让引擎写入基础输入。 */
+	public var batchTextureSlots:Array<String> = [];
 	/**
 	 * 多纹理支持的纹理单元数量
 	 */
@@ -176,11 +178,13 @@ class MultiTextureShader extends GraphicsShader {
 		uniform sampler2D uSampler15;
 		uniform sampler2D uSampler16;")
 	public function new(customVertexSource:String = null, customFragmentSource:String = null, customVertexBodySource:String = null,
-			customFragmentBodySource:String = null, glsl:GLSLSource = null) {
+			customFragmentBodySource:String = null, glsl:GLSLSource = null, engineSlots:Int = 0) {
 		var maxCombinedTextureImageUnits:Int = GL.getParameter(GL.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
 		var maxTextureImageUnits:Int = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
 		__supportedMultiTextureUnits = Math.floor(Math.min(maxCombinedTextureImageUnits, maxTextureImageUnits));
-		__supportedMultiTextureUnits = Std.int(Math.min(16, __supportedMultiTextureUnits));
+		__supportedMultiTextureUnits = Std.int(Math.max(1, Math.min(16, __supportedMultiTextureUnits)));
+		var compiledSlots:Int = engineSlots <= 0 ? __supportedMultiTextureUnits : Std.int(Math.max(1, Math.min(engineSlots, __supportedMultiTextureUnits)));
+		for (index in 0...(glsl == null ? compiledSlots : 1)) batchTextureSlots.push('uSampler$index');
 		if (glsl != null) {
 			__glVertexSource = glsl.vertexSource;
 			__glFragmentSource = glsl.fragmentSource;
@@ -188,18 +192,8 @@ class MultiTextureShader extends GraphicsShader {
 			__glVertexSource = vertexSource;
 			__glFragmentSource = fragmentSource;
 		}
-		var uSamplerVariableBuffer:String = "";
-		for (i in 0...__supportedMultiTextureUnits) {
-			uSamplerVariableBuffer += 'uniform sampler2D uSampler${i};\n';
-		}
-		__glFragmentSource = __glFragmentSource.replace("uniform sampler2D SAMPLER_INJECT;", uSamplerVariableBuffer);
-
-		var uSamplerBodyBuffer:String = "";
-		if (__supportedMultiTextureUnits >= 16) {
-			uSamplerBodyBuffer = texture16Shader;
-		} else {
-			uSamplerBodyBuffer = texture8Shader;
-		}
+		__glFragmentSource = __glFragmentSource.replace("uniform sampler2D SAMPLER_INJECT;", BatchTextureLayout.declarations(compiledSlots));
+		var uSamplerBodyBuffer:String = BatchTextureLayout.sampling(glsl == null ? compiledSlots : 1);
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, openfl_TextureCoordv);", uSamplerBodyBuffer);
 		__glFragmentSource = __glFragmentSource.replace("color = texture2D(SAMPLER_INJECT, uv);", uSamplerBodyBuffer.replace("openfl_TextureCoordv", "uv"));
 		__glFragmentSource = __glFragmentSource.replace("::CUSTOM_FRAGMENT_SHADER::", customFragmentSource != null ? customFragmentSource : "");

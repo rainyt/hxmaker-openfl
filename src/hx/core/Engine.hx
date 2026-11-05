@@ -49,6 +49,16 @@ class Engine extends EventDispatcher implements IEngine {
 	public var contextRecoveryCount(default, null):Int = 0;
 	private var __contextWindow:Window;
 	private var __stageBitmapResetPending:Bool = false;
+	private var __memorySweepPending:Bool = false;
+	private var __wechatLifecycle:WechatRenderLifecycle;
+	public var applicationVisible(default, null):Bool = true;
+	/** 前后台和广告返回复用同一循环，普通恢复不强制销毁纹理。 */
+	public function setApplicationVisible(visible:Bool):Void {
+		applicationVisible = visible;
+		if (visible) __lastTime = Timer.stamp();
+	}
+	/** 告警只记录请求，安全回收在正常帧入口按预算执行。 */
+	public function requestMemorySweep():Void { __memorySweepPending = true; }
 
 	/** 尺寸事件可能发生在两帧之间，旧批次拆除前只记录失效请求。 */
 	public function requestStageBitmapReset():Void {
@@ -76,9 +86,15 @@ class Engine extends EventDispatcher implements IEngine {
 
 	/** 在正常帧入口恢复共享资源，事件处理期间不向半初始化设备提交绘制。 */
 	public function prepareRenderContext():Bool {
+		if (!applicationVisible) return false;
+		if (stage != null && stage.context3D != null && @:privateAccess stage.context3D.gl.isContextLost()) {
+			if (!contextLost) __onRenderContextLost();
+			return false;
+		}
 		if (contextLost) return false;
 		if (!contextRecoveryPending) return true;
 		if (stage == null || stage.context3D == null || stage.window.context == null) return false;
+		renderer.clear();
 		hx.render2d.openfl.DisplayContextBridge.invalidate(__stageSprite);
 		TextFieldRender.onContextRestored();
 		StageBitmapData.onContextRestored();
@@ -391,6 +407,7 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onActivateImpl(e:Event):Void {
+		setApplicationVisible(true);
 		for (stage in stages) {
 			stage.onActivate();
 		}
@@ -413,6 +430,7 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onDeactivateImpl(e:Event):Void {
+		setApplicationVisible(false);
 		for (stage in stages) {
 			stage.onDeactivate();
 		}
@@ -437,6 +455,11 @@ class Engine extends EventDispatcher implements IEngine {
 	private function __onRenderEnterFrameImpl(e:Event):Void {
 		if (render == null || !prepareRenderContext())
 			return;
+		if (__memorySweepPending) {
+			__memorySweepPending = false;
+			hx.net.RequestQueue.collectUnused(64, 2, 67108864, false, "微信内存告警");
+			StageBitmapData.disposeAll();
+		}
 		ContextStats.statsCpuStart();
 		var now = Timer.stamp();
 		dt = now - __lastTime;
@@ -464,12 +487,13 @@ class Engine extends EventDispatcher implements IEngine {
 			beginRenderFrame();
 			// 渲染遍历期间禁止写文本图集，写入全部由上面的`prepare`在渲染前完成
 			TextFieldQueue.beginRender();
-			for (stage in stages) {
-				if (!stage.customRender)
-					this.render(stage);
+			try {
+				for (stage in stages) if (!stage.customRender) this.render(stage);
+				renderer.endFill();
+			} catch (error:Dynamic) {
+				TextFieldQueue.endRender(); renderer.clear(); throw error;
 			}
 			TextFieldQueue.endRender();
-			renderer.endFill();
 		}
 		ContextStats.statsCpu();
 		__time += dt;
@@ -478,10 +502,12 @@ class Engine extends EventDispatcher implements IEngine {
 			ContextStats.statsMemory(System.totalMemory);
 		}
 		StageBitmapData.update(dt);
+		hx.net.RequestQueue.maintain();
 	}
 
 	private function __initStageEvent():Void {
 		__initContextEvents();
+		if (__wechatLifecycle == null) __wechatLifecycle = new WechatRenderLifecycle(this);
 		#if cpp
 		this.stage.frameRate = 61;
 		#else
@@ -511,6 +537,9 @@ class Engine extends EventDispatcher implements IEngine {
 	}
 
 	private function __removeStageEvent():Void {
+		if (__wechatLifecycle != null) { __wechatLifecycle.dispose(); __wechatLifecycle = null; }
+		this.stage.removeEventListener(Event.ACTIVATE, __onActivate);
+		this.stage.removeEventListener(Event.DEACTIVATE, __onDeactivate);
 		__removeContextEvents();
 		this.stage.removeEventListener(Event.ENTER_FRAME, __onRenderEnterFrame);
 		this.stage.removeEventListener(Event.RESIZE, __onStageSizeEvent);
