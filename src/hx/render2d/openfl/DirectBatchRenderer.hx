@@ -1,6 +1,7 @@
 package hx.render2d.openfl;
 
 import lime.graphics.WebGLRenderContext;
+import lime.graphics.RenderContext;
 import lime.graphics.opengl.GLProgram;
 import lime.graphics.opengl.GLUniformLocation;
 import lime.utils.ArrayBufferView;
@@ -29,6 +30,7 @@ private typedef BatchProgram = {
 @:access(openfl.display3D._internal.Context3DState)
 class DirectBatchRenderer {
 	private var gl:WebGLRenderContext;
+	private var renderContext:RenderContext;
 	private var programs:Map<Int, BatchProgram> = [];
 	private var vertexArrays:VertexArrayBridge3D;
 	private var matrixData:Float32Array = new Float32Array(16);
@@ -67,16 +69,20 @@ class DirectBatchRenderer {
 		if (batch.indexCount == 0) return;
 		var renderer:OpenGLRenderer = cast event.renderer;
 		if (renderer.gl == null || renderer.gl.isContextLost()) return;
-		if (gl != renderer.gl) {
-			abandon(); gl = renderer.gl;
+		if (gl != renderer.gl || renderContext != renderer.__context3D.__context) {
+			abandon(); gl = renderer.gl; renderContext = renderer.__context3D.__context;
 			var raw:Dynamic = gl;
 			vertexArrays = new VertexArrayBridge3D(gl, Reflect.isFunction(Reflect.field(raw, "createVertexArray")));
 			maxAttributes = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
 			uintIndices = vertexArrays.webgl2 || gl.getExtension("OES_element_index_uint") != null;
 		}
+		if (batch.gpuContext != renderContext) {
+			batch.abandon();
+			batch.gpuContext = renderContext;
+		}
 		if (batch.wide && !uintIndices) throw "单个网格超过 65535 个顶点，需要 32 位索引扩展";
 		var native = batch.shaderBuffer != null && batch.shaderBuffer.shader != null;
-		var guard = new RenderStateGuard3D(renderer, native ? maxAttributes : 3, true, vertexArrays);
+		var guard = new RenderStateGuard3D(renderer, native ? maxAttributes : 3, true, vertexArrays, false, native);
 		var cachedArray = renderer.__context3D.__contextState.__currentGLArrayBuffer;
 		try {
 			guard.activateTexture(0);
@@ -151,29 +157,29 @@ class DirectBatchRenderer {
 
 	/** 复用 OpenFL 的 Shader 反射和参数绑定，绕过 Graphics 命令与几何重组。 */
 	private function drawNative(batch:DirectBatchDisplay, renderer:OpenGLRenderer, guard:RenderStateGuard3D):Void {
-		var buffer = batch.shaderBuffer, shader = buffer.shader;
-		shader.__setContext(renderer.__context3D);
+		var buffer:openfl.display._internal.ShaderBuffer = batch.shaderBuffer;
+		var shader:openfl.display.Shader = buffer.shader;
+		var contextChanged:Bool = batch.shaderContext != renderer.__context3D.__context;
+		if (contextChanged) buffer.paramDataBuffer = null;
+		BatchShaderBridge.initialize(shader, renderer.__context3D, contextChanged || batch.shaderInvalid);
+		batch.shaderContext = renderer.__context3D.__context;
+		batch.shaderInvalid = false;
 		gl.useProgram(shader.program.__glProgram);
-		shader.__enable();
 		bindNativeTextures(buffer, renderer, guard);
 		buffer.clearOverride();
 		buffer.addFloatOverride("openfl_Matrix", renderer.__getMatrix(batch.__renderTransform, AUTO));
 		nativeAlpha[0] = renderer.__worldAlpha;
 		buffer.addFloatOverride("openfl_Alpha", nativeAlpha);
 		buffer.addBoolOverride("openfl_HasColorTransform", [false]);
-		// 直接绑定纹理，不向 Context3D 的延迟状态队列写入临时采样状态。
-		var inputCount = buffer.inputCount;
-		buffer.inputCount = 0;
+		// 参数与纹理独立绑定，不改变快照数量，也不依赖库内的无效位置补丁。
 		renderer.__context3D.__contextState.__currentGLArrayBuffer = null;
-		try { shader.__updateGLFromBuffer(buffer, 0); }
-		catch (error:Dynamic) { buffer.inputCount = inputCount; throw error; }
-		buffer.inputCount = inputCount;
+		BatchShaderBridge.update(buffer, renderer.__context3D);
 		gl.bindBuffer(gl.ARRAY_BUFFER, batch.vertexBuffer);
-		if (shader.__position != null) {
+		if (shader.__position != null && shader.__position.index != null && shader.__position.index >= 0) {
 			gl.enableVertexAttribArray(shader.__position.index);
 			gl.vertexAttribPointer(shader.__position.index, 2, gl.FLOAT, false, 28, 0);
 		}
-		if (shader.__textureCoord != null) {
+		if (shader.__textureCoord != null && shader.__textureCoord.index != null && shader.__textureCoord.index >= 0) {
 			gl.enableVertexAttribArray(shader.__textureCoord.index);
 			gl.vertexAttribPointer(shader.__textureCoord.index, 2, gl.FLOAT, false, 28, 8);
 		}
@@ -182,16 +188,17 @@ class DirectBatchRenderer {
 		gl.drawElements(gl.TRIANGLES, batch.indexCount, batch.wide ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
 	}
 
-	/** 与 Shader.__enableGL 共用活动输入的排列规则，快照下标不等于纹理单元。 */
+	/** 显式设置活动采样器的纹理单元，不依赖不同 OpenFL 分支的编号规则。 */
 	private function bindNativeTextures(buffer:openfl.display._internal.ShaderBuffer, renderer:OpenGLRenderer,
 		guard:RenderStateGuard3D):Void {
-		var textureUnit = 0;
+		var textureUnit:Int = 0;
 		for (i in 0...buffer.inputCount) {
-			var input = buffer.inputRefs[i];
+			var input:openfl.display.ShaderInput<openfl.display.BitmapData> = buffer.inputRefs[i];
 			// 未使用的 sampler 没有有效位置，不能占用活动输入的连续编号。
 			if (input.index == null || input.index < 0) continue;
-			var slot = textureUnit++;
+			var slot:Int = textureUnit++;
 			guard.activateTexture(slot);
+			gl.uniform1i(input.index, slot);
 			if (buffer.inputs[i] == null) {
 				// 活动输入仍占一个单元；清理历史绑定，避免采样上一批次或离屏目标。
 				gl.bindTexture(gl.TEXTURE_2D, null);
@@ -205,14 +212,14 @@ class DirectBatchRenderer {
 	}
 
 	public function release(batch:DirectBatchDisplay):Void {
-		if (gl != null && !gl.isContextLost()) {
+		if (gl != null && !gl.isContextLost() && batch.gpuContext == renderContext) {
 			if (batch.vertexBuffer != null) gl.deleteBuffer(batch.vertexBuffer);
 			if (batch.indexBuffer != null) gl.deleteBuffer(batch.indexBuffer);
 			if (batch.shaderBuffer != null && batch.shaderBuffer.paramDataBuffer != null) gl.deleteBuffer(batch.shaderBuffer.paramDataBuffer);
 		}
 		batch.abandon();
 	}
-	public function abandon():Void { programs.clear(); if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null; gl = null; }
+	public function abandon():Void { programs.clear(); if (vertexArrays != null) vertexArrays.abandon(); vertexArrays = null; gl = null; renderContext = null; }
 	public function dispose():Void {
 		if (gl != null && !gl.isContextLost()) {
 			for (info in programs) gl.deleteProgram(info.program);

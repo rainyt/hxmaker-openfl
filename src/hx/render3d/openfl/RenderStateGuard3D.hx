@@ -25,13 +25,14 @@ class RenderStateGuard3D {
 	private var enabled:Map<Int, Bool> = [];
 	private var textures:Map<Int, Dynamic> = [];
 	private var attributes:Array<Dynamic> = [];
+	private var attributeValues:Array<Dynamic> = [];
 	private var parameters:Array<Dynamic> = [];
 	private var vertexArrays:VertexArrayBridge3D;
 	private var previousVertexArray:Dynamic;
 	private var timed:Bool;
 	private var stateCache:GLStateCache3D;
 	public function new(renderer:OpenGLRenderer, attributeCount:Int = 4, compositeOnly:Bool = false,
-		vertexArrays:VertexArrayBridge3D = null, timed:Bool = false) {
+		vertexArrays:VertexArrayBridge3D = null, timed:Bool = false, saveAttributeValues:Bool = false) {
 		this.timed = timed; this.vertexArrays = vertexArrays;
 		this.compositeOnly = compositeOnly;
 		isolatedVertexArray = vertexArrays != null && vertexArrays.available;
@@ -65,6 +66,11 @@ class RenderStateGuard3D {
 					type:gl.getVertexAttrib(index, gl.VERTEX_ATTRIB_ARRAY_TYPE), normalized:gl.getVertexAttrib(index, gl.VERTEX_ATTRIB_ARRAY_NORMALIZED),
 					stride:gl.getVertexAttrib(index, gl.VERTEX_ATTRIB_ARRAY_STRIDE), offset:gl.getVertexAttribOffset(index, gl.VERTEX_ATTRIB_ARRAY_POINTER)});
 			}
+		}
+		// 常量属性不属于 VAO；自定义二维材质会修改它们，必须单独恢复。
+		if (saveAttributeValues) for (index in 0...attributeCount) {
+			attributeValues.push(gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB));
+			queryCount++;
 		}
 		if (timed) snapshotCpuMs = clock()-mark;
 	}
@@ -150,6 +156,10 @@ class RenderStateGuard3D {
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, values.get(gl.ELEMENT_ARRAY_BUFFER_BINDING));
 		}
 		gl.bindBuffer(gl.ARRAY_BUFFER, values.get(gl.ARRAY_BUFFER_BINDING));
+		for (index in 0...attributeValues.length) {
+			var value:Dynamic = attributeValues[index];
+			gl.vertexAttrib4f(index, value[0], value[1], value[2], value[3]);
+		}
 		if (!compositeOnly) {
 			gl.bindRenderbuffer(gl.RENDERBUFFER, values.get(gl.RENDERBUFFER_BINDING)); restoreTarget();
 			gl.depthFunc(values.get(gl.DEPTH_FUNC)); gl.clearDepth(values.get(gl.DEPTH_CLEAR_VALUE));

@@ -6,6 +6,7 @@ import hx.geom.Matrix;
 import hx.display.DisplayObject;
 import openfl.display.BitmapData;
 import hx.display.IBitmapData;
+import hx.render2d.openfl.RenderBitmapData;
 
 /**
  * OpenFL纹理
@@ -29,7 +30,7 @@ class OpenFlBitmapData implements IBitmapData {
 	 * @return hx.display.BitmapData
 	 */
 	public static function fromSize(width:Int, height:Int, transparent:Bool = false, fillColor:Int = 0xffffff):hx.display.BitmapData {
-		return fromBitmapData(new BitmapData(width, height, transparent, fillColor));
+		return fromBitmapData(new RenderBitmapData(width, height, transparent, fillColor));
 	}
 
 	private static var __bitmapDataRender:Render;

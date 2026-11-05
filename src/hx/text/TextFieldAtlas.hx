@@ -1,6 +1,7 @@
 package hx.text;
 
 import hx.core.OpenFlBitmapData;
+import hx.render2d.openfl.RenderBitmapData;
 import openfl.Vector;
 import openfl.display.BitmapData;
 import openfl.display.Tileset;
@@ -29,7 +30,7 @@ class TextFieldAtlas {
 	public var emojs:Map<String, FntFrame> = [];
 
 	public function new(width:Int, height:Int, cpuPixels:Bool = false) {
-		var bitmapData = new BitmapData(width, height, true, 0x0);
+		var bitmapData:BitmapData = new RenderBitmapData(width, height, true, 0x0);
 		rects = new MaxRectsBinPack(width, height, false);
 		// 恢复后的浏览器图集保留 CPU 像素，draw 使用 Canvas，设备重建时可直接上传。
 		if (!cpuPixels) bitmapData.disposeImage();

@@ -3,6 +3,8 @@ package hx.core;
 import hx.display.Scene3D;
 import hx.render2d.openfl.DirectBatchDisplay;
 import hx.render2d.openfl.DirectBatchRenderer;
+import hx.render2d.openfl.RenderBitmapData;
+import hx.render2d.openfl.DisplayContextBridge;
 import hx.render3d.IScene3DRenderer;
 import hx.render3d.openfl.Scene3DDisplay;
 import haxe.ds.ObjectMap;
@@ -85,6 +87,8 @@ class Render implements IRender implements IScene3DRenderer {
 	}
 	public function onContextRestored(generation:Int):Void {
 		directGpu.abandon(); for (display in directDisplays) display.abandon();
+		DisplayContextBridge.invalidate(__stage);
+		DisplayContextBridge.invalidate(__cacheSprite);
 		__contextGeneration = generation;
 		currentShader = null; imageBufferData = []; drawImageBuffDataIndex = 0;
 		if (__cacheBitmap != null) {
@@ -203,7 +207,7 @@ class Render implements IRender implements IScene3DRenderer {
 				|| __cacheBitmap.bitmapData.height != sizeHeight) {
 				if (__cacheBitmap.bitmapData != null)
 					__cacheBitmap.bitmapData.dispose();
-				__cacheBitmap.bitmapData = new BitmapData(sizeWidth, sizeHeight, true, 0x0);
+				__cacheBitmap.bitmapData = new RenderBitmapData(sizeWidth, sizeHeight, true, 0x0);
 				__cacheBitmap.bitmapData.disposeImage();
 			}
 		} else {
@@ -488,6 +492,7 @@ class Render implements IRender implements IScene3DRenderer {
 	private var __pool:ObjectPool<EngineSprite> = new ObjectPool<EngineSprite>(() -> {
 		return new EngineSprite();
 	}, (sprite) -> {
+		sprite.prepareContext();
 		sprite.x = 0;
 		sprite.y = 0;
 		sprite.scrollRect = null;

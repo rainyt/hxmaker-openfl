@@ -6,6 +6,7 @@ import lime.utils.Float32Array;
 import lime.utils.UInt16Array;
 import lime.utils.UInt32Array;
 import lime.graphics.opengl.GLBuffer;
+import lime.graphics.RenderContext;
 import openfl.display.Sprite;
 import openfl.events.RenderEvent;
 
@@ -34,6 +35,11 @@ class DirectBatchDisplay extends Sprite {
 	public var gpuIndexCapacity:Int = 0;
 	public var fixedIndices:Bool = false;
 	public var shaderBuffer:openfl.display._internal.ShaderBuffer;
+	/** 参数缓冲和程序的设备归属由后端持有，不扩展 OpenFL ShaderBuffer。 */
+	public var shaderContext:RenderContext;
+	public var gpuContext:RenderContext;
+	public var shaderInvalid:Bool = true;
+	private var capturedShader:openfl.display.Shader;
 	private var bounds:openfl.geom.Rectangle = new openfl.geom.Rectangle();
 	private var renderer:DirectBatchRenderer;
 
@@ -78,6 +84,8 @@ class DirectBatchDisplay extends Sprite {
 	/** 自定义材质保留参数快照，避免共享 Shader 被后续批次修改。 */
 	public function captureShader(shader:openfl.display.Shader):Void {
 		if (shaderBuffer == null) shaderBuffer = new openfl.display._internal.ShaderBuffer();
+		if (capturedShader != shader) shaderInvalid = true;
+		capturedShader = shader;
 		shaderBuffer.update(cast shader);
 	}
 
@@ -145,8 +153,11 @@ class DirectBatchDisplay extends Sprite {
 		vertexBuffer = indexBuffer = null;
 		gpuVertexCapacity = gpuIndexCapacity = 0;
 		uploadedRevision = -1;
-		if (shaderBuffer != null) { shaderBuffer.paramDataBuffer = null; shaderBuffer.paramDataContext = null; }
+		shaderContext = null;
+		gpuContext = null;
+		shaderInvalid = true;
+		if (shaderBuffer != null) shaderBuffer.paramDataBuffer = null;
 	}
 
-	public function dispose():Void { renderer.release(this); textures.resize(0); vertices = null; indices = null; fixedIndexData = null; wideIndices = null; shaderBuffer = null; }
+	public function dispose():Void { renderer.release(this); textures.resize(0); vertices = null; indices = null; fixedIndexData = null; wideIndices = null; shaderBuffer = null; capturedShader = null; }
 }

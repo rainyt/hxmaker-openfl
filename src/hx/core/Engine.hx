@@ -79,6 +79,7 @@ class Engine extends EventDispatcher implements IEngine {
 		if (contextLost) return false;
 		if (!contextRecoveryPending) return true;
 		if (stage == null || stage.context3D == null || stage.window.context == null) return false;
+		hx.render2d.openfl.DisplayContextBridge.invalidate(__stageSprite);
 		TextFieldRender.onContextRestored();
 		StageBitmapData.onContextRestored();
 		cast(renderer, Render).onContextRestored(contextGeneration);

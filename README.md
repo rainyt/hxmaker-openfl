@@ -1,7 +1,18 @@
 # hxmaker-openfl
-OpenFL target backend for running hxmaker game engine
+hxmaker 游戏引擎的 OpenFL 渲染后端。
 
-# platform
-| platform | description |
+# OpenFL 兼容约定
+
+二维性能优化在本库内实现，不需要修改 OpenFL 源码，也不依赖 `9.2.3-beta` 中的迁移补丁。
+
+- GPU 批次通过渲染事件直接提交，保留多纹理合批、索引绘制及缓冲复用。
+- Shader 参数快照和设备归属由后端适配，不要求 OpenFL 添加方法或字段。
+- 引擎创建的离屏目标使用 `RenderBitmapData`，负责渲染器缓存、GPU 清屏和舞台状态恢复。
+- 设备恢复时，重建引擎显示树中的原生图形缓冲及位图缓存。
+
+目前按 OpenFL 9.2 系列已有内部接口适配；升级其他版本时仍需核对这些接口。源码静态对照采用官方 9.2.2，尚未进行官方库的编译和运行验证。
+
+# 平台
+| 平台 | 说明 |
 | -------- | ----------- |
-| game4399 | 4399 game platform |
+| game4399 | 4399 游戏平台 |
