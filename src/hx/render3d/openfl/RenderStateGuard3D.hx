@@ -69,8 +69,14 @@ class RenderStateGuard3D {
 		}
 		// 常量属性不属于 VAO；自定义二维材质会修改它们，必须单独恢复。
 		if (saveAttributeValues) for (index in 0...attributeCount) {
-			attributeValues.push(gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB));
-			queryCount++;
+			if (stateCache == null) {
+				attributeValues.push(gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB));
+				queryCount++;
+			} else {
+				var before:Int = stateCache.misses;
+				attributeValues.push(stateCache.vertexAttribute(index));
+				queryCount += stateCache.misses - before;
+			}
 		}
 		if (timed) snapshotCpuMs = clock()-mark;
 	}

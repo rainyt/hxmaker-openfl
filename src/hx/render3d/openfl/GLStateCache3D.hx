@@ -2,7 +2,7 @@ package hx.render3d.openfl;
 
 import lime.graphics.WebGLRenderContext;
 
-/** 跟踪 WebGL 标量状态的写入，避免保护现场时反复同步查询 GPU。未知状态保留实时查询，并随上下文恢复清空缓存。 */
+/** 跟踪 WebGL 状态与常量顶点属性，避免保护现场时反复同步查询 GPU。未知状态实时查询，设备恢复时清空缓存。 */
 class GLStateCache3D {
 	#if (js && html5 && !hxmaker_3d_full_state_queries)
 	private static var contexts:Dynamic = js.Syntax.code("new WeakMap()");
@@ -14,7 +14,34 @@ class GLStateCache3D {
 	}
 	private function new(gl:WebGLRenderContext) {
 		state = js.Syntax.code("(function(gl) {
-			var values = new Map(), flags = new Map(), tracked = new Set(), textures = new Map(), state = { misses: 0 };
+			var values = new Map(), flags = new Map(), tracked = new Set(), textures = new Map(), attributes = new Map(), state = { misses: 0 };
+			// 常量顶点属性独立于 VAO。跟踪写入，避免每个二维批次同步查询 GPU。
+			function rememberAttribute(index, x, y, z, w) {
+				x = Math.fround(x); y = Math.fround(y); z = Math.fround(z); w = Math.fround(w);
+				var previous = attributes.get(index);
+				if (previous && previous[0] === x && previous[1] === y && previous[2] === z && previous[3] === w) return;
+				// 快照可能仍持有旧数组，更新时必须替换，不能原地覆写。
+				attributes.set(index, [x, y, z, w]);
+			}
+			for (var size = 1; size <= 4; size++) {
+				(function(count) {
+					var scalarName = 'vertexAttrib' + count + 'f', vectorName = scalarName + 'v';
+					var scalarAttribute = gl[scalarName], vectorAttribute = gl[vectorName];
+					gl[scalarName] = function(index, x, y, z, w) {
+						scalarAttribute.apply(gl, arguments);
+						rememberAttribute(index, x, count >= 2 ? y : 0, count >= 3 ? z : 0, count >= 4 ? w : 1);
+					};
+					gl[vectorName] = function(index, value) {
+						vectorAttribute.call(gl, index, value);
+						rememberAttribute(index, value[0], count >= 2 ? value[1] : 0, count >= 3 ? value[2] : 0, count >= 4 ? value[3] : 1);
+					};
+				})(size);
+			}
+			// 整数属性交给完整查询路径，不能沿用之前的浮点常量。
+			for (var name of ['vertexAttribI4i', 'vertexAttribI4ui', 'vertexAttribI4iv', 'vertexAttribI4uiv']) {
+				if (!gl[name]) continue;
+				(function(method) { var original = gl[method]; gl[method] = function(index) { original.apply(gl, arguments); attributes.delete(index); }; })(name);
+			}
 			function scalar(name, key) {
 				tracked.add(key); var original = gl[name];
 				gl[name] = function(value) { original.call(gl, value); values.set(key, value); };
@@ -99,7 +126,15 @@ class GLStateCache3D {
 				if (flags.has(key)) return flags.get(key);
 				state.misses++; var value=gl.isEnabled(key); flags.set(key,value); return value;
 			};
-			function reset() { resetBindings(); flags.clear(); }
+			state.vertexAttribute=function(index) {
+				if (attributes.has(index)) return attributes.get(index);
+				state.misses++;
+				var value = gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB);
+				var copy = [value[0], value[1], value[2], value[3]];
+				attributes.set(index, copy);
+				return copy;
+			};
+			function reset() { resetBindings(); flags.clear(); attributes.clear(); }
 			gl.canvas.addEventListener('webglcontextlost',reset);
 			gl.canvas.addEventListener('webglcontextrestored',reset);
 			return state;
@@ -107,12 +142,14 @@ class GLStateCache3D {
 	}
 	public function query(key:Int):Dynamic { return state.query(key); }
 	public function isEnabled(key:Int):Bool { return state.enabled(key); }
+	public function vertexAttribute(index:Int):Dynamic { return state.vertexAttribute(index); }
 	public var misses(get, never):Int;
 	private function get_misses():Int { return state.misses; }
 	#else
 	public static function obtain(gl:WebGLRenderContext):GLStateCache3D { return null; }
 	public function query(key:Int):Dynamic { return null; }
 	public function isEnabled(key:Int):Bool { return false; }
+	public function vertexAttribute(index:Int):Dynamic { return null; }
 	public var misses(default, null):Int = 0;
 	#end
 }
