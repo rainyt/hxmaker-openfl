@@ -19,7 +19,7 @@ import sys.io.File;
 
 /** 图片请求内部使用的 ASTC 字节加载器，不占用或释放 RequestQueue 的并发位置。 */
 class ASTCBytesLoader {
-	public static var timeoutMilliseconds:Int = 12000;
+	public static var timeoutMilliseconds:Int = 60000;
 	private var path:String;
 	private var callback:Bytes->Null<String>->Void;
 	private var completed:Bool = false;
