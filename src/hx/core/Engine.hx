@@ -52,11 +52,52 @@ class Engine extends EventDispatcher implements IEngine {
 	private var __memorySweepPending:Bool = false;
 	private var __wechatLifecycle:WechatRenderLifecycle;
 	public var applicationVisible(default, null):Bool = true;
+	#if (js && html5 && !wechat_zygame_dom)
+	private var __visibilityListenerRegistered:Bool = false;
+	#end
 	/** 前后台和广告返回复用同一循环，普通恢复不强制销毁纹理。 */
 	public function setApplicationVisible(visible:Bool):Void {
+		if (applicationVisible == visible) return;
 		applicationVisible = visible;
-		if (visible) __lastTime = Timer.stamp();
+		if (visible) {
+			__lastTime = Timer.stamp();
+			// 恢复可见时请求一次重绘，不依赖焦点事件让 OpenFL 刷新画面。
+			for (current in stages) current.invalidate();
+		}
 	}
+	/** 浏览器窗口失焦仍可能可见；小游戏及无可见性 API 的宿主沿用激活事件。 */
+	private function __updateApplicationVisibility(active:Bool):Void {
+		#if (js && html5 && !wechat_zygame_dom)
+		var visibility:js.html.VisibilityState = js.Browser.document.visibilityState;
+		if (visibility == js.html.VisibilityState.VISIBLE || visibility == js.html.VisibilityState.HIDDEN) {
+			setApplicationVisible(visibility == js.html.VisibilityState.VISIBLE);
+			return;
+		}
+		#end
+		setApplicationVisible(active);
+	}
+	#if (js && html5 && !wechat_zygame_dom)
+	/** 真正隐藏或恢复页面时独立同步，不依赖之后再发生 focus 或点击。 */
+	private function __onDocumentVisibilityChange(event:js.html.Event):Void {
+		__updateApplicationVisibility(!js.Browser.document.hidden);
+	}
+	/** 同一引擎仅注册一次，初始就在后台加载时也要取得正确状态。 */
+	private function __initVisibilityEvents():Void {
+		var visibility:js.html.VisibilityState = js.Browser.document.visibilityState;
+		if (visibility != js.html.VisibilityState.VISIBLE && visibility != js.html.VisibilityState.HIDDEN) return;
+		if (!__visibilityListenerRegistered) {
+			js.Browser.document.addEventListener("visibilitychange", __onDocumentVisibilityChange);
+			__visibilityListenerRegistered = true;
+		}
+		__updateApplicationVisibility(true);
+	}
+	/** 舞台退出时配对移除监听，允许引擎以后重新挂载。 */
+	private function __removeVisibilityEvents():Void {
+		if (!__visibilityListenerRegistered) return;
+		js.Browser.document.removeEventListener("visibilitychange", __onDocumentVisibilityChange);
+		__visibilityListenerRegistered = false;
+	}
+	#end
 	/** 告警只记录请求，安全回收在正常帧入口按预算执行。 */
 	public function requestMemorySweep():Void { __memorySweepPending = true; }
 
@@ -407,7 +448,7 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onActivateImpl(e:Event):Void {
-		setApplicationVisible(true);
+		__updateApplicationVisibility(true);
 		for (stage in stages) {
 			stage.onActivate();
 		}
@@ -430,7 +471,7 @@ class Engine extends EventDispatcher implements IEngine {
 	 * @param e 事件对象
 	 */
 	private function __onDeactivateImpl(e:Event):Void {
-		setApplicationVisible(false);
+		__updateApplicationVisibility(false);
 		for (stage in stages) {
 			stage.onDeactivate();
 		}
@@ -507,6 +548,9 @@ class Engine extends EventDispatcher implements IEngine {
 
 	private function __initStageEvent():Void {
 		__initContextEvents();
+		#if (js && html5 && !wechat_zygame_dom)
+		__initVisibilityEvents();
+		#end
 		if (__wechatLifecycle == null) __wechatLifecycle = new WechatRenderLifecycle(this);
 		#if cpp
 		this.stage.frameRate = 61;
@@ -537,6 +581,9 @@ class Engine extends EventDispatcher implements IEngine {
 	}
 
 	private function __removeStageEvent():Void {
+		#if (js && html5 && !wechat_zygame_dom)
+		__removeVisibilityEvents();
+		#end
 		if (__wechatLifecycle != null) { __wechatLifecycle.dispose(); __wechatLifecycle = null; }
 		this.stage.removeEventListener(Event.ACTIVATE, __onActivate);
 		this.stage.removeEventListener(Event.DEACTIVATE, __onDeactivate);
