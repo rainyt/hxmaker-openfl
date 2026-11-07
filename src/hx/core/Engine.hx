@@ -475,6 +475,11 @@ class Engine extends EventDispatcher implements IEngine {
 	private function __onKeyboardEventImpl(e:KeyboardEvent):Void {
 		var engineEvent:hx.events.KeyboardEvent = new hx.events.KeyboardEvent(e.type, false, true);
 		engineEvent.keyCode = e.keyCode;
+		engineEvent.ctrlKey = e.ctrlKey;
+		engineEvent.metaKey = e.commandKey;
+		engineEvent.altKey = e.altKey;
+		engineEvent.shiftKey = e.shiftKey;
+		engineEvent.isComposing = Reflect.field(e, "isComposing") == true;
 		for (stage in stages) {
 			stage.handleKeyboardEvent(engineEvent);
 		}
