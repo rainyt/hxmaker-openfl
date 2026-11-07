@@ -67,6 +67,8 @@ class RenderBitmapData extends BitmapData {
 			gpuRenderer.setShader(null);
 			gpuRenderer.setShader(gpuRenderer.__defaultShader);
 			gpuRenderer.__allowSmoothing = smoothing;
+			// 每次绘制同步窗口像素比，避免高清屏上的离屏裁剪坐标被重复放大。
+			gpuRenderer.__pixelRatio = #if openfl_disable_hdpi 1 #else Lib.current.stage.window.scale #end;
 			gpuRenderer.__overrideBlendMode = blendMode;
 			gpuRenderer.__worldTransform = transform;
 			gpuRenderer.__worldAlpha = 1 / source.__worldAlpha;
