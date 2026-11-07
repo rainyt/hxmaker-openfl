@@ -57,7 +57,8 @@ class ASTCBytesLoader {
 				bytes = openfl.utils.Assets.getBytes(logical);
 			#end
 		} catch (error:Dynamic) {}
-		if (ASTCFormat.isValid(bytes)) {
+		bytes = decode(bytes);
+		if (bytes != null) {
 			finish(bytes, null);
 			return;
 		}
@@ -97,7 +98,8 @@ class ASTCBytesLoader {
 						return;
 					var bytes:Bytes = null;
 					try { bytes = Bytes.ofData(cast result.data); } catch (error:Dynamic) {}
-					if (ASTCFormat.isValid(bytes))
+					bytes = decode(bytes);
+					if (bytes != null)
 						finish(bytes, null);
 					else {
 						removeFile(file);
@@ -121,7 +123,8 @@ class ASTCBytesLoader {
 			if (file != null && FileSystem.exists(file) && !FileSystem.isDirectory(file))
 				bytes = File.getBytes(file);
 		} catch (error:Dynamic) {}
-		if (!ASTCFormat.isValid(bytes)) {
+		bytes = decode(bytes);
+		if (bytes == null) {
 			if (file == cachePath)
 				removeFile(file);
 			return false;
@@ -187,11 +190,12 @@ class ASTCBytesLoader {
 		#end
 	}
 
-	/** 只保存通过格式校验的原始 ASTC；存盘失败不会使成功下载变成加载失败。 */
+	/** 磁盘保留下载时的压缩或裸文件，只有传给纹理上传的字节才还原为原始 ASTC。 */
 	private function acceptDownload(bytes:Bytes):Void {
 		if (completed)
 			return;
-		if (!ASTCFormat.isValid(bytes)) {
+		var decoded:Bytes = decode(bytes);
+		if (decoded == null) {
 			finish(null, "ASTC 文件校验失败：" + path);
 			return;
 		}
@@ -216,8 +220,31 @@ class ASTCBytesLoader {
 		} catch (error:Dynamic) {
 			trace("ASTC 缓存写入失败，本次继续使用已下载纹理：" + path);
 		}
-		finish(bytes, null);
+		finish(decoded, null);
 	}
+
+	/** 所有来源共用格式识别和大小校验，运行时优先通过 Lime 调用平台 zlib 实现。 */
+	private static function decode(bytes:Bytes):Bytes {
+		if (bytes == null)
+			return null;
+		try {
+			#if lime
+			return ASTCFormat.decode(bytes, 67108864, inflate);
+			#else
+			return ASTCFormat.decode(bytes);
+			#end
+		} catch (error:Dynamic) {
+			return null;
+		}
+	}
+
+	#if lime
+	/** JS 使用适配层现有的 pako，原生平台由 Lime 调用 CFFI，不在 Haxe 层重复解压完整数据。 */
+	private static function inflate(bytes:Bytes):Bytes {
+		var source:lime.utils.Bytes = bytes;
+		return source.decompress(lime.utils.CompressionAlgorithm.ZLIB);
+	}
+	#end
 
 	/** 取消未结束的传输并阻止超时后的迟到回调，不处理外层请求队列。 */
 	private function finish(bytes:Bytes, error:Null<String>):Void {
