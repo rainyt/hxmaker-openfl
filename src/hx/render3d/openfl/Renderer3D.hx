@@ -213,7 +213,8 @@ class Renderer3D {
 		var canvas:js.html.CanvasElement = cast raw.canvas;
 		if (canvas != contextCanvas) {
 			removeContextListeners(); contextCanvas = canvas;
-			if (contextCanvas != null) {
+			// 小游戏原生 Canvas 不一定支持 DOM 事件，不能仅凭类型转换就注册监听。
+			if (contextCanvas != null && Reflect.isFunction(Reflect.field(contextCanvas, "addEventListener"))) {
 				contextCanvas.addEventListener("webglcontextlost", onContextChange);
 				contextCanvas.addEventListener("webglcontextrestored", onContextChange);
 			}
@@ -802,8 +803,10 @@ class Renderer3D {
 	private function onContextChange(event:js.html.Event):Void { abandonContext(); }
 	private function removeContextListeners():Void {
 		if (contextCanvas == null) return;
-		contextCanvas.removeEventListener("webglcontextlost", onContextChange);
-		contextCanvas.removeEventListener("webglcontextrestored", onContextChange);
+		if (Reflect.isFunction(Reflect.field(contextCanvas, "removeEventListener"))) {
+			contextCanvas.removeEventListener("webglcontextlost", onContextChange);
+			contextCanvas.removeEventListener("webglcontextrestored", onContextChange);
+		}
 		contextCanvas = null;
 	}
 	#end

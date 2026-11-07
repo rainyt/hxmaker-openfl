@@ -2,17 +2,34 @@ package hx.render3d.openfl;
 
 import lime.graphics.WebGLRenderContext;
 
-/** 跟踪 WebGL 状态与常量顶点属性，避免保护现场时反复同步查询 GPU。未知状态实时查询，设备恢复时清空缓存。 */
+/** 跟踪 WebGL 状态与常量顶点属性，避免保护现场时反复同步查询 GPU。未知状态首次查询，失败结果保留到写入或设备恢复。 */
 class GLStateCache3D {
+	/** 宿主可能无法查询常量顶点属性；无效结果不能作为四元快照读取。 */
+	public static function isValidVertexAttribute(value:Dynamic):Bool {
+		return value != null && value.length >= 4 && Std.isOfType(value[0], Float) && Std.isOfType(value[1], Float)
+			&& Std.isOfType(value[2], Float) && Std.isOfType(value[3], Float);
+	}
+
 	#if (js && html5 && !hxmaker_3d_full_state_queries)
 	private static var contexts:Dynamic = js.Syntax.code("new WeakMap()");
 	private var state:Dynamic;
+	private var deviceGeneration:Int;
+	/** 同一上下文复用查询结果；设备代次改变时连同失败记录一起失效。 */
 	public static function obtain(gl:WebGLRenderContext):GLStateCache3D {
 		var existing:GLStateCache3D = contexts.get(gl);
-		if (existing != null) return existing;
-		var result = new GLStateCache3D(gl); contexts.set(gl, result); return result;
+		var generation:Int = hx.render2d.openfl.TextureLifetime.generation();
+		if (existing != null) {
+			// 缺少 Canvas 事件接口时，仍通过引擎设备代次识别上下文恢复。
+			if (existing.deviceGeneration != generation) {
+				existing.state.reset();
+				existing.deviceGeneration = generation;
+			}
+			return existing;
+		}
+		var result:GLStateCache3D = new GLStateCache3D(gl, generation); contexts.set(gl, result); return result;
 	}
-	private function new(gl:WebGLRenderContext) {
+	private function new(gl:WebGLRenderContext, generation:Int) {
+		deviceGeneration = generation;
 		state = js.Syntax.code("(function(gl) {
 			var values = new Map(), flags = new Map(), tracked = new Set(), textures = new Map(), attributes = new Map(), state = { misses: 0 };
 			// 常量顶点属性独立于 VAO。跟踪写入，避免每个二维批次同步查询 GPU。
@@ -130,13 +147,23 @@ class GLStateCache3D {
 				if (attributes.has(index)) return attributes.get(index);
 				state.misses++;
 				var value = gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB);
+				// 用 null 标记查询失败，避免每个批次重试；跟踪写入会替换该槽，设备恢复时统一清空。
+				if (value == null || !(value.length >= 4) || typeof value[0] !== 'number' || typeof value[1] !== 'number'
+					|| typeof value[2] !== 'number' || typeof value[3] !== 'number') {
+					attributes.set(index, null);
+					return null;
+				}
 				var copy = [value[0], value[1], value[2], value[3]];
 				attributes.set(index, copy);
 				return copy;
 			};
 			function reset() { resetBindings(); flags.clear(); attributes.clear(); }
-			gl.canvas.addEventListener('webglcontextlost',reset);
-			gl.canvas.addEventListener('webglcontextrestored',reset);
+			state.reset = reset;
+			// 小游戏原生 Canvas 可能没有 DOM 事件接口，缺失时跳过监听。
+			if (gl.canvas && typeof gl.canvas.addEventListener === 'function') {
+				gl.canvas.addEventListener('webglcontextlost',reset);
+				gl.canvas.addEventListener('webglcontextrestored',reset);
+			}
 			return state;
 		})({0})", gl);
 	}

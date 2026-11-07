@@ -10,6 +10,7 @@ import openfl.display3D.textures.TextureBase;
 @:access(openfl.display3D.Context3D)
 @:access(openfl.display3D._internal.Context3DState)
 class RenderStateGuard3D {
+	private static var reportedAttributeQueryFailure:Bool = false;
 	public var flushCpuMs(default, null):Float = 0;
 	public var snapshotCpuMs(default, null):Float = 0;
 	public var restoreCpuMs(default, null):Float = 0;
@@ -71,13 +72,23 @@ class RenderStateGuard3D {
 		}
 		// 常量属性不属于 VAO；自定义二维材质会修改它们，必须单独恢复。
 		if (saveAttributeValues) for (index in 0...attributeCount) {
+			var value:Dynamic;
 			if (stateCache == null) {
-				attributeValues.push(gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB));
+				value = gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB);
 				queryCount++;
 			} else {
 				var before:Int = stateCache.misses;
-				attributeValues.push(stateCache.vertexAttribute(index));
+				value = stateCache.vertexAttribute(index);
 				queryCount += stateCache.misses - before;
+			}
+			if (GLStateCache3D.isValidVertexAttribute(value)) attributeValues.push(value);
+			else {
+				// 保留槽位对应关系；未知值不能伪造成初始值覆盖父级状态。
+				attributeValues.push(null);
+				if (!reportedAttributeQueryFailure) {
+					reportedAttributeQueryFailure = true;
+					trace("无法保存常量顶点属性，跳过该属性的恢复；请检查宿主适配库", {index:index, pname:gl.CURRENT_VERTEX_ATTRIB});
+				}
 			}
 		}
 		if (timed) snapshotCpuMs = clock()-mark;
@@ -168,6 +179,7 @@ class RenderStateGuard3D {
 		gl.bindBuffer(gl.ARRAY_BUFFER, values.get(gl.ARRAY_BUFFER_BINDING));
 		for (index in 0...attributeValues.length) {
 			var value:Dynamic = attributeValues[index];
+			if (!GLStateCache3D.isValidVertexAttribute(value)) continue;
 			gl.vertexAttrib4f(index, value[0], value[1], value[2], value[3]);
 		}
 		if (!compositeOnly) {
