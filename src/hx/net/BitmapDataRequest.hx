@@ -25,37 +25,13 @@ class BitmapDataRequest extends BaseRequest<BitmapData> {
 				this.callback(data.data, null);
 				RequestQueue.loadComplete();
 			}).onError((err) -> {
-				// 包内位图不可用时继续按清单分发
-				__loadManifestOrPng();
+				// 包内位图不可用时继续加载原图
+				__loadPng();
 			});
 			return;
 		}
-		__loadManifestOrPng();
-	}
-
-	/** 清单命中且设备支持 ASTC 时直接使用 ASTC，加载失败不再回退原图。 */
-	private function __loadManifestOrPng():Void {
-		#if hx_astcenc
-		// 首次使用时绑定后端解码器，之后由核心通过 IASTCDecoder 接口调用。
-		if (hx.assets.astc.ASTCLoader.decoder == null)
-			hx.assets.astc.ASTCLoader.registerDecoder(new hx.core.ASTCDecoder());
-		if (hx.assets.astc.ASTCLoader.load(this.url, __onASTC))
-			return;
-		#end
 		__loadPng();
 	}
-
-	#if hx_astcenc
-	/** ASTC 成功或失败都只结算一次，不改变外层请求的并发计数。 */
-	private function __onASTC(bitmap:BitmapData, error:Null<String>):Void {
-		if (bitmap != null) {
-			this.callback(bitmap, null);
-		} else {
-			this.callback(null, FutureErrorEvent.create(FutureErrorEvent.LOAD_ERROR, -1, error ?? ("ASTC 加载失败：" + this.url), this.url));
-		}
-		RequestQueue.loadComplete();
-	}
-	#end
 
 	private function __loadPng():Void {
 		#if wechat_zygame_dom
