@@ -33,7 +33,11 @@ class BitmapDataFuture extends Future<BitmapData, String> {
 			ASTCLoader.registerDecoder(new ASTCDecoder());
 		var clean:String = cleanUrl(url);
 		var until:Null<Float> = __astcFailedUntil.get(clean);
-		if ((until == null || Timer.stamp() >= until) && !RequestQueue.hasCache(url)) {
+		// 资源包已经提供原图时优先使用包内位图，不再走 ASTC。
+		if ((until == null || Timer.stamp() >= until)
+			&& !RequestQueue.hasCache(url)
+			&& ASTCLoader.canLoad(url)
+			&& !hx.ui.UIManager.hasBytesByBundle(url)) {
 			if (__loadASTC(url, clean))
 				return;
 		}
