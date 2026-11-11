@@ -127,22 +127,32 @@ class ImageBufferData {
 	private var dataPerVertex = 0;
 	private var indicesOffset = 0;
 
-	// 每个批次独立记录，只有上次完整结算的稳定图片前缀允许复用。
+	// 每个批次独立记录图片片段；Graphics 全量追加，图片复用时核对实际偏移。
 	private var __imageEntries:Array<ImageBufferEntry> = [];
 	private var __cacheValid:Bool = false;
 	private var __reusePrefix:Bool = false;
 	private var __recording:Bool = true;
 	private var __blockedBuild:Bool = false;
-	// 完整颜色与几何、UV同时变化时比较成本可能超过节省，短暂退让后重新探测。
+	// 属性持续全量变化或布局持续失配时退让，稳定后重新探测。
 	private var __fullBuildsRemaining:Int = 0;
 	private var __sampledCache:Bool = false;
 	private var __expensiveImages:Int = 0;
+	private var __previousGraphics:Bool = false;
+	private var __currentGraphics:Bool = false;
+	private var __checkOffsets:Bool = false;
+	private var __probeIndex:Int = 0;
+	private var __graphicCount:Int = 0;
+	private var __layoutMiss:Bool = false;
+	private var __firstDisplacedImage:Int = 0;
+	private var __unstableBuilds:Int = 0;
+	private var __imageOffsets:Array<ImageBufferOffsets> = [];
 
-	/** 特殊作用域与不规则图形使本批余下部分回退，不改变原有切批。 */
+	/** 特殊作用域使本批余下部分回退，不改变原有切批。 */
 	private function __disableIncremental():Void {
 		__blockedBuild = true;
 		if (__recording || __imageEntries.length > 0) {
 			__imageEntries.resize(0);
+			__imageOffsets.resize(0);
 			__recording = false;
 		}
 		__reusePrefix = false;
@@ -155,9 +165,15 @@ class ImageBufferData {
 		__reusePrefix = __cacheValid && __fullBuildsRemaining == 0;
 		__sampledCache = __reusePrefix;
 		__expensiveImages = 0;
+		__graphicCount = 0;
+		__layoutMiss = false;
+		__firstDisplacedImage = 0;
 		__cacheValid = false;
-		// 持续含图形的批次不反复创建随后立即丢弃的图片记录。
+		// 特殊作用域中的批次不反复采集随后立即丢弃的图片记录。
 		__recording = !__blockedBuild && __fullBuildsRemaining == 0;
+		__checkOffsets = __previousGraphics;
+		__currentGraphics = false;
+		if (__recording) __probeIndex = 0;
 		if (__fullBuildsRemaining > 0) __fullBuildsRemaining--;
 		__blockedBuild = false;
 		enabledColorTransform = false;
@@ -201,17 +217,28 @@ class ImageBufferData {
 		ids.resize(dataPerVertex4);
 		// 长度缩短会丢失实际数组尾部，元数据也必须同步截断。
 		if (__recording) {
-			__imageEntries.resize(index);
-			__cacheValid = true;
-			if (__sampledCache && __expensiveImages > 0 && __expensiveImages * 2 >= index) {
+			if (__imageEntries.length > index) __imageEntries.resize(index);
+			__cacheValid = __imageEntries.length > 0;
+			var imageCount:Int = index - __graphicCount;
+			var displaced:Bool = __sampledCache && __layoutMiss
+				&& (imageCount - __firstDisplacedImage) * 2 >= imageCount;
+			// 单次布局调整直接重新采集；连续失配且影响半数图片时才退让。
+			__unstableBuilds = displaced ? __unstableBuilds + 1 : 0;
+			if ((__sampledCache && __expensiveImages > 0 && __expensiveImages * 2 >= index - __graphicCount)
+				|| __unstableBuilds >= 2) {
+				__unstableBuilds = 0;
 				__fullBuildsRemaining = 60;
 				__cacheValid = false;
 				// 保留记录容量供下次探测，释放过期的显示对象引用。
-				for (entry in __imageEntries) entry.image = null;
+				for (entry in __imageEntries) if (entry != null) entry.image = null;
 			}
 		} else if (__imageEntries.length > index) {
 			__imageEntries.resize(index);
 		}
+		while (__imageEntries.length > 0 && __imageEntries[__imageEntries.length - 1] == null) __imageEntries.pop();
+		if (__imageOffsets.length > __imageEntries.length) __imageOffsets.resize(__imageEntries.length);
+		if (__imageEntries.length == 0) __cacheValid = false;
+		__previousGraphics = __currentGraphics;
 	}
 
 	/**
@@ -221,7 +248,7 @@ class ImageBufferData {
 	 * @return Bool
 	 */
 	public function drawGraphic(graphic:Graphics, render:Render):Bool {
-		__disableIncremental();
+		if (!__blockedBuild && !render.incrementalBufferAllowed) __disableIncremental();
 		var data = graphic.__graphicsDrawData;
 		var len = data.draws.length;
 		while (graphic.__graphicsDrawData.index < len) {
@@ -299,6 +326,13 @@ class ImageBufferData {
 							id = bitmapDatas.length - 1;
 							mapIds.set(texture, id);
 						}
+						// 不规则图形始终全量追加。旧图片记录若占据本命令槽位，立即失效。
+						__graphicCount++;
+						__currentGraphics = true;
+						__checkOffsets = true;
+						if (__imageEntries.length > index) __imageEntries[index] = null;
+						if (__imageOffsets.length > index) __imageOffsets[index] = null;
+						if (__recording && __probeIndex == index) __probeIndex = index + 1;
 						// 根据顶点设置数据
 						var len = Std.int(vertices.length / 2);
 						// 顶点坐标
@@ -408,24 +442,37 @@ class ImageBufferData {
 			mapIds.set(texture, id);
 		}
 
-		var incremental:Bool = render.incrementalBufferAllowed;
-		if (incremental && __recording) {
-			// 纯图片前缀每项固定四顶点，index 唯一确定全部属性与索引偏移。
-			var entry:ImageBufferEntry = __imageEntries[index];
-			var reuse:Bool = __reusePrefix && entry != null && entry.image == image;
-			if (!reuse) {
-				__reusePrefix = false;
-				if (entry == null) {
-					entry = new ImageBufferEntry();
-					__imageEntries[index] = entry;
+		// 本批已经全量回退时，不逐图片重复查询渲染作用域。
+		var incremental:Bool = __recording && render.incrementalBufferAllowed;
+		if (incremental) {
+			if (__checkOffsets) {
+				__writeMixedImage(image, id);
+			} else {
+				var entry:ImageBufferEntry = __imageEntries[index];
+				var reuse:Bool = __reusePrefix && entry != null && entry.image == image;
+				if (!reuse) {
+					if (__reusePrefix) { __layoutMiss = true; __firstDisplacedImage = index; }
+					__reusePrefix = false;
+					if (entry == null) {
+						entry = new ImageBufferEntry();
+						__imageEntries[index] = entry;
+					}
+					__recordImageOffsets(false);
 				}
+				var expensive:Bool = entry.write(this, image, id, reuse);
+				if (reuse && expensive) __expensiveImages++;
 			}
-			if (entry.write(this, image, id, reuse)) __expensiveImages++;
 		} else {
-			if (!incremental) {
+			if (__recording || (__fullBuildsRemaining == 0 && !__blockedBuild && !render.incrementalBufferAllowed)) {
 				__disableIncremental();
-			} else if (index == 0 && __imageEntries.length > 0 && !__imageEntries[0].probeStable(image)) {
-				__fullBuildsRemaining = 60;
+			} else if (index == __probeIndex && __imageEntries.length > index
+				&& __imageEntries[index] != null) {
+				var probe:ImageBufferEntry = __imageEntries[index];
+				var stable:Bool = probe.probeStable(image);
+				var offsets:ImageBufferOffsets = __imageOffsets[index];
+				var offsetsStable:Bool = offsets == null || offsets.matches(this);
+				if (offsets != null) offsets.capture(this);
+				if (!stable || !offsetsStable) __fullBuildsRemaining = 60;
 			}
 			__writeImageFull(image, id);
 		}
@@ -441,6 +488,45 @@ class ImageBufferData {
 		indicesOffset += 4;
 		return true;
 	}
+	/** 将混排校验隔离在专用路径，普通图片不进入混排偏移校验。 */
+	private function __writeMixedImage(image:Image, id:Int):Void {
+		// 混排时，命令槽位相同也可能因前方网格变长而移动，必须验证实际缓冲偏移。
+		var entry:ImageBufferEntry = __imageEntries[index];
+		var reuse:Bool = __reusePrefix && entry != null && entry.image == image;
+		if (reuse) {
+			var offsets:ImageBufferOffsets = __imageOffsets[index];
+			reuse = offsets == null
+				? dataPerVertex == index * 8 && dataPerVertex6 == index * 6 && dataPerVertex4 == index * 4
+				: offsets.matches(this);
+		}
+		if (!reuse) {
+			if (__reusePrefix) {
+				__layoutMiss = true;
+				__firstDisplacedImage = index - __graphicCount;
+			}
+			__reusePrefix = false;
+			if (entry == null) {
+				entry = new ImageBufferEntry();
+				__imageEntries[index] = entry;
+			}
+			__recordImageOffsets(true);
+		}
+		var expensive:Bool = entry.write(this, image, id, reuse);
+		// 结构失配导致的重写不代表属性持续变化，不能据此延迟稳定批次的缓存。
+		if (reuse && expensive) __expensiveImages++;
+	}
+
+	/** 按批次保存偏移，普通图片记录保持原有字段布局。 */
+	private function __recordImageOffsets(mixed:Bool):Void {
+		var offsets:ImageBufferOffsets = __imageOffsets[index];
+		if (offsets == null) {
+			if (!mixed) return;
+			offsets = new ImageBufferOffsets();
+			__imageOffsets[index] = offsets;
+		}
+		offsets.capture(this);
+	}
+
 	/** 保留独立全量路径，关闭增量开关时不执行缓存分量比较。 */
 	private function __writeImageFull(image:Image, id:Int):Void {
 		#if hxmaker_buffer_stats
