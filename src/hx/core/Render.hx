@@ -463,6 +463,9 @@ class Render implements IRender {
 
 	/** 保持公开入口一次调用，避免特殊作用域重复触发子类的覆写。 */
 	private function __renderDisplayObject(object:DisplayObject):Void {
+		// 坐标查询可能提前更新世界矩阵，渲染时仍需刷新依赖变换脏标记的后端缓存。
+		if (object.__consumeWorldTransformChanged())
+			object.__setRenderTransformDirty();
 		// 过滤器渲染支持
 		if (enableRenderFilterDisplayObject != object) {
 			// 这是BlendMode的增强渲染处理
