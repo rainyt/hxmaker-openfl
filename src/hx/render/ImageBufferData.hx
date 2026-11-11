@@ -127,9 +127,39 @@ class ImageBufferData {
 	private var dataPerVertex = 0;
 	private var indicesOffset = 0;
 
+	// 每个批次独立记录，只有上次完整结算的稳定图片前缀允许复用。
+	private var __imageEntries:Array<ImageBufferEntry> = [];
+	private var __cacheValid:Bool = false;
+	private var __reusePrefix:Bool = false;
+	private var __recording:Bool = true;
+	private var __blockedBuild:Bool = false;
+	// 完整颜色与几何、UV同时变化时比较成本可能超过节省，短暂退让后重新探测。
+	private var __fullBuildsRemaining:Int = 0;
+	private var __sampledCache:Bool = false;
+	private var __expensiveImages:Int = 0;
+
+	/** 特殊作用域与不规则图形使本批余下部分回退，不改变原有切批。 */
+	private function __disableIncremental():Void {
+		__blockedBuild = true;
+		if (__recording || __imageEntries.length > 0) {
+			__imageEntries.resize(0);
+			__recording = false;
+		}
+		__reusePrefix = false;
+		__cacheValid = false;
+	}
+
 	public function new() {}
 
 	public function reset() {
+		__reusePrefix = __cacheValid && __fullBuildsRemaining == 0;
+		__sampledCache = __reusePrefix;
+		__expensiveImages = 0;
+		__cacheValid = false;
+		// 持续含图形的批次不反复创建随后立即丢弃的图片记录。
+		__recording = !__blockedBuild && __fullBuildsRemaining == 0;
+		if (__fullBuildsRemaining > 0) __fullBuildsRemaining--;
+		__blockedBuild = false;
 		enabledColorTransform = false;
 		index = 0;
 		dataPerVertex4 = 0;
@@ -169,6 +199,19 @@ class ImageBufferData {
 		alphas.resize(dataPerVertex4);
 		addBlendModes.resize(dataPerVertex4);
 		ids.resize(dataPerVertex4);
+		// 长度缩短会丢失实际数组尾部，元数据也必须同步截断。
+		if (__recording) {
+			__imageEntries.resize(index);
+			__cacheValid = true;
+			if (__sampledCache && __expensiveImages > 0 && __expensiveImages * 2 >= index) {
+				__fullBuildsRemaining = 60;
+				__cacheValid = false;
+				// 保留记录容量供下次探测，释放过期的显示对象引用。
+				for (entry in __imageEntries) entry.image = null;
+			}
+		} else if (__imageEntries.length > index) {
+			__imageEntries.resize(index);
+		}
 	}
 
 	/**
@@ -178,6 +221,7 @@ class ImageBufferData {
 	 * @return Bool
 	 */
 	public function drawGraphic(graphic:Graphics, render:Render):Bool {
+		__disableIncremental();
 		var data = graphic.__graphicsDrawData;
 		var len = data.draws.length;
 		while (graphic.__graphicsDrawData.index < len) {
@@ -249,7 +293,7 @@ class ImageBufferData {
 							applyBlendAddMode = true;
 						}
 						// 可以绘制，记录纹理ID
-						var id = mapIds.get(texture);
+						var id:Null<Int> = mapIds.get(texture);
 						if (id == null) {
 							bitmapDatas.push(texture);
 							id = bitmapDatas.length - 1;
@@ -298,8 +342,8 @@ class ImageBufferData {
 									colorOffset[dataPerVertex16 + i * 4 + 3] += graphic.colorTransform.alphaOffset;
 								}
 							}
-							var x = vertices[i * 2];
-							var y = vertices[i * 2 + 1];
+							var x:Float = vertices[i * 2];
+							var y:Float = vertices[i * 2 + 1];
 							this.vertices[dataPerVertex + i * 2] = tileTransform.__transformX(x, y);
 							this.vertices[dataPerVertex + i * 2 + 1] = tileTransform.__transformY(x, y);
 							this.uvtData[dataPerVertex + i * 2] = uvs[i * 2];
@@ -334,8 +378,8 @@ class ImageBufferData {
 	 * @param image 
 	 */
 	public function draw(image:Image, render:Render):Bool {
-		var texture = image.data.data.getTexture();
-		var id = mapIds.get(texture);
+		var texture:BitmapData = image.data.data.getTexture();
+		var id:Null<Int> = mapIds.get(texture);
 		if (id == null && bitmapDatas.length >= MultiTextureShader.supportedMultiTextureUnits) {
 			return false;
 		}
@@ -364,23 +408,49 @@ class ImageBufferData {
 			mapIds.set(texture, id);
 		}
 
-		// if (!isBad) {
-		// 	var displayObject = drawDisplayList[index];
-		// 	var isSame = displayObject == image;
-		// 	if (!isSame)
-		// 		isBad = true;
-		// }
-		// TODO 如果是一样的列表，只是设置visible，那么该脏检测不正确
-		// TODO 同isUvsDirty，需要想办法优化解决所有可能发生的情况
-		// var isColorDirty = isBad || image.__colorTransformDirty;
-		// var isTransformDirty = isBad || image.__transformDirty;
-		// var isUvsDirty = isBad || image.__uvsDirty;
-		// var isUvsDirty = true;
-		// var isColorDirty = true;
+		var incremental:Bool = render.incrementalBufferAllowed;
+		if (incremental && __recording) {
+			// 纯图片前缀每项固定四顶点，index 唯一确定全部属性与索引偏移。
+			var entry:ImageBufferEntry = __imageEntries[index];
+			var reuse:Bool = __reusePrefix && entry != null && entry.image == image;
+			if (!reuse) {
+				__reusePrefix = false;
+				if (entry == null) {
+					entry = new ImageBufferEntry();
+					__imageEntries[index] = entry;
+				}
+			}
+			if (entry.write(this, image, id, reuse)) __expensiveImages++;
+		} else {
+			if (!incremental) {
+				__disableIncremental();
+			} else if (index == 0 && __imageEntries.length > 0 && !__imageEntries[0].probeStable(image)) {
+				__fullBuildsRemaining = 60;
+			}
+			__writeImageFull(image, id);
+		}
+		image.__transformDirty = false;
+		image.__colorTransformDirty = false;
+		image.__uvsDirty = false;
+		// 下一个
+		index++;
+		dataPerVertex4 += 4;
+		dataPerVertex6 += 6;
+		dataPerVertex16 += 16;
+		dataPerVertex += 8;
+		indicesOffset += 4;
+		return true;
+	}
+	/** 保留独立全量路径，关闭增量开关时不执行缓存分量比较。 */
+	private function __writeImageFull(image:Image, id:Int):Void {
+		#if hxmaker_buffer_stats
+		BufferBuildStats.fullImages++;
+		BufferBuildStats.vertexWrites++;
+		BufferBuildStats.uvWrites++;
+		BufferBuildStats.indexWrites++;
+		if (enabledColorTransform) BufferBuildStats.colorWrites++;
+		#end
 
-		// if (displayObject != image || image.__transformDirty) {
-		// if (isColorDirty) {
-		// 4个顶点数据
 		for (i in 0...4) {
 			ids[dataPerVertex4 + i] = id;
 			alphas[dataPerVertex4 + i] = image.__worldAlpha;
@@ -409,75 +479,18 @@ class ImageBufferData {
 				}
 			}
 		}
-		// }
 
-		// if (isTransformDirty) {
-		// 坐标顶点
 		var tileWidth:Float = image.data.rect != null ? image.data.rect.width : image.data.data.getWidth();
 		var tileHeight:Float = image.data.rect != null ? image.data.rect.height : image.data.data.getHeight();
-		var tileTransform = @:privateAccess image.__worldTransform;
-		var x = @:privateAccess tileTransform.__transformX(0, 0);
-		var y = @:privateAccess tileTransform.__transformY(0, 0);
-		var x2 = @:privateAccess tileTransform.__transformX(tileWidth, 0);
-		var y2 = @:privateAccess tileTransform.__transformY(tileWidth, 0);
-		var x3 = @:privateAccess tileTransform.__transformX(0, tileHeight);
-		var y3 = @:privateAccess tileTransform.__transformY(0, tileHeight);
-		var x4 = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
-		var y4 = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
-
-		// TODO 3D变化支持
-		// var __transformMatrix3D = @:privateAccess image.__transformMatrix3D;
-		// if (__transformMatrix3D.transform3D != null) {
-		// 	var matrix3D = new Matrix3D();
-		// 	matrix3D.identity();
-		// 	matrix3D.appendTranslation(-tileTransform.tx, -tileTransform.ty, 0);
-		// 	if (__transformMatrix3D.center3DVector != null)
-		// 		matrix3D.appendTranslation(-__transformMatrix3D.center3DVector.x, -__transformMatrix3D.center3DVector.y, -__transformMatrix3D.center3DVector.z);
-		// 	matrix3D.append(__transformMatrix3D.transform3D);
-
-		// if (__transformMatrix3D.projectionMatrix3D != null) {
-		// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, 0, 400);
-		// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-		// }
-
-		// if (__transformMatrix3D.projectionMatrix3D != null) {
-		// matrix3D.appendTranslation(0, 0, 1000);
-		// matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-		// }
-
-		// if (__transformMatrix3D.center3DVector != null)
-		// 	matrix3D.appendTranslation(__transformMatrix3D.center3DVector.x, __transformMatrix3D.center3DVector.y, __transformMatrix3D.center3DVector.z);
-		// matrix3D.appendTranslation(tileTransform.tx, tileTransform.ty, 0);
-
-		// if (__transformMatrix3D.projectionMatrix3D != null) {
-		// 	matrix3D.appendTranslation(image.stage.stageWidth / 2, image.stage.stageHeight / 2, 1000);
-		// 	matrix3D.append(__transformMatrix3D.projectionMatrix3D);
-		// }
-
-		// var array = [x, y, 0, x2, y2, 0, x3, y3, 0, x4, y4, 0];
-		// var array = [0, 0, tileWidth, 0, 0, tileWidth, tileWidth, tileHeight];
-		// var projected = [];
-		// var uvt = [];
-		// Utils3D.projectVectors2D(matrix3D, array, projected, uvt);
-		// trace(projected);
-		// x = projected[0];
-		// y = projected[1];
-		// x2 = projected[2];
-		// y2 = projected[3];
-		// x3 = projected[4];
-		// y3 = projected[5];
-		// x4 = projected[6];
-		// y4 = projected[7];
-
-		// x = @:privateAccess tileTransform.__transformX(x, y);
-		// y = @:privateAccess tileTransform.__transformY(x, y);
-		// x2 = @:privateAccess tileTransform.__transformX(x2, y2);
-		// y2 = @:privateAccess tileTransform.__transformY(x2, y2);
-		// x3 = @:privateAccess tileTransform.__transformX(x3, y3);
-		// y3 = @:privateAccess tileTransform.__transformY(x3, y3);
-		// x4 = @:privateAccess tileTransform.__transformX(x4, y4);
-		// y4 = @:privateAccess tileTransform.__transformY(x4, y4);
-		// }
+		var tileTransform:Matrix = @:privateAccess image.__worldTransform;
+		var x:Float = @:privateAccess tileTransform.__transformX(0, 0);
+		var y:Float = @:privateAccess tileTransform.__transformY(0, 0);
+		var x2:Float = @:privateAccess tileTransform.__transformX(tileWidth, 0);
+		var y2:Float = @:privateAccess tileTransform.__transformY(tileWidth, 0);
+		var x3:Float = @:privateAccess tileTransform.__transformX(0, tileHeight);
+		var y3:Float = @:privateAccess tileTransform.__transformY(0, tileHeight);
+		var x4:Float = @:privateAccess tileTransform.__transformX(tileWidth, tileHeight);
+		var y4:Float = @:privateAccess tileTransform.__transformY(tileWidth, tileHeight);
 
 		vertices[dataPerVertex] = x;
 		vertices[dataPerVertex + 1] = y;
@@ -488,24 +501,20 @@ class ImageBufferData {
 		vertices[dataPerVertex + 6] = (x4);
 		vertices[dataPerVertex + 7] = (y4);
 
-		// 顶点
 		indices[dataPerVertex6] = (indicesOffset);
 		indices[dataPerVertex6 + 1] = (indicesOffset + 1);
 		indices[dataPerVertex6 + 2] = (indicesOffset + 2);
 		indices[dataPerVertex6 + 3] = (indicesOffset + 1);
 		indices[dataPerVertex6 + 4] = (indicesOffset + 2);
 		indices[dataPerVertex6 + 5] = (indicesOffset + 3);
-		// }
 
-		// UVs
-		// if (isUvsDirty) {
 		if (image.data.rect != null) {
-			var imageWidth = image.data.data.getWidth();
-			var imageHeight = image.data.data.getHeight();
-			var uvX = image.data.rect.x / imageWidth;
-			var uvY = image.data.rect.y / imageHeight;
-			var uvW = (image.data.rect.x + image.data.rect.width) / imageWidth;
-			var uvH = (image.data.rect.y + image.data.rect.height) / imageHeight;
+			var imageWidth:Int = image.data.data.getWidth();
+			var imageHeight:Int = image.data.data.getHeight();
+			var uvX:Float = image.data.rect.x / imageWidth;
+			var uvY:Float = image.data.rect.y / imageHeight;
+			var uvW:Float = (image.data.rect.x + image.data.rect.width) / imageWidth;
+			var uvH:Float = (image.data.rect.y + image.data.rect.height) / imageHeight;
 			uvtData[dataPerVertex] = (uvX);
 			uvtData[dataPerVertex + 1] = (uvY);
 			uvtData[dataPerVertex + 2] = (uvW);
@@ -524,19 +533,6 @@ class ImageBufferData {
 			uvtData[dataPerVertex + 6] = (1);
 			uvtData[dataPerVertex + 7] = (1);
 		}
-		// }
-		// }
-		// drawDisplayList[index] = image;
-		image.__transformDirty = false;
-		image.__colorTransformDirty = false;
-		image.__uvsDirty = false;
-		// 下一个
-		index++;
-		dataPerVertex4 += 4;
-		dataPerVertex6 += 6;
-		dataPerVertex16 += 16;
-		dataPerVertex += 8;
-		indicesOffset += 4;
-		return true;
 	}
+
 }

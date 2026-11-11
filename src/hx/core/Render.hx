@@ -424,7 +424,36 @@ class Render implements IRender {
 	 */
 	public var enableRenderFilterDisplayObject:DisplayObject = null;
 
+	/** 普通图片和字形的缓冲增量构建，可关闭以使用原全量路径。 */
+	public var incrementalBufferEnabled:Bool = true;
+	private var __incrementalSuppressed:Bool = false;
+
+	@:noCompletion public var incrementalBufferAllowed(get, never):Bool;
+	private inline function get_incrementalBufferAllowed():Bool {
+		return incrementalBufferEnabled && !__incrementalSuppressed && !__cacheAsBitmap
+			&& enableRenderFilterDisplayObject == null && currentShader == null && __maskSprite == null;
+	}
+
 	public function renderDisplayObject(object:DisplayObject):Void {
+		// 仅特殊节点进入保护作用域，普通节点不增加异常处理与额外递归。
+		if (!__incrementalSuppressed && (object.maskRect != null || object.shader != null
+			|| object.__blendFilter != null || (object.filters != null && object.filters.length > 0)
+			|| object is CustomDisplayObject)) {
+			__incrementalSuppressed = true;
+			try {
+				__renderDisplayObject(object);
+			} catch (error:Dynamic) {
+				__incrementalSuppressed = false;
+				throw error;
+			}
+			__incrementalSuppressed = false;
+			return;
+		}
+		__renderDisplayObject(object);
+	}
+
+	/** 保持公开入口一次调用，避免特殊作用域重复触发子类的覆写。 */
+	private function __renderDisplayObject(object:DisplayObject):Void {
 		// 使用本节点实际的世界矩阵变化通知；父节点的旧脏标记不会被清除，不能用于逐帧传播。
 		if (object.__consumeWorldTransformChanged())
 			object.__setRenderTransformDirty();
