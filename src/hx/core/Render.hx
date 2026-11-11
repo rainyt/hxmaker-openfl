@@ -425,9 +425,9 @@ class Render implements IRender {
 	public var enableRenderFilterDisplayObject:DisplayObject = null;
 
 	public function renderDisplayObject(object:DisplayObject):Void {
-		if (object.parent != null && object.parent.__transformDirty) {
-			object.setTransformDirty();
-		}
+		// 使用本节点实际的世界矩阵变化通知；父节点的旧脏标记不会被清除，不能用于逐帧传播。
+		if (object.__consumeWorldTransformChanged())
+			object.__setRenderTransformDirty();
 		// 过滤器渲染支持
 		if (enableRenderFilterDisplayObject != object) {
 			// 这是BlendMode的增强渲染处理
