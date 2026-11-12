@@ -220,6 +220,23 @@ class RequestQueue {
 	}
 
 	/**
+	 * 把已经准备好的资源写入缓存。
+	 * 供绕过请求队列、自行完成加载的调用方登记纹理，保证后续 retain/release 生效。
+	 */
+	public static function put(url:String, data:Dynamic):Void {
+		if (url == null || url == "")
+			return;
+		var entry:CacheEntry = __cache.get(url);
+		if (entry == null) {
+			entry = new CacheEntry();
+			__cache.set(url, entry);
+		}
+		entry.data = data;
+		entry.isLoading = false;
+		syncContextStats();
+	}
+
+	/**
 	 * 释放资源（减少引用计数）
 	 * 前端释放资源时调用。当引用计数归零时，不会立即释放，
 	 * 而是启动延迟计时，在 RELEASE_DELAY 秒后若仍为0才真正释放。

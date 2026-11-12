@@ -18,8 +18,11 @@ class BytesRequest extends BaseRequest<Bytes> {
 			#if assets_debug
 			trace("[Assets] Loading bytes data from assets bundle: " + this.url);
 			#end
-			this.callback(bytes, null);
-			RequestQueue.loadComplete();
+			// 资源包字节是同步返回的，推迟一拍完成，避免在队列计数更新前递归派发。
+			haxe.Timer.delay(function() {
+				this.callback(bytes, null);
+				RequestQueue.loadComplete();
+			}, 0);
 			return;
 		}
 

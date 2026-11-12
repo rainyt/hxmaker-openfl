@@ -1,9 +1,6 @@
 package hx.net;
 
 import hx.utils.System;
-#if hx_astcenc
-import openfl.display.ASTCBitmapData;
-#end
 import hx.ui.UIManager;
 import hx.core.OpenFlBitmapData;
 import lime.graphics.Image;
@@ -15,65 +12,25 @@ import hx.assets.Future;
 using StringTools;
 
 class BitmapDataRequest extends BaseRequest<BitmapData> {
-	override function request() {
+	override function request():Void {
 		super.request();
 
+		// 资源包优先：包内提供的是位图就直接使用
 		var future = UIManager.loadBitmapDataFromAssetsBundle(this.url);
 		if (future != null) {
 			#if assets_debug
 			trace("[Assets] Loading bitmap data from assets bundle: " + this.url);
 			#end
 			future.onComplete((data) -> {
-				var bmd = data.data;
-				this.callback(bmd, null);
+				this.callback(data.data, null);
 				RequestQueue.loadComplete();
 			}).onError((err) -> {
-				this.callback(null, err);
-				RequestQueue.loadComplete();
+				// 包内位图不可用时继续加载原图
+				__loadPng();
 			});
 			return;
 		}
-		#if hx_astcenc
-		__loadAstc();
-		#else
 		__loadPng();
-		#end
-	}
-
-	private function __loadAstc():Void {
-		#if (wechat_zygame_dom && hx_astcenc)
-		if (!ASTCBitmapData.isSupportASTCConfig()) {
-			__loadPng();
-			return;
-		}
-		// 微信小游戏，可先检查本地是否存在这个文件，然后进行本地加载
-		var localFile = haxe.io.Path.join([Wx.env.USER_DATA_PATH, this.url.replace(".png", ".astc")]);
-		hx.utils.System.existFile(localFile).onComplete(function(data) {
-			if (data.data) {
-				#if assets_debug
-				trace("[Assets] Loading bitmap data from local file: " + localFile);
-				#end
-				new BytesRequest(localFile.replace(Wx.env.USER_DATA_PATH, ""), (bytes, err) -> {
-					if (err == null) {
-						trace("bytes=", bytes);
-						trace("bytes", bytes is haxe.io.Bytes);
-						trace("bytes", bytes.length, Type.typeof(bytes));
-						var bitmapData = ASTCBitmapData.fromBytes(bytes);
-						this.callback(BitmapData.formData(new OpenFlBitmapData(bitmapData)), null);
-						RequestQueue.loadComplete();
-					} else {
-						trace("Error loading bitmap data from local file: " + localFile);
-						this.callback(null, err);
-						RequestQueue.loadComplete();
-					}
-				}).request();
-			} else {
-				__loadPng();
-			}
-		});
-		#else
-		__loadPng();
-		#end
 	}
 
 	private function __loadPng():Void {
