@@ -1,6 +1,6 @@
 package hx.net;
 
-import hx.core.OpenFLSound;
+import hx.core.OpenFLSound.OpenFLSoundAsset;
 import hx.core.BaseSound;
 import openfl.events.IOErrorEvent;
 import openfl.events.Event;
@@ -46,8 +46,7 @@ class SoundRequest extends BaseRequest<Sound> {
 		@:privateAccess sound.__isMusic = isMusic;
 		#end
 		sound.addEventListener(Event.COMPLETE, (e) -> {
-			var data = new Sound();
-			data.root = new OpenFLSound(sound);
+			var data:Sound = new OpenFLSoundAsset(sound);
 			this.callback(data, null);
 			RequestQueue.loadComplete();
 		});
