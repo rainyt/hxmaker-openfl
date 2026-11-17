@@ -23,7 +23,12 @@ class ASTCDecoder implements IASTCDecoder {
 
 	/** 把校验过的 ASTC 字节直接上传为 GPU 压缩纹理。 */
 	public function fromBytes(bytes:Bytes):BitmapData {
-		return BitmapData.formData(new OpenFlBitmapData(ASTCBitmapData.fromBytes(bytes)));
+		var astc = ASTCBitmapData.fromBytes(bytes);
+		// ASTC 纹理是直接创建并塞进位图的，补登记弱引用，
+		// 位图对象被 JS 回收后由 BitmapData.sweepOrphanTextures() 回收纹理
+		if (astc != null)
+			astc.registerOwnTexture();
+		return BitmapData.formData(new OpenFlBitmapData(astc));
 	}
 
 	/** 使用 Lime 的平台 zlib 实现，避免在 JS 上重复纯 Haxe 解压。 */
