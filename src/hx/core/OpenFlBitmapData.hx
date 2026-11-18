@@ -67,8 +67,9 @@ class OpenFlBitmapData implements IBitmapData {
 			__root.disposeImage();
 		}
 		if (updateTransform) {
-			if (source.stage != null && @:privateAccess source.stage.__transformDirty) {
-				@:privateAccess source.stage.__updateTransform(null);
+			if (source.stage != null) {
+				if (@:privateAccess source.stage.__dirty)
+					@:privateAccess source.stage.__updateTransform(null);
 			} else if (@:privateAccess source.__transformDirty) {
 				@:privateAccess source.__updateTransform(null);
 			}
