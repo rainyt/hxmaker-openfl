@@ -367,6 +367,31 @@ class RequestQueue {
 	}
 
 	/**
+	 * 立即释放所有"引用计数已归零"的资源，忽略延迟释放时间。
+	 * 用于收到系统内存告警的场景：此刻再等 RELEASE_DELAY（默认60秒）没有任何意义。
+	 * 只动 refCount<=0 的条目，正在使用中的资源不受影响。
+	 * @return 本次清理的条目数量
+	 */
+	public static function releaseUnusedNow():Int {
+		// 先收集再删除：边遍历边 __cache.remove 在部分 Map 实现上不安全
+		var urls:Array<String> = [];
+		for (url => entry in __cache) {
+			if (entry.refCount <= 0 && !entry.isLoading)
+				urls.push(url);
+		}
+		for (url in urls) {
+			var entry = __cache.get(url);
+			if (entry != null) {
+				disposeResource(entry.data);
+				__cache.remove(url);
+			}
+		}
+		if (urls.length > 0)
+			syncContextStats();
+		return urls.length;
+	}
+
+	/**
 	 * 强制移除缓存（不检查引用计数，立即释放）
 	 * @param url 资源URL
 	 */
